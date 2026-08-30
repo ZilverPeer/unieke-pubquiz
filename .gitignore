@@ -1,0 +1,25 @@
+# secrets
+.env
+.env.local
+.env.*.local
+
+# node
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# supabase
+supabase/.branches
+supabase/.temp
+
+# quiz content (not code — never commit)
+content/
+*.pdf
+*.mp3
+*.wav
+
+# OS/editor
+.DS_Store
+Thumbs.db
