@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
     "typecheck": "next typegen && tsc --noEmit",
     "announcements:generate": "tsx scripts/announcements/generate.ts",
     "db:reset": "supabase db reset",
