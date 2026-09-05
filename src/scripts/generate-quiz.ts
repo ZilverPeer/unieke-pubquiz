@@ -41,7 +41,10 @@ export async function generateQuiz(
   options: GenerateOptions,
   repository: ContentRepository,
 ): Promise<GenerateQuizResult> {
-  const { seed, out: _out, ...request } = options;
+  // `out` (the output folder) is only meaningful to generate.ts's file
+  // writing; this function never touches the filesystem.
+  const { seed, quizMode, categoryPicks, requestedDifficulty, billingEmail, locale } = options;
+  const request = { quizMode, categoryPicks, requestedDifficulty, billingEmail, locale };
 
   const pool = await repository.loadPool(request.locale);
   const excludedItemIds = await repository.loadExcludedItemIds(request.billingEmail);
