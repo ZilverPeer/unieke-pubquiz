@@ -3,16 +3,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractText, getDocumentProxy } from "unpdf";
 import { describe, expect, test } from "vitest";
-import { buildQuizContentFixture } from "@/domain/fixtures";
+import { buildQuizContentFixture } from "@/domain";
 import { renderAnswerSheetPdf } from "./answer-sheet-pdf";
 
 const scratchDir = path.join(process.cwd(), ".scratch");
 
-async function writeScratch(name: string, buffer: Buffer): Promise<string> {
+/**
+ * Writes a sample PDF for visual inspection, only when explicitly opted in
+ * via PUBQUIZ_WRITE_SAMPLES=1 — a plain `npm test` run has no filesystem
+ * side effects.
+ */
+async function writeScratch(name: string, buffer: Buffer): Promise<void> {
+  if (process.env.PUBQUIZ_WRITE_SAMPLES !== "1") return;
   fs.mkdirSync(scratchDir, { recursive: true });
-  const filePath = path.join(scratchDir, name);
-  fs.writeFileSync(filePath, buffer);
-  return filePath;
+  fs.writeFileSync(path.join(scratchDir, name), buffer);
 }
 
 describe("renderAnswerSheetPdf", () => {

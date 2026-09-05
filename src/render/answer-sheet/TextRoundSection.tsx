@@ -1,27 +1,12 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
-import { PDF_FONT_FAMILY } from "../pdf/shell";
-import { CELL_WIDTH, ROW_HEIGHT } from "./layout";
+import { CELL_WIDTH } from "./layout";
+import { sectionStyles } from "./section-styles";
 
 const ITEMS_PER_COLUMN = 5;
 
 const styles = StyleSheet.create({
   cell: {
     width: CELL_WIDTH,
-    height: ROW_HEIGHT,
-    borderStyle: "dashed",
-    borderWidth: 1,
-    borderColor: "#000000",
-    padding: 6,
-    fontFamily: PDF_FONT_FAMILY,
-  },
-  heading: {
-    fontSize: 9,
-    fontWeight: "bold",
-    marginBottom: 3,
-  },
-  teamName: {
-    fontSize: 8,
-    marginBottom: 4,
   },
   answerColumns: {
     flexDirection: "row",
@@ -54,9 +39,9 @@ export function TextRoundSection({ heading, teamNameLabel }: TextRoundSectionPro
   const rightNumbers = Array.from({ length: ITEMS_PER_COLUMN }, (_, i) => i + 1 + ITEMS_PER_COLUMN);
 
   return (
-    <View style={styles.cell} wrap={false}>
-      <Text style={styles.heading}>{heading}</Text>
-      <Text style={styles.teamName}>{teamNameLabel}: ______________</Text>
+    <View style={[sectionStyles.cell, styles.cell]} wrap={false}>
+      <Text style={sectionStyles.heading}>{heading}</Text>
+      <Text style={sectionStyles.teamName}>{teamNameLabel}: ______________</Text>
       <View style={styles.answerColumns} wrap={false}>
         <View style={styles.answerColumn} wrap={false}>
           {leftNumbers.map((n) => (

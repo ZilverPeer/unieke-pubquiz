@@ -1,13 +1,10 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import type { QuizContent } from "@/domain";
+import type { MessageKey, QuizContent } from "@/domain";
 import { message } from "@/domain";
-import type { MessageKey } from "@/domain/messages/keys";
 import { MusicRoundSection } from "./answer-sheet/MusicRoundSection";
 import { PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH } from "./answer-sheet/layout";
 import { TextRoundSection } from "./answer-sheet/TextRoundSection";
-import { PDF_FONT_FAMILY, registerPdfFonts } from "./pdf/shell";
-
-registerPdfFonts();
+import { PDF_FONT_FAMILY } from "./pdf/shell";
 
 const ROUND_HEADING_KEYS: readonly MessageKey[] = [
   "roundHeading1",
