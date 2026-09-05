@@ -23,6 +23,26 @@ const logoBytes = fs.readFileSync(logoPath);
 
 const COLUMNS = 2;
 const CELL_HEIGHT = 108;
+const MAX_UNBROKEN_RUN = 14;
+
+/**
+ * @react-pdf/renderer's default hyphenation only inserts break points inside
+ * words its heuristic recognises; a long run with no such points (a long
+ * technical term, an all-caps abbreviation, ...) is laid out as one
+ * unbreakable line that overflows the page's right edge instead of wrapping.
+ * Falls back to forcing a break every MAX_UNBROKEN_RUN characters so any
+ * Category name wraps within the page width.
+ */
+function wrapLongRuns(word: string, builtinHyphenate?: (word: string) => string[]): string[] {
+  const parts = builtinHyphenate ? builtinHyphenate(word) : [word];
+  if (parts.length > 1 || word.length <= MAX_UNBROKEN_RUN) return parts;
+
+  const chunks: string[] = [];
+  for (let i = 0; i < word.length; i += MAX_UNBROKEN_RUN) {
+    chunks.push(word.slice(i, i + MAX_UNBROKEN_RUN));
+  }
+  return chunks;
+}
 
 const styles = StyleSheet.create({
   logo: {
@@ -58,21 +78,10 @@ const styles = StyleSheet.create({
     border: "1pt solid #333333",
     padding: 6,
   },
-  badgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  badge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#333333",
-    color: "#ffffff",
-    fontSize: 10,
+  number: {
+    fontSize: 11,
     fontWeight: "bold",
-    textAlign: "center",
-    lineHeight: 1.3,
+    marginBottom: 4,
   },
   imageWrapper: {
     flexGrow: 1,
@@ -108,7 +117,7 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
     <Document>
       <PdfPage>
         <Image src={logoBytes} style={styles.logo} />
-        <Text style={styles.heading}>
+        <Text style={styles.heading} hyphenationCallback={wrapLongRuns}>
           {message(quiz.locale, "pictureRoundHeading")}: {round.categoryName}
         </Text>
         <Text style={styles.instruction}>
@@ -125,9 +134,7 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
             return (
               <View key={item.id} style={styles.cell} wrap={false}>
                 <View style={styles.cellInner}>
-                  <View style={styles.badgeRow}>
-                    <Text style={styles.badge}>{index + 1}</Text>
-                  </View>
+                  <Text style={styles.number}>{index + 1}</Text>
                   <View style={styles.imageWrapper}>
                     <Image src={Buffer.from(item.image)} style={styles.image} />
                   </View>
