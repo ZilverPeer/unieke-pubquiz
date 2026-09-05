@@ -2,7 +2,7 @@
  * Random-source-driven helpers shared by the sampling algorithm. Private to
  * src/sample; not part of the public seam.
  */
-import type { RandomSource } from "./index";
+import type { RandomSource } from "./random";
 
 /** Fisher-Yates shuffle, driven by `random`. Mutates and returns `items`. */
 export function shuffleInPlace<T>(items: T[], random: RandomSource): T[] {

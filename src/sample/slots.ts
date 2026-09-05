@@ -5,7 +5,7 @@
  */
 import type { Difficulty, ItemKind, PoolItem, RequestedDifficulty } from "@/domain";
 import { pickIndex, shuffleInPlace } from "./shuffle";
-import type { RandomSource } from "./index";
+import type { RandomSource } from "./random";
 
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
 
