@@ -3,6 +3,8 @@ import type { MessageKey } from "./messages/keys";
 import en from "./messages/en";
 import nl from "./messages/nl";
 
+export type { MessageKey } from "./messages/keys";
+
 const catalogs: Record<Locale, Record<MessageKey, string>> = { nl, en };
 
 /**
