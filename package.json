@@ -2,6 +2,7 @@
   "name": "unieke-pubquiz",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +13,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "announcements:generate": "tsx scripts/announcements/generate.ts",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/repository/database.types.ts"
+    "db:types": "supabase gen types typescript --local > src/repository/database.types.ts",
+    "generate": "tsx src/scripts/generate.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

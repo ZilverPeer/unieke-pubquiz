@@ -33,7 +33,7 @@ const PAD_SECONDS = 0.1;
 const SILENCE_THRESHOLD_DB = -40;
 const LOUDNESS_TOLERANCE_LU = 2;
 
-const OUTPUT_ROOT = join(__dirname, "..", "..", "public", "audio", "announcements");
+const OUTPUT_ROOT = join(import.meta.dirname, "..", "..", "public", "audio", "announcements");
 
 interface LoudnormMeasurement {
   input_i: string;
