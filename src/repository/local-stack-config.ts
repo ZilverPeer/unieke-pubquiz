@@ -1,11 +1,14 @@
 /**
- * Resolves the local Supabase stack's URL and service role key for the
- * repository integration tests: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY from
- * the environment if set, otherwise parsed from `supabase status -o env`.
- * Not imported by src/repository/index.ts -- test-only.
+ * Resolves the local Supabase stack's URL and service role key:
+ * SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY from the environment if set,
+ * otherwise parsed from `supabase status -o env`.
+ *
+ * Local-dev only -- this is how the repository integration tests and the
+ * `src/scripts/generate.ts` dev script find the local stack. Never use this
+ * against a hosted project.
  */
 import { execFileSync } from "node:child_process";
-import type { RepositoryConfig } from "../client";
+import type { RepositoryConfig } from "./client";
 
 // Supabase CLI's well-known local demo service role key. Only ever valid
 // against a local stack (see supabase/config.toml's demo project setup) --

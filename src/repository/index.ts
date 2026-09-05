@@ -17,6 +17,9 @@ import type { PoolEntry } from "./types";
 
 export type { RepositoryConfig } from "./client";
 export type { ItemTranslation, PoolEntry } from "./types";
+// Local-dev only: resolves the local Supabase stack's connection config for
+// dev scripts and integration tests. See local-stack-config.ts.
+export { resolveLocalStackConfig } from "./local-stack-config";
 
 export interface ContentRepository {
   loadPool(locale: Locale): Promise<PoolEntry[]>;
