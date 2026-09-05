@@ -62,11 +62,16 @@ export interface Composition {
   slots: readonly (readonly string[])[];
 }
 
-/** A hard-fail reason when a slot cannot be filled to ITEMS_PER_SLOT Items. */
+/**
+ * A hard-fail reason when a slot cannot be filled - either because there
+ * were not enough Items (categoryId is the slot's Category, shortfall is how
+ * many Items short of ITEMS_PER_SLOT it ended up), or because there was no
+ * Category left to assign to this slot at all (categoryId is null, shortfall
+ * is how many slots from this one onward are left without a Category).
+ */
 export interface GenerationFailure {
   slotIndex: number;
-  categoryId: string;
-  /** How many Items short of ITEMS_PER_SLOT the slot ended up. */
+  categoryId: string | null;
   shortfall: number;
 }
 
