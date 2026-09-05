@@ -8,8 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { CompositionRecord } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT } from "@/domain";
 import type { Database } from "./database.types";
-import { createRepository } from "./index";
-import { resolveLocalStackConfig } from "./test-support/local-stack-config";
+import { createRepository, resolveLocalStackConfig } from "./index";
 
 const config = resolveLocalStackConfig();
 const repository = createRepository(config);

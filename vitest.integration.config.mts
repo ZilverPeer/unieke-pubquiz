@@ -11,6 +11,10 @@ export default defineConfig({
     // Integration tests share one Postgres instance and reset state in
     // beforeEach; running them concurrently would race on that state.
     fileParallelism: false,
+    // The generate.ts end-to-end tests render all four Deliverables (PDF x3,
+    // ffmpeg-driven MP3), sometimes twice per test -- comfortably over
+    // vitest's 5s default.
+    testTimeout: 30_000,
   },
   resolve: {
     alias: {
