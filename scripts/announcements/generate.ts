@@ -31,6 +31,7 @@ const TARGET_TP = -1.5;
 const TARGET_LRA = 11;
 const PAD_SECONDS = 0.1;
 const SILENCE_THRESHOLD_DB = -40;
+const LOUDNESS_TOLERANCE_LU = 2;
 
 const OUTPUT_ROOT = join(__dirname, "..", "..", "public", "audio", "announcements");
 
@@ -202,6 +203,7 @@ interface ProbeInfo {
   sampleRate: string;
   channels: string;
   codecName: string;
+  integratedLufs: number;
 }
 
 function probeFile(file: string): ProbeInfo {
@@ -218,11 +220,13 @@ function probeFile(file: string): ProbeInfo {
   ]);
   const parsed = JSON.parse(out);
   const stream = parsed.streams[0];
+  const measurement = measureLoudness(file);
   return {
     durationSeconds: parseFloat(parsed.format.duration),
     sampleRate: String(stream.sample_rate),
     channels: String(stream.channels),
     codecName: String(stream.codec_name),
+    integratedLufs: parseFloat(measurement.input_i),
   };
 }
 
@@ -249,6 +253,13 @@ function verify(): boolean {
       if (info.durationSeconds < 0.5 || info.durationSeconds > 2.5) {
         console.error(
           `DURATION OUT OF RANGE: ${file} is ${info.durationSeconds.toFixed(2)}s (expected 0.5-2.5s)`,
+        );
+        ok = false;
+      }
+      if (Math.abs(info.integratedLufs - TARGET_LUFS) > LOUDNESS_TOLERANCE_LU) {
+        console.error(
+          `LOUDNESS OUT OF RANGE: ${file} measured ${info.integratedLufs.toFixed(1)} LUFS ` +
+            `(expected within +/-${LOUDNESS_TOLERANCE_LU} LU of ${TARGET_LUFS} LUFS)`,
         );
         ok = false;
       }
@@ -279,10 +290,11 @@ function verify(): boolean {
   }
 
   console.log("\nVerification results:");
-  console.log("locale\tn\tduration(s)\tsampleRate\tchannels\tcodec");
+  console.log("locale\tn\tduration(s)\tsampleRate\tchannels\tcodec\tintegrated LUFS");
   for (const { locale, n, info } of infos) {
     console.log(
-      `${locale}\t${n}\t${info.durationSeconds.toFixed(3)}\t${info.sampleRate}\t${info.channels}\t${info.codecName}`,
+      `${locale}\t${n}\t${info.durationSeconds.toFixed(3)}\t${info.sampleRate}\t${info.channels}\t` +
+        `${info.codecName}\t${info.integratedLufs.toFixed(1)}`,
     );
   }
 

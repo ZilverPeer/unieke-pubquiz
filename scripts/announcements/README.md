@@ -20,10 +20,16 @@ public/audio/announcements/<locale>/<n>.mp3
 ## Format
 
 - MP3, 44100 Hz, mono, 128 kbps CBR (`libmp3lame`)
-- Loudness-normalised to -16 LUFS integrated (EBU R128, ffmpeg `loudnorm`,
-  two-pass: a first pass measures the source, a second pass applies the
-  filter with the measured values so the target is hit precisely rather than
-  approximated)
+- Loudness-normalised with a -16 LUFS integrated target (EBU R128, ffmpeg
+  `loudnorm`, two-pass: a first pass measures the source, a second pass
+  applies the filter with the measured values). In practice the committed
+  files measure about -16 to -18 LUFS integrated, not exactly -16: EBU R128's
+  gating block is designed for minutes-long programme material and is
+  unreliable on sub-second clips like these, so the measured value drifts
+  from the target by a couple of LU per file. This is expected and
+  acceptable here — the Music Round renderer normalises the whole
+  concatenated track again once the announcements are mixed with the music
+  clips, which is what actually fixes the loudness a listener hears.
 - Leading/trailing silence trimmed (ffmpeg `silenceremove`), then ~100 ms of
   silence padding re-added at both ends (`adelay` + `apad`) so playback
   doesn't click
@@ -61,11 +67,13 @@ prints a table of each file's duration and measured integrated loudness.
 npm run announcements:generate -- --verify
 ```
 
-Uses `ffprobe` to assert that:
+Uses `ffprobe`/`ffmpeg` to assert that:
 
 - all 20 files exist and are non-empty
 - they all share the same codec, sample rate, and channel layout
 - each file is between 0.5 and 2.5 seconds long
+- each file's measured integrated loudness is within ±2 LU of -16 LUFS
+  (a wider tolerance than the encode target, per the loudness note above)
 
 Exits non-zero and prints the offending file(s) if any check fails. This is
 the acceptance check for this ticket; there are no Vitest tests for these
