@@ -126,6 +126,26 @@ describe("loadExcludedItemIds", () => {
     expect(afterSecond.size).toBe(160);
     expect(afterSecond).toEqual(new Set([...firstIds, ...secondIds]));
   });
+
+  it("compares billing emails trimmed and case-insensitively", async () => {
+    const pool = await repository.loadPool("nl");
+    const ids = pool.slice(0, 80).map((e) => e.item.id);
+
+    await repository.persistComposition(buildRecord("review-probe@example.com", ids));
+    const result = await repository.loadExcludedItemIds("  REVIEW-PROBE@EXAMPLE.COM  ");
+
+    expect(result).toEqual(new Set(ids));
+  });
+
+  it("does not leak one billing email's Composition into another's exclusions", async () => {
+    const pool = await repository.loadPool("nl");
+    const idsForA = pool.slice(0, 80).map((e) => e.item.id);
+
+    await repository.persistComposition(buildRecord("email-a@example.com", idsForA));
+    const excludedForB = await repository.loadExcludedItemIds("email-b@example.com");
+
+    expect(excludedForB).toEqual(new Set());
+  });
 });
 
 describe("persistComposition", () => {

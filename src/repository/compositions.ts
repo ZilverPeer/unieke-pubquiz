@@ -6,6 +6,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CompositionRecord } from "@/domain";
 import type { Database } from "./database.types";
 
+// Billing email is the no-repeat rule's key, but WooCommerce doesn't
+// guarantee consistent case or whitespace across orders for the same
+// customer -- see CONTEXT.md "No-repeat rule". Normalised here, the one
+// place both read (loadExcludedItemIds) and write (persistComposition) sides
+// go through, rather than in a DB constraint/migration.
+function normalizeBillingEmail(billingEmail: string): string {
+  return billingEmail.trim().toLowerCase();
+}
+
 export async function loadExcludedItemIds(
   client: SupabaseClient<Database>,
   billingEmail: string,
@@ -13,7 +22,7 @@ export async function loadExcludedItemIds(
   const { data, error } = await client
     .from("composition_items")
     .select("item_id, compositions!inner(billing_email)")
-    .eq("compositions.billing_email", billingEmail);
+    .eq("compositions.billing_email", normalizeBillingEmail(billingEmail));
 
   if (error) throw error;
 
@@ -27,7 +36,7 @@ export async function persistComposition(
   const { data: composition, error: compositionError } = await client
     .from("compositions")
     .insert({
-      billing_email: record.billingEmail,
+      billing_email: normalizeBillingEmail(record.billingEmail),
       locale: record.locale,
       quiz_mode: record.quizMode,
       requested_difficulty: record.requestedDifficulty,
