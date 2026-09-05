@@ -32,8 +32,14 @@ export function resolveFfmpeg(): FfmpegPaths | null {
     return null;
   }
 
-  const ffmpegCandidate = (ffmpegStatic as unknown as string | null) ?? "ffmpeg";
-  if (!respondsToVersion(ffmpegCandidate)) {
+  const staticCandidate = ffmpegStatic as unknown as string | null;
+  let ffmpegCandidate: string | null = null;
+  if (staticCandidate && respondsToVersion(staticCandidate)) {
+    ffmpegCandidate = staticCandidate;
+  } else if (respondsToVersion("ffmpeg")) {
+    ffmpegCandidate = "ffmpeg";
+  }
+  if (!ffmpegCandidate) {
     return null;
   }
 

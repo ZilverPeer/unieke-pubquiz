@@ -5,18 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { buildQuizContentFixture } from "@/domain";
-import {
-  MUSIC_ROUND_GAP_SECONDS,
-  MUSIC_ROUND_LOUDNESS_TARGET_LUFS,
-  renderMusicRoundMp3,
-  resolveFfmpeg,
-} from "./music-round-mp3";
+import { MUSIC_ROUND_LOUDNESS_TARGET_LUFS, renderMusicRoundMp3, resolveFfmpeg } from "./music-round-mp3";
 
 const TONE_A = join(__dirname, "..", "..", "supabase", "seed-assets", "music-clips", "tone-a.mp3");
 const TONE_B = join(__dirname, "..", "..", "supabase", "seed-assets", "music-clips", "tone-b.mp3");
 const ANNOUNCEMENTS_ROOT = join(__dirname, "..", "..", "public", "audio", "announcements");
 const DURATION_TOLERANCE_SECONDS = 2.0;
 const LOUDNESS_TOLERANCE_LU = 3;
+// Independent of MUSIC_ROUND_GAP_SECONDS (the value under test) — must match
+// the documented gap length in src/render/music-round/README.md.
+const EXPECTED_GAP_SECONDS = 1;
 
 function ffprobeDurationSeconds(file: string): number {
   const result = spawnSync(
@@ -102,7 +100,7 @@ describe.skipIf(resolveFfmpeg() === null)("renderMusicRoundMp3 (needs ffmpeg)", 
 
       const announcementSum = announcementSumSeconds("nl");
       const toneADuration = ffprobeDurationSeconds(TONE_A);
-      const expectedDuration = announcementSum + 10 * toneADuration + 10 * MUSIC_ROUND_GAP_SECONDS;
+      const expectedDuration = announcementSum + 10 * toneADuration + 10 * EXPECTED_GAP_SECONDS;
 
       expect(Math.abs(actualDuration - expectedDuration)).toBeLessThanOrEqual(
         DURATION_TOLERANCE_SECONDS,
@@ -137,8 +135,8 @@ describe.skipIf(resolveFfmpeg() === null)("renderMusicRoundMp3 (needs ffmpeg)", 
       const toneADuration = ffprobeDurationSeconds(TONE_A);
       const nlAnnouncementSum = announcementSumSeconds("nl");
       const enAnnouncementSum = announcementSumSeconds("en");
-      const nlExpected = nlAnnouncementSum + 10 * toneADuration + 10 * MUSIC_ROUND_GAP_SECONDS;
-      const enExpected = enAnnouncementSum + 10 * toneADuration + 10 * MUSIC_ROUND_GAP_SECONDS;
+      const nlExpected = nlAnnouncementSum + 10 * toneADuration + 10 * EXPECTED_GAP_SECONDS;
+      const enExpected = enAnnouncementSum + 10 * toneADuration + 10 * EXPECTED_GAP_SECONDS;
 
       expect(Math.abs(nlDuration - nlExpected)).toBeLessThanOrEqual(DURATION_TOLERANCE_SECONDS);
       expect(Math.abs(enDuration - enExpected)).toBeLessThanOrEqual(DURATION_TOLERANCE_SECONDS);
@@ -209,27 +207,30 @@ describe.skipIf(resolveFfmpeg() === null)("renderMusicRoundMp3 (needs ffmpeg)", 
     }
   }, 60_000);
 
-  test("throws before invoking ffmpeg on a Round with the wrong number of Items", async () => {
-    const quiz = buildQuizContentFixture({ locale: "nl" });
-    const musicRound = quiz.rounds[7];
-    const brokenQuiz = {
-      ...quiz,
-      rounds: quiz.rounds.map((round, index) =>
-        index === 7 ? { ...musicRound, items: musicRound.items.slice(0, 5) } : round,
-      ),
-    };
+});
 
-    await expect(renderMusicRoundMp3(brokenQuiz)).rejects.toThrow(/exactly 10 Items/);
-  });
+// Pre-flight validation happens before ffmpeg is ever spawned, so these run
+// unconditionally, independent of whether ffmpeg is available on this machine.
+test("throws before invoking ffmpeg on a Round with the wrong number of Items", async () => {
+  const quiz = buildQuizContentFixture({ locale: "nl" });
+  const musicRound = quiz.rounds[7];
+  const brokenQuiz = {
+    ...quiz,
+    rounds: quiz.rounds.map((round, index) =>
+      index === 7 ? { ...musicRound, items: musicRound.items.slice(0, 5) } : round,
+    ),
+  };
 
-  test("throws before invoking ffmpeg when slot 7 is not a music Round", async () => {
-    const quiz = buildQuizContentFixture({ locale: "nl" });
-    const textRound = quiz.rounds[0];
-    const brokenQuiz = {
-      ...quiz,
-      rounds: quiz.rounds.map((round, index) => (index === 7 ? textRound : round)),
-    };
+  await expect(renderMusicRoundMp3(brokenQuiz)).rejects.toThrow(/exactly 10 Items/);
+});
 
-    await expect(renderMusicRoundMp3(brokenQuiz)).rejects.toThrow(/music Round/);
-  });
+test("throws before invoking ffmpeg when slot 7 is not a music Round", async () => {
+  const quiz = buildQuizContentFixture({ locale: "nl" });
+  const textRound = quiz.rounds[0];
+  const brokenQuiz = {
+    ...quiz,
+    rounds: quiz.rounds.map((round, index) => (index === 7 ? textRound : round)),
+  };
+
+  await expect(renderMusicRoundMp3(brokenQuiz)).rejects.toThrow(/music Round/);
 });

@@ -34,6 +34,11 @@ function announcementPath(locale: string, position: number): string {
   return join(announcementsRoot(), locale, `${position + 1}.mp3`);
 }
 
+/** The shared output format flags (44100 Hz mono 128 kbps CBR libmp3lame), appended to every ffmpeg call that produces audio for the final concat. */
+function outputFormatArgs(): string[] {
+  return ["-ar", String(SAMPLE_RATE), "-ac", String(CHANNELS), "-c:a", "libmp3lame", "-b:a", BITRATE];
+}
+
 function assertRenderableMusicRound(quiz: QuizContent): readonly MusicItemContent[] {
   const round = quiz.rounds[MUSIC_ROUND_SLOT_INDEX];
   if (!round || round.kind !== "music") {
@@ -59,37 +64,12 @@ function assertRenderableMusicRound(quiz: QuizContent): readonly MusicItemConten
 function normalizeClip(ffmpeg: string, inputPath: string, outputPath: string): void {
   const filter =
     `loudnorm=I=${MUSIC_ROUND_LOUDNESS_TARGET_LUFS}:TP=${LOUDNORM_TP}:LRA=${LOUDNORM_LRA}`;
-  runFfmpeg(ffmpeg, [
-    "-i",
-    inputPath,
-    "-af",
-    filter,
-    "-ar",
-    String(SAMPLE_RATE),
-    "-ac",
-    String(CHANNELS),
-    "-c:a",
-    "libmp3lame",
-    "-b:a",
-    BITRATE,
-    outputPath,
-  ]);
+  runFfmpeg(ffmpeg, ["-i", inputPath, "-af", filter, ...outputFormatArgs(), outputPath]);
 }
 
 /** Re-encodes a file (e.g. generated gap silence) to the shared output format so the concat demuxer mixes matching streams. */
 function reencode(ffmpeg: string, inputArgs: string[], outputPath: string): void {
-  runFfmpeg(ffmpeg, [
-    ...inputArgs,
-    "-ar",
-    String(SAMPLE_RATE),
-    "-ac",
-    String(CHANNELS),
-    "-c:a",
-    "libmp3lame",
-    "-b:a",
-    BITRATE,
-    outputPath,
-  ]);
+  runFfmpeg(ffmpeg, [...inputArgs, ...outputFormatArgs(), outputPath]);
 }
 
 function escapeConcatPath(path: string): string {
@@ -159,14 +139,7 @@ export async function renderMusicRoundMp3(quiz: QuizContent): Promise<Buffer> {
       "0",
       "-i",
       listPath,
-      "-ar",
-      String(SAMPLE_RATE),
-      "-ac",
-      String(CHANNELS),
-      "-c:a",
-      "libmp3lame",
-      "-b:a",
-      BITRATE,
+      ...outputFormatArgs(),
       outputPath,
     ]);
 
