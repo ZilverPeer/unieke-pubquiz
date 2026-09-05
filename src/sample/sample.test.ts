@@ -123,6 +123,30 @@ describe("sampleComposition", () => {
     ).toThrow(Error);
   });
 
+  test("mixed mode with fewer pool Categories than unassigned slots fails with a null-Category shortfall", () => {
+    // Only 3 distinct Categories in the pool, no picks: slots 0-2 can each
+    // get a Category, slot 3 onward can't - a content shortfall, not a
+    // caller error.
+    const { pool } = buildPoolFixture({
+      locales: ["nl"],
+      categories: 3,
+      subsubcategoriesPerCategory: 1,
+      itemsPerKindPerDifficulty: 1,
+    });
+
+    const result = sampleComposition({
+      request: baseRequest(),
+      pool,
+      excludedItemIds: new Set(),
+      random: createSeededRandom(1),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure).toEqual({ slotIndex: 3, categoryId: null, shortfall: 5 });
+  });
+
   test("single_category mode uses one Category for all 8 slots", () => {
     const { pool, categories } = buildFullPool();
     const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
