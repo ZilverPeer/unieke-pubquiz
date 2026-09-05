@@ -11,6 +11,10 @@ Repository: the only module that talks to Postgres (via Supabase). Loads the sam
 
 Private helpers live alongside it: `client.ts` (Supabase client construction), `pool.ts`, `compositions.ts`, `storage.ts`, `types.ts` (the `PoolEntry` / `ItemTranslation` shapes).
 
+`pool.ts`'s two queries that scale with the Item count (the main Items query and the other-Locale translations lookup) are paginated in pages of 1000 (`fetchAllPages`, ordered by a stable key) rather than issued as a single request, so the pool is never silently truncated once the Item count passes PostgREST's `api.max_rows` cap (1000 locally).
+
+`loadExcludedItemIds` and `persistComposition` compare/store billing email trimmed and lower-cased (`normalizeBillingEmail` in `compositions.ts`) -- see CONTEXT.md "No-repeat rule".
+
 ## Running the integration tests
 
 The only test file, `repository.integration.test.ts`, runs against the real local Supabase stack -- migrations and seed applied, no mocking. One documented command sequence, from the repo root:

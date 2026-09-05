@@ -103,6 +103,18 @@ describe("loadPool", () => {
     const category1EntryEn = poolEn.find((e) => e.item.categoryId === "1");
     expect(category1EntryEn?.categoryName).toBe("Sports");
   });
+
+  it("returns every matching Item, matching an independent exact count (no silent truncation)", async () => {
+    const { count, error } = await db
+      .from("items")
+      .select("id, item_translations!inner(locale)", { count: "exact", head: true })
+      .eq("item_translations.locale", "nl");
+    if (error) throw error;
+
+    const pool = await repository.loadPool("nl");
+
+    expect(pool).toHaveLength(count ?? -1);
+  });
 });
 
 describe("loadExcludedItemIds", () => {

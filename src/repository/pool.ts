@@ -34,18 +34,42 @@ function otherLocale(locale: Locale): Locale {
   return locale === "nl" ? "en" : "nl";
 }
 
+// PostgREST caps any single response at config.toml's api.max_rows (1000
+// locally). Both queries below scale with the Item count (currently 717 per
+// Locale, comfortably under that cap, but nothing stops the pool from
+// growing past it) -- paginate in pages of PAGE_SIZE, following a stable
+// `id` order, until a short page proves there's no more data, rather than
+// silently returning a truncated pool once the Item count crosses 1000.
+const PAGE_SIZE = 1000;
+
+async function fetchAllPages<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+    from += PAGE_SIZE;
+  }
+}
+
 export async function loadPool(
   client: SupabaseClient<Database>,
   locale: Locale,
 ): Promise<PoolEntry[]> {
   const other = otherLocale(locale);
-  const [itemsResult, chainResult, categoryNamesResult, otherLocaleResult] = await Promise.all([
-    // See the comment on ItemRow above: this embedded select goes deeper
-    // than supabase-js's generic select-string inference handles.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (client.from("items") as any)
-      .select(
-        `
+  const [itemRows, chainResult, categoryNamesResult, otherLocaleRows] = await Promise.all([
+    fetchAllPages<ItemRow>((from, to) =>
+      // See the comment on ItemRow above: this embedded select goes deeper
+      // than supabase-js's generic select-string inference handles.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.from("items") as any)
+        .select(
+          `
             id,
             kind,
             difficulty,
@@ -54,24 +78,27 @@ export async function loadPool(
             picture_item_details(storage_path),
             music_item_details(storage_path,artist,title)
           `,
-      )
-      .eq("item_translations.locale", locale),
+        )
+        .eq("item_translations.locale", locale)
+        .order("id")
+        .range(from, to),
+    ),
     client.from("subsubcategories").select("id, subcategory_id, subcategories(id, category_id)"),
     client.from("category_translations").select("category_id, name").eq("locale", locale),
     // Filtering to just the *other* Locale (rather than every translation row
-    // for every Locale, or passing the whole pool's ids in an `.in()` filter,
-    // which blows the URL length limit at this pool size) keeps the row
-    // count at most the total Item count -- well under PostgREST's
-    // `max_rows` cap.
-    client.from("item_translations").select("item_id").eq("locale", other),
+    // for every Locale, or passing the whole pool's ids in an `.in()`
+    // filter, which blows the URL length limit at this pool size) keeps the
+    // row count per page at most the total Item count, paginated the same
+    // way as the main Items query above.
+    fetchAllPages<{ item_id: string }>((from, to) =>
+      client.from("item_translations").select("item_id").eq("locale", other).order("item_id").range(from, to),
+    ),
   ]);
 
-  if (itemsResult.error) throw itemsResult.error;
   if (chainResult.error) throw chainResult.error;
   if (categoryNamesResult.error) throw categoryNamesResult.error;
-  if (otherLocaleResult.error) throw otherLocaleResult.error;
 
-  const hasOtherLocale = new Set(otherLocaleResult.data.map((row) => row.item_id));
+  const hasOtherLocale = new Set(otherLocaleRows.map((row) => row.item_id));
 
   const chainRows = chainResult.data as SubsubcategoryRow[];
   const chainBySubsubcategoryId = new Map<
@@ -91,7 +118,6 @@ export async function loadPool(
     categoryNameById.set(String(row.category_id), row.name);
   }
 
-  const itemRows = itemsResult.data as ItemRow[];
   const entries: PoolEntry[] = [];
 
   for (const row of itemRows) {
