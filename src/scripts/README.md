@@ -1,0 +1,1 @@
+Scripts: the only composer module — it may import `src/domain`, `src/sample`, `src/repository`, and `src/render` together, wiring them into runnable entry points (e.g. the local dev generation script). No other module may import from `src/scripts`. Behaviour lands in ticket #11.
