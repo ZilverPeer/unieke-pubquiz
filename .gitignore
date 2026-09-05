@@ -52,3 +52,8 @@ content/
 
 .vercel
 .env*
+.scratch/
+
+# static app audio (announcements) and non-copyrighted seed assets are code, not content
+!public/audio/**
+!supabase/seed-assets/**

@@ -1,13 +1,13 @@
 ---
-description: Post-feature retrospective — review what was built, capture lessons in CLAUDE.md or skills, consolidate any bloat, and commit the improvements to the feature branch so they ship with the PR. Invoked from web-release-flow (step 4) or mobile-release-flow as part of the wrap-up; ends on the feature branch and hands control back to the calling flow for merge/deploy. Platform-agnostic — never switches branches itself.
+description: Post-feature retrospective — review what was built, capture lessons in CLAUDE.md or skills, consolidate any bloat, and commit the improvements to the feature branch so they ship with the PR. Run once a feature is done and its PR is open; ends on the feature branch and hands control back for merge/deploy. Platform-agnostic — never switches branches itself.
 allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git branch:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git status:*), Read, Edit, Write, Glob, Grep, Agent
 ---
 
 ## Context
 
 - Current branch: !`git branch --show-current`
-- Commits on this branch vs main: !`git log main..HEAD --oneline`
-- Files changed vs main: !`git diff main..HEAD --name-only`
+- Commits on this branch vs master: !`git log master..HEAD --oneline`
+- Files changed vs master: !`git diff master..HEAD --name-only`
 
 ## Your task
 
@@ -78,7 +78,7 @@ Edit CLAUDE.md to apply consolidations. Do not remove information — compress i
 
 ### Step 5 — Commit improvements to the feature branch
 
-If CLAUDE.md, any skill file, or any memory file was created or modified in Steps 3–4, commit those changes to the current feature branch so they are included in the PR and merged to main together with the feature.
+If CLAUDE.md, any skill file, or any memory file was created or modified in Steps 3–4, commit those changes to the current feature branch so they are included in the PR and merged to master together with the feature.
 
 ```
 git add CLAUDE.md .claude/commands/ .claude/projects/
@@ -91,7 +91,7 @@ If nothing was changed in Steps 3–4, skip this step.
 
 ### Step 6 — Report and hand back
 
-Do **not** switch branches or merge. The calling release-flow (`web-release-flow` or `mobile-release-flow`) owns merge timing and the eventual return to `main`. End on the feature branch.
+Do **not** switch branches or merge. Merge timing and the eventual return to `master` are handled outside this command. End on the feature branch.
 
 Tell the user:
 - What lesson(s) were found (or "nothing noteworthy this time")
@@ -99,4 +99,4 @@ Tell the user:
 - Whether CLAUDE.md was consolidated and what was merged/removed
 - Whether the skill-reviewer flagged anything and what was fixed
 - Confirm the improvements were committed and pushed to the feature branch
-- Hand control back to the calling release-flow for the next gate (merge for web, submit/deploy for mobile)
+- Hand control back for the next gate (merge to master)
