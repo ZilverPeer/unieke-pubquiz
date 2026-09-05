@@ -1,4 +1,6 @@
+import type { ItemContent, QuizContent, RoundContent } from "./content";
 import type { Difficulty, ItemKind, Locale, PoolItem } from "./types";
+import { ITEMS_PER_SLOT, SLOT_KINDS } from "./types";
 
 const KINDS: readonly ItemKind[] = ["text", "picture", "music"];
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
@@ -107,6 +109,7 @@ export function buildPoolFixture(options: PoolFixtureOptions): PoolFixture {
           categoryId: subsubcategory.categoryId,
           subcategoryId: subsubcategory.subcategoryId,
           subsubcategoryId: subsubcategory.id,
+          locales,
         });
 
         for (const locale of locales) {
@@ -121,4 +124,83 @@ export function buildPoolFixture(options: PoolFixtureOptions): PoolFixture {
   }
 
   return { pool, categories, subcategories, subsubcategories, translations };
+}
+
+/** A valid 1x1 white PNG, the smallest image @react-pdf/renderer will embed. */
+const ONE_PIXEL_PNG = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
+
+const LOCALE_FIXTURE_WORDS: Record<
+  Locale,
+  { question: string; about: string; answer: string; fact: string; category: string }
+> = {
+  nl: {
+    question: "Fixturevraag",
+    about: "over",
+    answer: "Fixtureantwoord",
+    fact: "Fixtureweetje",
+    category: "Categorie",
+  },
+  en: {
+    question: "Fixture question",
+    about: "about",
+    answer: "Fixture answer",
+    fact: "Fixture fact",
+    category: "Category",
+  },
+};
+
+export interface QuizContentFixtureOptions {
+  locale: Locale;
+  /** Image bytes for every Picture Item; defaults to a 1x1 PNG. */
+  image?: Uint8Array;
+  /** Clip bytes for every Music Item; defaults to empty (fine for PDF tests, not for ffmpeg). */
+  clip?: Uint8Array;
+}
+
+/**
+ * Builds a complete QuizContent (8 Rounds x 10 Items) with deterministic
+ * strings in the requested Locale, for renderer smoke tests. Strings embed
+ * Locale-specific words so a test can assert nothing from the other Locale
+ * leaks. Every 7th Item carries a Fact.
+ */
+export function buildQuizContentFixture(options: QuizContentFixtureOptions): QuizContent {
+  const { locale, image = ONE_PIXEL_PNG, clip = new Uint8Array() } = options;
+  const words = LOCALE_FIXTURE_WORDS[locale];
+
+  const rounds: RoundContent[] = SLOT_KINDS.map((kind, slotIndex) => {
+    const items: ItemContent[] = [];
+    for (let position = 0; position < ITEMS_PER_SLOT; position++) {
+      const n = slotIndex * ITEMS_PER_SLOT + position + 1;
+      const id = `fixture-${kind}-${n}`;
+      const fact = n % 7 === 0 ? `${words.fact} ${n}` : undefined;
+      if (kind === "text") {
+        items.push({
+          id,
+          kind,
+          question: `${words.question} ${n} ${words.about} ${words.category} ${slotIndex + 1}?`,
+          answer: `${words.answer} ${n}`,
+          fact,
+        });
+      } else if (kind === "picture") {
+        items.push({ id, kind, answer: `${words.answer} ${n}`, fact, image });
+      } else {
+        items.push({
+          id,
+          kind,
+          artist: `Fixture Artist ${position + 1}`,
+          title: `Fixture Track ${n}`,
+          fact,
+          clip,
+        });
+      }
+    }
+    return { slotIndex, kind, categoryName: `${words.category} ${slotIndex + 1}`, items };
+  });
+
+  return { locale, rounds };
 }

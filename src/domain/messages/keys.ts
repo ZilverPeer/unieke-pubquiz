@@ -12,6 +12,16 @@ export interface Messages {
   pictureHandoutPdfLabel: string;
   answerSheetPdfLabel: string;
   musicRoundMp3Label: string;
+  /** Labels used inside the Deliverables (tickets #7-#10). */
+  quizmasterHeading: string;
+  questionLabel: string;
+  answerLabel: string;
+  factLabel: string;
+  artistLabel: string;
+  titleLabel: string;
+  teamNameLabel: string;
+  answerSheetHeading: string;
+  pictureHandoutInstruction: string;
 }
 
 export type MessageKey = keyof Messages;

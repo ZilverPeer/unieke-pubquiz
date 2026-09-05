@@ -13,6 +13,15 @@ const en: Messages = {
   pictureHandoutPdfLabel: "Picture Round handout PDF",
   answerSheetPdfLabel: "Answer sheet PDF",
   musicRoundMp3Label: "Music Round MP3",
+  quizmasterHeading: "Quizmaster",
+  questionLabel: "Question",
+  answerLabel: "Answer",
+  factLabel: "Fact",
+  artistLabel: "Artist",
+  titleLabel: "Title",
+  teamNameLabel: "Team name",
+  answerSheetHeading: "Answer sheet",
+  pictureHandoutInstruction: "Write your answer under each picture.",
 };
 
 export default en;

@@ -40,6 +40,7 @@ describe("buildPoolFixture", () => {
     for (const item of fixture.pool) {
       expect(fixture.translations.nl.has(item.id)).toBe(true);
       expect(fixture.translations.en.has(item.id)).toBe(true);
+      expect(item.locales).toEqual(["nl", "en"]);
     }
   });
 

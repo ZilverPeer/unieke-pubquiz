@@ -13,6 +13,15 @@ const nl: Messages = {
   pictureHandoutPdfLabel: "Beeldronde-invulblad",
   answerSheetPdfLabel: "Antwoordblad",
   musicRoundMp3Label: "Muziekronde-mp3",
+  quizmasterHeading: "Quizmaster",
+  questionLabel: "Vraag",
+  answerLabel: "Antwoord",
+  factLabel: "Weetje",
+  artistLabel: "Artiest",
+  titleLabel: "Titel",
+  teamNameLabel: "Teamnaam",
+  answerSheetHeading: "Antwoordblad",
+  pictureHandoutInstruction: "Schrijf je antwoord onder elk plaatje.",
 };
 
 export default nl;

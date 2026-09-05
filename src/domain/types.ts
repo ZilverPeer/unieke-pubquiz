@@ -41,7 +41,11 @@ export interface QuizRequest {
   billingEmail: string;
 }
 
-/** An Item as seen by sampling: its kind, Difficulty, and full Category chain. */
+/**
+ * An Item as seen by sampling: its kind, Difficulty, full Category chain, and
+ * the Locales it has a translation for. Sampling only chooses an Item whose
+ * `locales` include the requested Locale.
+ */
 export interface PoolItem {
   id: string;
   kind: ItemKind;
@@ -49,6 +53,7 @@ export interface PoolItem {
   categoryId: string;
   subcategoryId: string;
   subsubcategoryId: string;
+  locales: readonly Locale[];
 }
 
 /** The sampled Item ids per Round slot, source of the no-repeat rule. */
@@ -63,4 +68,14 @@ export interface GenerationFailure {
   categoryId: string;
   /** How many Items short of ITEMS_PER_SLOT the slot ended up. */
   shortfall: number;
+}
+
+/** Everything the repository stores alongside a Composition's slots. */
+export interface CompositionRecord {
+  billingEmail: string;
+  locale: Locale;
+  quizMode: QuizMode;
+  requestedDifficulty: RequestedDifficulty;
+  seed: number;
+  composition: Composition;
 }
