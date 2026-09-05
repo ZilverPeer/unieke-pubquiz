@@ -1,0 +1,3 @@
+# One Item identity across languages, text in per-locale translation rows
+
+Quizzes are delivered in Dutch or English, chosen per quiz. We model this as a single `items` row per piece of content with its language-dependent text (question, answer, fact) in `item_translations(item_id, locale, …)`, and the same pattern for category names. The alternative — a separate Item per language — would double the bookkeeping and, more importantly, break the no-repeat rule: a customer could get the same question once in Dutch and again in English. With shared identity the no-repeat rule keys on `item_id` regardless of locale, and an Item is simply not sampleable for a locale it has no translation for, so the two pools may differ in size.
