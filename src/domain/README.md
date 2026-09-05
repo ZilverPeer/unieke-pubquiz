@@ -1,0 +1,1 @@
+Shared domain types (`Locale`, `QuizMode`, `ItemKind`, `Difficulty`, `RequestedDifficulty`, `QuizRequest`, `PoolItem`, `Composition`, `GenerationFailure`), the per-Locale message catalogs and `message()` lookup helper, and the in-memory pool fixture builder used by tests. This module imports nothing from any other `src` module — every other module may import from it.

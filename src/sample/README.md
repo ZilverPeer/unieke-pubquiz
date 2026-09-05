@@ -1,0 +1,1 @@
+Sampling: turns a `QuizRequest` plus an in-memory Item pool into a `Composition` (or a `GenerationFailure`), applying the no-repeat, Category, Difficulty, and no-duplicate-Subsubcategory rules. Pure, no I/O. May import only `src/domain`. Must never import `src/repository` or `src/render` — behaviour lands in ticket #5.
