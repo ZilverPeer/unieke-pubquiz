@@ -109,7 +109,7 @@ If a pivot rewrites enough that the **stable core / volatile shell** split chang
 
 ### 5. Verify (always)
 
-Invoke **`review`** before claiming done — it checks the branch on both axes (Standards: does it follow repo conventions? Spec: does it match what the issues asked for?). Add **`qa`** if the feature is user-facing and you want a bug sweep. Includes `S` — no exceptions.
+Invoke **`code-review`** before claiming done — it checks the branch on both axes (Standards: does it follow repo conventions? Spec: does it match what the issues asked for?). Add **`qa`** if the feature is user-facing and you want a bug sweep. Includes `S` — no exceptions.
 
 ## Routing table
 
@@ -124,7 +124,7 @@ Invoke **`review`** before claiming done — it checks the branch on both axes (
 | Implement a slice           | **Sonnet coding subagent** off the issue — never code it yourself |
 | Stable-core slice           | subagent runs `tdd`                                       |
 | Volatile-shell slice        | subagent builds against `frontend` skill + acceptance criteria |
-| Claiming done               | `review` (+ `qa` if user-facing)                          |
+| Claiming done               | `code-review` (+ `qa` if user-facing)                          |
 
 ## Strict mode (default)
 

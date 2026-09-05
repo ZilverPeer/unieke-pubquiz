@@ -4,6 +4,17 @@
 
 - `CONTEXT.md` is the domain and decision source of truth; `docs/adr/` records the why behind hard-to-reverse choices. Read them before designing anything. When a decision changes, update `CONTEXT.md` in the same change — never let docs and code disagree.
 - This repo shares nothing with SparkStock. Do not apply SparkStock rules, skills, or conventions here.
+- **Orchestrate, don't type.** The main session designs, plans, reviews, and coordinates. Production code and tests are written by Sonnet subagents given a scoped task; the main session reviews their output with `code-review` before merging. Use `tdd` for all feature and bugfix work.
+
+## Agent skills
+
+### Issue tracker
+
+Specs and bugs are GitHub issues on this repo, driven with `gh`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ## Build philosophy
 
