@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
-    "announcements:generate": "tsx scripts/announcements/generate.ts"
+    "announcements:generate": "tsx scripts/announcements/generate.ts",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > src/repository/database.types.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

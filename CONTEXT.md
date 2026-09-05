@@ -77,7 +77,7 @@ A Quiz has a **Quiz mode**: `mixed` (the default flow above — up to 8 customer
 
 ### Content model
 - **Category hierarchy**: strictly nested 3 levels — Category → Subcategory → Subsubcategory, each with exactly one parent. No deeper nesting planned. Names are translated per Locale.
-- **Item storage shape**: a shared `items` base table (id, type, Subsubcategory FK, Difficulty) joined 1:1 to type-specific detail tables (`text_item_details`, `picture_item_details`, `music_item_details`) and 1:N to `item_translations(item_id, locale, question, answer, fact)`. Not one flat table with nullable per-type columns. Keeps sampling uniform across types while letting payloads diverge (e.g. Music Items carry artist/title/clip path, never question text).
+- **Item storage shape**: a shared `items` base table (id, type, Subsubcategory FK, Difficulty) joined 1:1 to type-specific detail tables (`picture_item_details`, `music_item_details`) and 1:N to `item_translations(item_id, locale, question, answer, fact)`. Text Items have no detail table — their whole payload (question, answer, Fact) lives in `item_translations`. Not one flat table with nullable per-type columns. Keeps sampling uniform across types while letting payloads diverge (e.g. Music Items carry artist/title/clip path, never question text).
 - **Difficulty**: two separate enums. `Item.difficulty` is `easy | medium | hard` (exactly one, fixed per Item). The customer-facing **requested difficulty** on a Quiz is `easy | medium | hard | mixed`. `mixed` draws 4/3/3 across the three levels per Round, with which level gets the fourth slot chosen at random. Difficulty is chosen once per Quiz, not per Round.
 
 ### Admin UI
