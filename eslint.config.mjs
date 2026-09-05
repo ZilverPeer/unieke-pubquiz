@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // jsx-a11y/alt-text targets HTML <img>; @react-pdf/renderer's own <Image>
+    // has no `alt` prop, so the rule only produces false positives here.
+    files: ["src/render/**"],
+    rules: {
+      "jsx-a11y/alt-text": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
