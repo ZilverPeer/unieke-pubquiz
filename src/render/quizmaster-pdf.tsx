@@ -1,6 +1,7 @@
 import { Document, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ItemContent, QuizContent, RoundContent } from "@/domain";
-import { type MessageKey, message } from "@/domain";
+import { message } from "@/domain";
+import type { MessageKey } from "@/domain/messages/keys";
 import { PDF_FONT_FAMILY, PdfPage } from "./pdf/shell";
 
 /** Message key for the round heading of each of the 8 slots, by slot index. */
