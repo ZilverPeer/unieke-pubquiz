@@ -1,6 +1,6 @@
 # Supabase: schema and seed
 
-Local stack ports are 55320-55329 (see `config.toml`) so this project can run
+Local stack ports are 45320-45329 (see `config.toml`) so this project can run
 alongside another local Supabase stack on the same machine. Do not change
 them.
 
@@ -97,7 +97,7 @@ supabase db query < supabase/checks/pool-coverage.sql
 ```
 
 or, if `supabase db query` piping isn't available in your CLI version,
-against the DB container directly (DB port 55322 locally):
+against the DB container directly (DB port 45322 locally):
 
 ```sh
 docker exec -i $(docker ps --filter "name=supabase_db" --format "{{.Names}}") \
