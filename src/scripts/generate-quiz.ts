@@ -1,0 +1,91 @@
+/**
+ * Orchestrates one full Quiz generation: load pool + exclusions, sample,
+ * assemble content, render all four Deliverables, persist the Composition
+ * LAST so a render failure consumes no Items. No process.exit here -- see
+ * src/scripts/generate.ts for the CLI entry point.
+ */
+import type { CompositionRecord, GenerationFailure } from "@/domain";
+import { createSeededRandom, sampleComposition } from "@/sample";
+import type { ContentRepository } from "@/repository";
+import {
+  renderAnswerSheetPdf,
+  renderMusicRoundMp3,
+  renderPictureHandoutPdf,
+  renderQuizmasterPdf,
+} from "@/render";
+import { assembleQuizContent } from "./assemble-quiz-content";
+import type { GenerateOptions } from "./cli-args";
+
+export interface GeneratedQuizFiles {
+  "quizmaster.pdf": Buffer;
+  "picture-handout.pdf": Buffer;
+  "answer-sheet.pdf": Buffer;
+  "music-round.mp3": Buffer;
+}
+
+export type GenerateQuizResult =
+  | {
+      ok: true;
+      files: GeneratedQuizFiles;
+      compositionRecord: CompositionRecord;
+      compositionId: string;
+    }
+  | {
+      ok: false;
+      failure: GenerationFailure;
+      /** The failed slot's Category name, or the raw id if unknown, or "none". */
+      categoryLabel: string;
+    };
+
+export async function generateQuiz(
+  options: GenerateOptions,
+  repository: ContentRepository,
+): Promise<GenerateQuizResult> {
+  const { seed, out: _out, ...request } = options;
+
+  const pool = await repository.loadPool(request.locale);
+  const excludedItemIds = await repository.loadExcludedItemIds(request.billingEmail);
+
+  const sampleResult = sampleComposition({
+    request,
+    pool: pool.map((entry) => entry.item),
+    excludedItemIds,
+    random: createSeededRandom(seed),
+  });
+
+  if (!sampleResult.ok) {
+    const { failure } = sampleResult;
+    let categoryLabel = "none";
+    if (failure.categoryId !== null) {
+      const entry = pool.find((e) => e.item.categoryId === failure.categoryId);
+      categoryLabel = entry?.categoryName ?? failure.categoryId;
+    }
+    return { ok: false, failure, categoryLabel };
+  }
+
+  const entriesById = new Map(pool.map((entry) => [entry.item.id, entry]));
+  const quizContent = await assembleQuizContent(sampleResult.composition, request.locale, entriesById, {
+    picture: (storagePath) => repository.downloadPicture(storagePath),
+    music: (storagePath) => repository.downloadMusicClip(storagePath),
+  });
+
+  const files: GeneratedQuizFiles = {
+    "quizmaster.pdf": await renderQuizmasterPdf(quizContent),
+    "picture-handout.pdf": await renderPictureHandoutPdf(quizContent),
+    "answer-sheet.pdf": await renderAnswerSheetPdf(quizContent),
+    "music-round.mp3": await renderMusicRoundMp3(quizContent),
+  };
+
+  const compositionRecord: CompositionRecord = {
+    billingEmail: request.billingEmail,
+    locale: request.locale,
+    quizMode: request.quizMode,
+    requestedDifficulty: request.requestedDifficulty,
+    seed,
+    composition: sampleResult.composition,
+  };
+
+  const { compositionId } = await repository.persistComposition(compositionRecord);
+
+  return { ok: true, files, compositionRecord, compositionId };
+}
