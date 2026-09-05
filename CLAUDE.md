@@ -12,6 +12,14 @@
 
 Specs and bugs are GitHub issues on this repo, driven with `gh`. See `docs/agents/issue-tracker.md`.
 
+### Triage labels
+
+Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), labels exist on the repo. See `docs/agents/triage-labels.md`.
+
+### Feature cycle
+
+`grilling` or `grill-with-docs` → `to-spec` (spec as a GitHub issue) → `to-tickets` (tracer-bullet issues with blocking edges) → `implement` per ticket via Sonnet subagents using `tdd` → `code-review` against the ticket → merge.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
