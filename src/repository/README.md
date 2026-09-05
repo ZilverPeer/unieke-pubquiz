@@ -1,0 +1,1 @@
+Repository: the only module that talks to Postgres (via Supabase). Loads the sampleable Item pool for a Locale, loads a billing email's excluded Item ids, and persists a Composition. May import only `src/domain`. Never imported by `src/sample` or `src/render`. Behaviour and the generated `database.types.ts` land in ticket #6.
