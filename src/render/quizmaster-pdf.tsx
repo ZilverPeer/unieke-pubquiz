@@ -1,7 +1,6 @@
 import { Document, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import type { ItemContent, QuizContent, RoundContent } from "@/domain";
+import type { ItemContent, MessageKey, QuizContent, RoundContent } from "@/domain";
 import { message } from "@/domain";
-import type { MessageKey } from "@/domain/messages/keys";
 import { PDF_FONT_FAMILY, PdfPage } from "./pdf/shell";
 
 /** Message key for the round heading of each of the 8 slots, by slot index. */
@@ -39,23 +38,18 @@ const styles = StyleSheet.create({
 
 function itemLines(item: ItemContent, position: number, locale: QuizContent["locale"]): string[] {
   const number = position + 1;
-  if (item.kind === "text") {
-    const lines = [
-      `${number}. ${message(locale, "questionLabel")}: ${item.question}`,
-      `${message(locale, "answerLabel")}: ${item.answer}`,
-    ];
-    if (item.fact) lines.push(`${message(locale, "factLabel")}: ${item.fact}`);
-    return lines;
-  }
-  if (item.kind === "picture") {
-    const lines = [`${number}. ${message(locale, "answerLabel")}: ${item.answer}`];
-    if (item.fact) lines.push(`${message(locale, "factLabel")}: ${item.fact}`);
-    return lines;
-  }
-  const lines = [
-    `${number}. ${message(locale, "artistLabel")}: ${item.artist}`,
-    `${message(locale, "titleLabel")}: ${item.title}`,
-  ];
+  const lines =
+    item.kind === "text"
+      ? [
+          `${number}. ${message(locale, "questionLabel")}: ${item.question}`,
+          `${message(locale, "answerLabel")}: ${item.answer}`,
+        ]
+      : item.kind === "picture"
+        ? [`${number}. ${message(locale, "answerLabel")}: ${item.answer}`]
+        : [
+            `${number}. ${message(locale, "artistLabel")}: ${item.artist}`,
+            `${message(locale, "titleLabel")}: ${item.title}`,
+          ];
   if (item.fact) lines.push(`${message(locale, "factLabel")}: ${item.fact}`);
   return lines;
 }
