@@ -1,8 +1,10 @@
 /**
  * Orchestrates one full Quiz generation: load pool + exclusions, sample,
- * assemble content, render all four Deliverables, persist the Composition
- * LAST so a render failure consumes no Items. No process.exit here -- see
- * src/scripts/generate.ts for the CLI entry point.
+ * assemble content, render all four Deliverables, deliver them via the
+ * injected `writeDeliverables`, and persist the Composition LAST -- after
+ * every Deliverable has been written -- so a render or delivery failure
+ * consumes no Items. No process.exit here -- see src/scripts/generate.ts
+ * for the CLI entry point.
  */
 import type { CompositionRecord, GenerationFailure } from "@/domain";
 import { createSeededRandom, sampleComposition } from "@/sample";
@@ -37,9 +39,18 @@ export type GenerateQuizResult =
       categoryLabel: string;
     };
 
+/**
+ * Delivers the four rendered files (e.g. writes them to disk). Called after
+ * rendering and before persisting -- see generateQuiz below. A rejection
+ * here (nothing written, or only partially written) must stop generateQuiz
+ * from persisting, so it is never swallowed.
+ */
+export type WriteDeliverables = (files: GeneratedQuizFiles) => Promise<void>;
+
 export async function generateQuiz(
   options: GenerateOptions,
   repository: ContentRepository,
+  writeDeliverables: WriteDeliverables,
 ): Promise<GenerateQuizResult> {
   // `out` (the output folder) is only meaningful to generate.ts's file
   // writing; this function never touches the filesystem.
@@ -78,6 +89,11 @@ export async function generateQuiz(
     "answer-sheet.pdf": await renderAnswerSheetPdf(quizContent),
     "music-round.mp3": await renderMusicRoundMp3(quizContent),
   };
+
+  // Deliver before persisting: if writing fails, this rejects and
+  // persistComposition below never runs, so a delivery failure never
+  // consumes Items a customer could otherwise still receive.
+  await writeDeliverables(files);
 
   const compositionRecord: CompositionRecord = {
     billingEmail: request.billingEmail,

@@ -8,20 +8,39 @@
  * ffmpeg-dependent assertions are skipped, the same way
  * src/render/music-round-mp3.test.ts skips, when ffmpeg isn't available.
  */
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Locale } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT } from "@/domain";
 import { createRepository, resolveLocalStackConfig } from "@/repository";
+import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
 import type { GenerateOptions } from "./cli-args";
-import { generateQuiz } from "./generate-quiz";
+import { generateQuiz, type WriteDeliverables } from "./generate-quiz";
 
 const config = resolveLocalStackConfig();
 const repository = createRepository(config);
+// Raw client for cleanup only -- generateQuiz and the CLI are only ever
+// exercised through their public interfaces. Mirrors
+// src/repository/repository.integration.test.ts's own cleanup.
+const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
+
+afterEach(async () => {
+  // compositions cascade-deletes composition_items; seed Items are never
+  // touched. This suite persists real Compositions (both via generateQuiz
+  // directly and via the spawned CLI) and must not leave them behind for
+  // later test runs or other integration test files.
+  const { error } = await db.from("compositions").delete().not("id", "is", null);
+  if (error) throw error;
+});
+
+// Ignores the rendered files; for tests that only assert on the sampled/
+// persisted Composition, not on what's written to disk.
+const noopWriteDeliverables: WriteDeliverables = async () => {};
 
 // Category id 1 is "Sport" (nl) / "Sports" (en) -- see supabase/seed.sql
 // section 1. Every Category gets exactly 10 hard Text Items (one per
@@ -174,6 +193,7 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
           out: "unused",
         },
         repository,
+        noopWriteDeliverables,
       );
       const result2 = await generateQuiz(
         {
@@ -186,6 +206,7 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
           out: "unused",
         },
         repository,
+        noopWriteDeliverables,
       );
 
       expect(result1.ok).toBe(true);
@@ -207,50 +228,55 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
     categoryPicks[0] = HARD_TEXT_CATEGORY_ID;
     const outDir = join(await makeTmpDir(), "run-2");
 
-    const firstResult = await generateQuiz(
-      {
-        locale: "nl",
-        quizMode: "mixed",
-        categoryPicks,
-        requestedDifficulty: "hard",
-        billingEmail: email,
-        seed: 200,
-        out: "unused",
-      },
-      repository,
-    );
-    expect(firstResult.ok).toBe(true);
-    if (!firstResult.ok) return;
+    try {
+      const firstResult = await generateQuiz(
+        {
+          locale: "nl",
+          quizMode: "mixed",
+          categoryPicks,
+          requestedDifficulty: "hard",
+          billingEmail: email,
+          seed: 200,
+          out: "unused",
+        },
+        repository,
+        noopWriteDeliverables,
+      );
+      expect(firstResult.ok).toBe(true);
+      if (!firstResult.ok) return;
 
-    const excludedAfterFirst = await repository.loadExcludedItemIds(email);
+      const excludedAfterFirst = await repository.loadExcludedItemIds(email);
 
-    const { status, stdout, stderr } = runCli([
-      "--locale",
-      "nl",
-      "--mode",
-      "mixed",
-      "--difficulty",
-      "hard",
-      "--email",
-      email,
-      "--pick",
-      `0=${HARD_TEXT_CATEGORY_ID}`,
-      "--seed",
-      "201",
-      "--out",
-      outDir,
-    ]);
+      const { status, stdout, stderr } = runCli([
+        "--locale",
+        "nl",
+        "--mode",
+        "mixed",
+        "--difficulty",
+        "hard",
+        "--email",
+        email,
+        "--pick",
+        `0=${HARD_TEXT_CATEGORY_ID}`,
+        "--seed",
+        "201",
+        "--out",
+        outDir,
+      ]);
 
-    expect(status).toBe(1);
-    expect(stderr).toContain(
-      `Generation failed: slot 0, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10`,
-    );
-    expect(stdout).not.toContain("Composition id");
+      expect(status).toBe(1);
+      expect(stderr).toContain(
+        `Generation failed: slot 0, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10`,
+      );
+      expect(stdout).not.toContain("Composition id");
 
-    const excludedAfterSecond = await repository.loadExcludedItemIds(email);
-    expect(excludedAfterSecond).toEqual(excludedAfterFirst);
+      const excludedAfterSecond = await repository.loadExcludedItemIds(email);
+      expect(excludedAfterSecond).toEqual(excludedAfterFirst);
 
-    expect(await pathExists(join(outDir, "quizmaster.pdf"))).toBe(false);
-    await expect(readdir(outDir)).rejects.toThrow();
+      expect(await pathExists(join(outDir, "quizmaster.pdf"))).toBe(false);
+      await expect(readdir(outDir)).rejects.toThrow();
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+    }
   });
 });

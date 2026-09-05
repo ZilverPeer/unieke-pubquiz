@@ -39,6 +39,10 @@ export function resolveLocalStackConfig(): RepositoryConfig {
   const output = execFileSync("npx", ["supabase", "status", "-o", "env"], {
     encoding: "utf-8",
     shell: true,
+    // The Supabase CLI logs container housekeeping (e.g. "Stopped
+    // services: [...]") to stderr on every invocation; only stdout carries
+    // the env output this function parses.
+    stdio: ["ignore", "pipe", "ignore"],
   });
   const values = parseStatusEnv(output);
 

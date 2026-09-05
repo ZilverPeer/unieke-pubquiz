@@ -1,35 +1,41 @@
 /**
- * Local dev script entry point: parses args, runs generateQuiz, writes
- * files, and sets the process exit code. Keep this file thin -- the actual
- * flow lives in generate-quiz.ts. See README.md for the documented command.
+ * Local dev script entry point: parses args, runs generateQuiz (handing it
+ * the file-writing boundary), and sets the process exit code. Keep this
+ * file thin -- the actual flow lives in generate-quiz.ts. See README.md for
+ * the documented command.
  *
- * Run with `npm run generate` (tsx), never with plain `node` -- see
- * src/scripts/README.md.
+ * Run with `tsx` (`npx tsx src/scripts/generate.ts ...`, or `npm run
+ * generate --`), never with plain `node` -- see src/scripts/README.md.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createRepository, resolveLocalStackConfig } from "@/repository";
 import { parseGenerateArgs } from "./cli-args";
-import { generateQuiz } from "./generate-quiz";
+import { generateQuiz, type GeneratedQuizFiles } from "./generate-quiz";
 
 async function main(): Promise<number> {
   const options = parseGenerateArgs(process.argv.slice(2));
   const repository = createRepository(resolveLocalStackConfig());
 
-  const result = await generateQuiz(options, repository);
+  const writeDeliverables = async (files: GeneratedQuizFiles): Promise<void> => {
+    await mkdir(options.out, { recursive: true });
+    for (const [name, bytes] of Object.entries(files)) {
+      await writeFile(join(options.out, name), bytes);
+    }
+  };
+
+  const result = await generateQuiz(options, repository, writeDeliverables);
 
   if (!result.ok) {
     const { slotIndex, shortfall } = result.failure;
     console.error(
       `Generation failed: slot ${slotIndex}, Category ${result.categoryLabel}, shortfall ${shortfall}`,
     );
+    // A failed run must still be reproducible.
+    console.error(`Seed: ${options.seed}`);
     return 1;
   }
 
-  await mkdir(options.out, { recursive: true });
-  for (const [name, bytes] of Object.entries(result.files)) {
-    await writeFile(join(options.out, name), bytes);
-  }
   await writeFile(
     join(options.out, "composition.json"),
     JSON.stringify(

@@ -23,6 +23,8 @@ export interface QuizContentDownloads {
   music(storagePath: string): Promise<Uint8Array>;
 }
 
+// The single kind-to-content translation point: a new Item kind is added
+// here (and in the one renderer that needs its ItemContent shape) only.
 async function buildItemContent(
   entry: PoolEntry,
   downloads: QuizContentDownloads,
