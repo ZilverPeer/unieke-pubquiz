@@ -37,9 +37,9 @@ const styles = StyleSheet.create({
 });
 
 /**
- * Renders the one-page Answer sheet PDF: a 2x4 grid of six eighth-page Text
- * Round sections and one quarter-page Music Round section, with dashed cut
- * lines between every section.
+ * Renders the one-page landscape Answer sheet PDF: a 2-column x 4-row grid
+ * of six Text Round sections (two per row, three rows), followed by one
+ * full-width Music Round row, with dashed cut lines between every section.
  */
 export async function renderAnswerSheetPdf(quiz: QuizContent): Promise<Buffer> {
   const { locale, rounds } = quiz;
