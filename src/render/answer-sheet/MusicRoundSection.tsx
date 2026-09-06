@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { wrapLongRuns } from "../pdf/hyphenation";
 import { CELL_WIDTH } from "./layout";
 import { sectionStyles } from "./section-styles";
 
@@ -74,7 +75,9 @@ export function MusicRoundSection({
   return (
     <View style={[sectionStyles.cell, styles.cell]} wrap={false}>
       <View style={sectionStyles.header} wrap={false}>
-        <Text style={sectionStyles.heading}>{heading}</Text>
+        <Text style={sectionStyles.heading} hyphenationCallback={wrapLongRuns}>
+          {heading}
+        </Text>
         <View style={sectionStyles.teamNameGroup} wrap={false}>
           <Text style={sectionStyles.teamNameLabel}>{teamNameLabel}:</Text>
           <View style={sectionStyles.teamNameLine} />
