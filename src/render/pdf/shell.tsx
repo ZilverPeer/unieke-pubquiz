@@ -59,15 +59,17 @@ const styles = StyleSheet.create({
 
 export interface PdfPageProps {
   children: ReactNode;
+  /** Page orientation; defaults to portrait. */
+  orientation?: "portrait" | "landscape";
 }
 
 /**
  * Branded A4 page frame: a minimal header ("Unieke Pubquiz") and footer,
  * shared by every PDF Deliverable. Renderer tickets place content in `children`.
  */
-export function PdfPage({ children }: PdfPageProps) {
+export function PdfPage({ children, orientation = "portrait" }: PdfPageProps) {
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size="A4" orientation={orientation} style={styles.page}>
       <Text style={styles.header} fixed>
         Unieke Pubquiz
       </Text>
