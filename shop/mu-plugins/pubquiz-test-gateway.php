@@ -1,19 +1,26 @@
 <?php
 /**
  * Plugin Name: Pubquiz Test Gateway
- * Description: Local-only WooCommerce payment gateway that always succeeds
- *              and moves the order straight to `processing`, never
- *              `completed`, regardless of the Pubquiz product being virtual
- *              and downloadable (WooCommerce's default payment_complete()
- *              would otherwise jump straight to `completed` for a fully
- *              virtual order, skipping the status the pipeline's webhook
- *              listens for). Used by both the order-placing script and a
- *              real Store API checkout (spec #36, ticket #37). Never enable
- *              this outside local development.
+ * Description: Local-only WooCommerce payment gateway that always succeeds.
+ *              Calls the order's standard payment_complete() exactly like a
+ *              real gateway would -- it does NOT special-case the resulting
+ *              status itself. Holding the order at `processing` instead of
+ *              WooCommerce's default `completed` (for a fully virtual,
+ *              downloadable product) is pubquiz-hold-processing.php's job,
+ *              so that this gateway proves the same path production
+ *              gateways take. Used by both the order-placing script and a
+ *              real checkout (spec #36, ticket #37). Never enable this
+ *              outside local development.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
+}
+
+// Belt-and-braces: never register this gateway outside local development,
+// even if this mu-plugin were ever mapped into a non-local wp-env config.
+if ( ! in_array( wp_get_environment_type(), [ 'local', 'development' ], true ) ) {
+    return;
 }
 
 add_action(
@@ -60,12 +67,8 @@ add_action(
             public function process_payment( $order_id ) {
                 $order = wc_get_order( $order_id );
                 $order->set_transaction_id( 'pubquiz-test-' . $order_id );
-                $order->update_status( 'processing', 'Paid via the local Pubquiz test gateway.' );
-                $order->save();
+                $order->payment_complete();
 
-                if ( function_exists( 'wc_reduce_stock_levels' ) ) {
-                    wc_reduce_stock_levels( $order_id );
-                }
                 if ( WC()->cart ) {
                     WC()->cart->empty_cart();
                 }

@@ -10,6 +10,7 @@
     "wp-content/mu-plugins": "./shop/mu-plugins"
   },
   "config": {
-    "WP_DEBUG": true
+    "WP_DEBUG": true,
+    "WP_ENVIRONMENT_TYPE": "local"
   }
 }

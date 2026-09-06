@@ -143,17 +143,33 @@ these 8 dropdowns. Acceptable for this ticket (only WP-CLI/curl-driven
 verification is required); a real storefront would need a paid tier or a
 different plugin to show friendly names while still submitting ids.
 
-## Local test payment gateway
+## Local test payment gateway, and why the order still reaches `processing`
 
 `shop/mu-plugins/pubquiz-test-gateway.php` registers `pubquiz_test_gateway`,
-a `WC_Payment_Gateway` that always succeeds and moves the order straight to
-`processing` (WooCommerce's default `payment_complete()` would jump straight
-to `completed` for a fully virtual/downloadable product like ours, skipping
-`processing` entirely -- this gateway calls `update_status('processing', ...)`
-explicitly instead, matching what a real gateway with manual review would
-do). Enabled by default; select it at checkout, or pass
-`payment_method=pubquiz_test_gateway` when scripting a checkout POST as
-above.
+a `WC_Payment_Gateway` that always succeeds and calls the order's standard
+`payment_complete()` -- exactly what a real gateway does on success. It does
+**not** special-case the resulting status itself. Enabled by default; select
+it at checkout, or pass `payment_method=pubquiz_test_gateway` when scripting
+a checkout POST as above.
+
+Left alone, WooCommerce's `payment_complete()` jumps straight to
+`completed` for an order made up entirely of virtual, downloadable products
+(the Pubquiz product is both) -- skipping `processing` entirely, which would
+fire the customer's completed-order email with download links before
+generation has even started. `shop/mu-plugins/pubquiz-hold-processing.php`
+fixes this at the source, for every gateway and every environment
+(production included, not just local): it filters
+`woocommerce_payment_complete_order_status` to hold any order containing a
+Pubquiz-configured line item (matched on the presence of the
+`pubquiz_locale` line item meta) at `processing`. The test gateway therefore
+exercises the exact path a production gateway would.
+
+Both `pubquiz-mailpit-smtp.php` and `pubquiz-test-gateway.php` return early
+unless `wp_get_environment_type()` is `local` or `development` (set via
+`WP_ENVIRONMENT_TYPE` in `.wp-env.json`); `pubquiz-hold-processing.php` and
+`pubquiz-allow-host-webhooks.php` have no such guard since they are meant to
+run in production too (`pubquiz-operator-mail.php` is also production code,
+gated only by the presence of a prefixed private note).
 
 ## Operator mail proof
 
@@ -162,7 +178,8 @@ Mailpit) whenever a **private** order note's content starts with
 `[pubquiz]` (kept in sync by hand with `OPERATOR_NOTE_PREFIX` in
 `src/domain/checkout.ts` -- PHP cannot import the TypeScript constant).
 Verified via WP-CLI against a fresh order, watching Mailpit's message count
-(`curl http://127.0.0.1:45332/api/v1/messages`):
+(`curl http://127.0.0.1:45332/api/v1/messages`; clear the inbox first with
+`curl -X DELETE http://127.0.0.1:45332/api/v1/messages`):
 
 - `wp wc order_note create <id> --note='\[pubquiz\] operator alert test' --customer_note=false` -> Mailpit count +1, subject `[Pubquiz] Order #<id> needs attention`.
 - `wp wc order_note create <id> --note='just a regular note' --customer_note=false` -> Mailpit count unchanged (no mail).

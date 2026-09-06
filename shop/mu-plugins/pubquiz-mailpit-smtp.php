@@ -19,6 +19,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Never redirect real mail to Mailpit outside local development.
+if ( ! in_array( wp_get_environment_type(), [ 'local', 'development' ], true ) ) {
+    return;
+}
+
 // wp_mail()'s default From address ("wordpress@" + server hostname, e.g.
 // "wordpress@localhost") fails PHPMailer's own address syntax check (no TLD)
 // inside the wp-env container -- and wp_mail() sets the From address via

@@ -40,17 +40,10 @@ if ( ! $product ) {
     WP_CLI::error( 'Pubquiz product not found; create it before running this script.' );
 }
 
-/** Category ids and Dutch names, hardcoded from supabase/seed.sql (8 seeded Categories). */
-$categories = [
-    1 => 'Sport',
-    2 => 'Geschiedenis',
-    3 => 'Muziek',
-    4 => 'Aardrijkskunde',
-    5 => 'Wetenschap',
-    6 => 'Film en TV',
-    7 => 'Literatuur',
-    8 => 'Algemene Kennis',
-];
+/** Category ids, hardcoded from supabase/seed.sql (8 seeded Categories). Only
+ * the ids are needed -- choice labels are ids, not names, per the file
+ * docblock above. */
+$category_ids = [ 1, 2, 3, 4, 5, 6, 7, 8 ];
 
 function pubquiz_choice( $slug, $label, $selected = false ) {
     return [
@@ -102,8 +95,7 @@ $fields[] = [
 
 for ( $slot = 0; $slot < 8; $slot++ ) {
     $choices = [ pubquiz_choice( '', '(none)', true ) ];
-    foreach ( $categories as $id => $name ) {
-        // Label is the id, not $name -- see the file docblock.
+    foreach ( $category_ids as $id ) {
         $choices[] = pubquiz_choice( (string) $id, (string) $id );
     }
 

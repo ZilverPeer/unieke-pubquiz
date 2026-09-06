@@ -1,21 +1,11 @@
 /**
  * Shared configuration for the local shop scripts (ticket #37).
  *
- * Category ids and Dutch names are hardcoded here from `supabase/seed.sql`
- * (the seed is the single source of truth; this list must be updated by
- * hand if the seed's 8 Categories ever change). See shop/README.md.
+ * Category ids are hardcoded from `supabase/seed.sql` (the seed is the
+ * single source of truth) in
+ * shop/mu-plugins/wp-cli-scripts/setup-field-group.php, which is PHP and so
+ * cannot import this module. See shop/README.md.
  */
-
-export const CATEGORIES: ReadonlyArray<{ id: number; nl: string }> = [
-  { id: 1, nl: "Sport" },
-  { id: 2, nl: "Geschiedenis" },
-  { id: 3, nl: "Muziek" },
-  { id: 4, nl: "Aardrijkskunde" },
-  { id: 5, nl: "Wetenschap" },
-  { id: 6, nl: "Film en TV" },
-  { id: 7, nl: "Literatuur" },
-  { id: 8, nl: "Algemene Kennis" },
-];
 
 export const WP_ENV_PORT = 45330;
 export const WP_ENV_TESTS_PORT = 45331;
