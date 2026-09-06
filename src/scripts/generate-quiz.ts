@@ -6,7 +6,7 @@
  * consumes no Items. No process.exit here -- see src/scripts/generate.ts
  * for the CLI entry point.
  */
-import type { CompositionRecord, GenerationFailure } from "@/domain";
+import type { CompositionRecord, GenerationFailure, QuizContent } from "@/domain";
 import { createSeededRandom, sampleComposition } from "@/sample";
 import type { ContentRepository } from "@/repository";
 import {
@@ -47,6 +47,21 @@ export type GenerateQuizResult =
  */
 export type WriteDeliverables = (files: GeneratedQuizFiles) => Promise<void>;
 
+/**
+ * Renders all four Deliverables from an already-assembled QuizContent.
+ * Extracted from generateQuiz so ticket #42's `--composition` dev-script
+ * flag can re-render an existing Composition (no sampling, no persisting)
+ * through exactly the same rendering path a fresh generation uses.
+ */
+export async function renderQuizFiles(quizContent: QuizContent): Promise<GeneratedQuizFiles> {
+  return {
+    "quizmaster.pdf": await renderQuizmasterPdf(quizContent),
+    "picture-handout.pdf": await renderPictureHandoutPdf(quizContent),
+    "answer-sheet.pdf": await renderAnswerSheetPdf(quizContent),
+    "music-round.mp3": await renderMusicRoundMp3(quizContent),
+  };
+}
+
 export async function generateQuiz(
   options: GenerateOptions,
   repository: ContentRepository,
@@ -83,12 +98,7 @@ export async function generateQuiz(
     music: (storagePath) => repository.downloadMusicClip(storagePath),
   });
 
-  const files: GeneratedQuizFiles = {
-    "quizmaster.pdf": await renderQuizmasterPdf(quizContent),
-    "picture-handout.pdf": await renderPictureHandoutPdf(quizContent),
-    "answer-sheet.pdf": await renderAnswerSheetPdf(quizContent),
-    "music-round.mp3": await renderMusicRoundMp3(quizContent),
-  };
+  const files = await renderQuizFiles(quizContent);
 
   // Deliver before persisting: if writing fails, this rejects and
   // persistComposition below never runs, so a delivery failure never

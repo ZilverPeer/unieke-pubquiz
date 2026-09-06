@@ -57,6 +57,9 @@ async function buildFakeRepository(): Promise<ContentRepository> {
     persistComposition: async () => {
       throw new Error("persistComposition should not be reachable in this test");
     },
+    getCompositionById: async () => {
+      throw new Error("getCompositionById should not be reachable in this test");
+    },
     downloadPicture: async () => new Uint8Array([1, 2, 3]),
     downloadMusicClip: async () => toneA,
   };

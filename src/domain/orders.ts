@@ -65,3 +65,23 @@ export type DeliverableFile = (typeof DELIVERABLE_FILES)[number];
 export function downloadPath(token: string, file: DeliverableFile): string {
   return `/download/${token}/${file}`;
 }
+
+/**
+ * Days a download token stays valid after `delivered_at` (CONTEXT.md
+ * "Orders and Quizzes"). The daily pruning job (ticket #42, src/worker/prune.ts)
+ * clears any token/objects older than this; the shop's own product download
+ * expiry (ticket #37) is set to match this constant, not re-derived.
+ */
+export const DOWNLOAD_VALIDITY_DAYS = 30;
+
+/**
+ * Content-Type per Deliverable file. Shared by the worker's upload
+ * (src/worker/quiz-job.ts) and the download route (ticket #42) so the two
+ * never drift apart.
+ */
+export const DELIVERABLE_CONTENT_TYPES: Record<DeliverableFile, string> = {
+  "quizmaster.pdf": "application/pdf",
+  "picture-handout.pdf": "application/pdf",
+  "answer-sheet.pdf": "application/pdf",
+  "music-round.mp3": "audio/mpeg",
+};

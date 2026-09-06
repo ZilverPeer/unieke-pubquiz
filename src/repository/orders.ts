@@ -288,6 +288,23 @@ export async function listPendingQuizzes(client: SupabaseClient<Database>): Prom
   return data.map(toQuizRecord);
 }
 
+/** Every `failed` Quiz -- the pruning job (#42) deletes any leftover (possibly partial) Storage objects for these. */
+export async function listFailedQuizzes(client: SupabaseClient<Database>): Promise<QuizRecord[]> {
+  const { data, error } = await client.from("quizzes").select().eq("status", "failed");
+  if (error) throw error;
+  return data.map(toQuizRecord);
+}
+
+/** The Quiz referencing a Composition, if any -- for the `--composition` dev script flag (ticket #42). */
+export async function getQuizByCompositionId(
+  client: SupabaseClient<Database>,
+  compositionId: string,
+): Promise<QuizRecord | null> {
+  const { data, error } = await client.from("quizzes").select().eq("composition_id", compositionId).maybeSingle();
+  if (error) throw error;
+  return data ? toQuizRecord(data) : null;
+}
+
 /**
  * Added for the worker (ticket #40): generateQuiz needs the order's billing
  * email, which QuizRecord doesn't carry (billing email lives on `orders`,

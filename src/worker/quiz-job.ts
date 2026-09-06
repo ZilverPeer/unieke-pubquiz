@@ -11,20 +11,13 @@
  */
 import { randomBytes } from "node:crypto";
 import type { DeliverableFile } from "@/domain";
-import { DELIVERABLE_FILES, downloadPath } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
 import { QuizStatusChangedConcurrentlyError } from "@/repository";
 import type { QuizRecord } from "@/domain";
 import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import type { GenerateOptions } from "@/scripts/cli-args";
-
-const CONTENT_TYPES: Record<DeliverableFile, string> = {
-  "quizmaster.pdf": "application/pdf",
-  "picture-handout.pdf": "application/pdf",
-  "answer-sheet.pdf": "application/pdf",
-  "music-round.mp3": "audio/mpeg",
-};
 
 /** Thrown for a Quiz whose checkout configuration cannot be satisfied at all -- never retried. */
 export class InvalidQuizConfigError extends Error {
@@ -164,7 +157,7 @@ async function generateAndRecord(
 
   const writeDeliverables = async (files: GeneratedQuizFiles): Promise<void> => {
     for (const file of DELIVERABLE_FILES) {
-      await deps.uploadDeliverable(`${quiz.id}/${file}`, files[file], CONTENT_TYPES[file]);
+      await deps.uploadDeliverable(`${quiz.id}/${file}`, files[file], DELIVERABLE_CONTENT_TYPES[file]);
     }
   };
 
