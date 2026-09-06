@@ -1,10 +1,112 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractText, getDocumentProxy } from "unpdf";
+import { extractText, extractTextItems, getDocumentProxy } from "unpdf";
 import { describe, expect, test } from "vitest";
+import type { QuizContent } from "@/domain";
 import { buildQuizContentFixture } from "@/domain";
 import { renderAnswerSheetPdf } from "./answer-sheet-pdf";
+import {
+  CELL_WIDTH,
+  GRID_COLUMNS,
+  GRID_ROWS,
+  PAGE_HEIGHT,
+  PAGE_MARGIN,
+  PAGE_WIDTH,
+  ROW_HEIGHT,
+} from "./answer-sheet/layout";
+import { CELL_PADDING, sectionStyles } from "./answer-sheet/section-styles";
+
+/** Every cell's dashed border, inside which CELL_PADDING is also applied. */
+const CELL_BORDER_WIDTH = 1;
+
+/**
+ * The x-coordinate a heading's glyphs must stay left of: the right edge of
+ * the grid cell(s) a section occupies (2 for the Music section, 1 for a
+ * Text Round section), minus the cell's own border and padding inset.
+ */
+function sectionRightEdge(startColumn: number, columnSpan: number): number {
+  return PAGE_MARGIN + CELL_WIDTH * (startColumn + columnSpan) - CELL_PADDING - CELL_BORDER_WIDTH;
+}
+
+/**
+ * Generous enough to cover the header's worst case: a two-line-wrapped
+ * heading (18pt) plus the team-name group pushed onto its own following
+ * line (another ~13pt), plus inter-line spacing.
+ */
+const HEADER_ZONE_HEIGHT = 45;
+
+const HEADING_START_PATTERN = /^(Ronde|Round|Muziekronde|Music Round)\b/;
+const TEAM_NAME_LABEL_PATTERN = /^(Teamnaam|Team name):$/;
+/** A numbered answer/entry row ("1.", "1. Artiest:", ...) — never part of a header. */
+const ANSWER_ROW_PATTERN = /^\d+\./;
+
+interface TextBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+function boxOf(item: { x: number; y: number; width: number; height: number }): TextBox {
+  return { minX: item.x, maxX: item.x + item.width, minY: item.y, maxY: item.y + item.height };
+}
+
+function unionBox(items: { x: number; y: number; width: number; height: number }[]): TextBox {
+  const boxes = items.map(boxOf);
+  return {
+    minX: Math.min(...boxes.map((b) => b.minX)),
+    maxX: Math.max(...boxes.map((b) => b.maxX)),
+    minY: Math.min(...boxes.map((b) => b.minY)),
+    maxY: Math.max(...boxes.map((b) => b.maxY)),
+  };
+}
+
+function boxesIntersect(a: TextBox, b: TextBox): boolean {
+  return a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+}
+
+/**
+ * For one grid row, pairs up each section's heading (its start item plus any
+ * wrapped continuation lines, grouped by sharing the heading start's exact
+ * x) with that section's team-name label item — sections left-to-right in
+ * both lists line up because both are read in the same left-to-right x
+ * order — and returns each pair's bounding boxes for an overlap check.
+ */
+function headerPairsForRow(
+  items: { str: string; x: number; y: number; width: number; height: number }[],
+  rowTopY: number,
+): { heading: TextBox; teamNameLabel: TextBox; headingText: string }[] {
+  const zoneItems = items.filter(
+    (item) =>
+      item.str.trim() !== "" &&
+      !ANSWER_ROW_PATTERN.test(item.str) &&
+      item.y <= rowTopY - CELL_PADDING &&
+      item.y > rowTopY - CELL_PADDING - HEADER_ZONE_HEIGHT,
+  );
+
+  const headingStarts = zoneItems
+    .filter((item) => HEADING_START_PATTERN.test(item.str))
+    .sort((a, b) => a.x - b.x);
+  const teamNameLabels = zoneItems
+    .filter((item) => TEAM_NAME_LABEL_PATTERN.test(item.str))
+    .sort((a, b) => a.x - b.x);
+
+  expect(headingStarts.length, "expected one heading start item per section in this row").toBe(
+    teamNameLabels.length,
+  );
+
+  return headingStarts.map((start, i) => {
+    const headingLines = zoneItems.filter(
+      (item) => item.x === start.x && !TEAM_NAME_LABEL_PATTERN.test(item.str),
+    );
+    return {
+      heading: unionBox(headingLines),
+      teamNameLabel: boxOf(teamNameLabels[i]),
+      headingText: headingLines.map((line) => line.str).join(" "),
+    };
+  });
+}
 
 const scratchDir = path.join(process.cwd(), ".scratch");
 
@@ -19,8 +121,29 @@ async function writeScratch(name: string, buffer: Buffer): Promise<void> {
   fs.writeFileSync(path.join(scratchDir, name), buffer);
 }
 
+describe("Answer sheet grid geometry", () => {
+  test("is a 4-column x 2-row grid of ~205pt x ~288pt cells", () => {
+    expect(GRID_COLUMNS).toBe(4);
+    expect(GRID_ROWS).toBe(2);
+    expect(CELL_WIDTH).toBeCloseTo((PAGE_WIDTH - PAGE_MARGIN * 2) / 4, 5);
+    expect(ROW_HEIGHT).toBeCloseTo((PAGE_HEIGHT - PAGE_MARGIN * 2) / 2, 5);
+    // A cell this narrow only has room for a single stacked answer column,
+    // not the two-columns-of-five that a wider (2x4-grid) cell could fit.
+    expect(CELL_WIDTH).toBeLessThan(250);
+    // A cell this tall gives a legible (>20pt) pitch across 10 stacked rows.
+    expect(ROW_HEIGHT).toBeGreaterThan(250);
+  });
+});
+
+describe("Answer sheet answer-line style", () => {
+  test("the answer line fills the remaining row width instead of a fixed-length blank", () => {
+    expect(sectionStyles.answerLine.flexGrow).toBe(1);
+    expect(sectionStyles.answerLine.borderBottomWidth).toBeGreaterThan(0);
+  });
+});
+
 describe("renderAnswerSheetPdf", () => {
-  test("renders exactly one A4 page", async () => {
+  test("renders exactly one landscape A4 page", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
 
     const buffer = await renderAnswerSheetPdf(quiz);
@@ -30,7 +153,163 @@ describe("renderAnswerSheetPdf", () => {
 
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     expect(pdf.numPages).toBe(1);
+
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    expect(viewport.width).toBeGreaterThan(viewport.height);
   });
+
+  test("Text Round heading and team-name label share one line", async () => {
+    const quiz = buildQuizContentFixture({ locale: "nl" });
+
+    const buffer = await renderAnswerSheetPdf(quiz);
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const lines = text.split("\n");
+
+    for (let n = 1; n <= 6; n++) {
+      const headingLine = lines.find(
+        (line) => line.includes(`Ronde ${n}: Categorie ${n}`) && line.includes("Teamnaam"),
+      );
+      expect(
+        headingLine,
+        `expected a line containing both "Ronde ${n}: Categorie ${n}" and "Teamnaam"`,
+      ).toBeDefined();
+    }
+  });
+
+  test(
+    "still fits on one page with nl, en and a 40-character Category name, wrapping the " +
+      "heading instead of clipping it or the team-name field when the two don't fit on one line",
+    async () => {
+      const longCategoryName = "A".repeat(40);
+      const withLongCategoryNames = (quiz: QuizContent): QuizContent => ({
+        ...quiz,
+        rounds: quiz.rounds.map((round) => ({ ...round, categoryName: longCategoryName })),
+      });
+
+      const nlQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "nl" }));
+      const enQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "en" }));
+
+      const nlBuffer = await renderAnswerSheetPdf(nlQuiz);
+      const enBuffer = await renderAnswerSheetPdf(enQuiz);
+      await writeScratch("answer-sheet-nl-long-category.pdf", nlBuffer);
+
+      const nlPdf = await getDocumentProxy(new Uint8Array(nlBuffer));
+      const enPdf = await getDocumentProxy(new Uint8Array(enBuffer));
+
+      expect(nlPdf.numPages).toBe(1);
+      expect(enPdf.numPages).toBe(1);
+
+      // A 40-character Category name doesn't fit a Text Round section's
+      // ~205pt-wide header alongside "Teamnaam" at 9pt, nor even on a single
+      // wrapped line of its own (~193pt of usable width holds ~31 characters
+      // of this font). Chosen behaviour: the full Category name still
+      // renders in full — reflowed across as many of its own lines as it
+      // needs — and "Teamnaam" moves to a following line of its own;
+      // neither is clipped, and no line mixes the two.
+      const { text } = await extractText(nlPdf, { mergePages: true });
+      const lines = text.split("\n");
+
+      const reflowedWithoutBreaks = lines.join("");
+      expect(
+        reflowedWithoutBreaks,
+        'expected the full 40-character Category name to still appear intact once its wrapped lines are rejoined, not clipped',
+      ).toContain(longCategoryName);
+
+      // The Music Round section is two grid columns wide, so it has enough
+      // room to fit its heading and "Teamnaam" on one line even with a
+      // 40-character Category name — only the (single-column) Text Round
+      // sections are expected to need the heading-wraps-to-its-own-line
+      // fallback under test here.
+      const textSectionCategoryLines = lines.filter(
+        (line) => /A{5,}/.test(line) && !line.includes("Muziekronde") && !line.includes("Music Round"),
+      );
+      expect(textSectionCategoryLines.length).toBeGreaterThan(0);
+      for (const line of textSectionCategoryLines) {
+        expect(line).not.toContain("Teamnaam");
+      }
+      expect(lines.some((line) => line.includes("Teamnaam"))).toBe(true);
+    },
+  );
+
+  test("a wrapped heading never overflows its section's right edge into the next section", async () => {
+    const longCategoryName = "A".repeat(40);
+    const quiz: QuizContent = {
+      ...buildQuizContentFixture({ locale: "nl" }),
+      rounds: buildQuizContentFixture({ locale: "nl" }).rounds.map((round) => ({
+        ...round,
+        categoryName: longCategoryName,
+      })),
+    };
+
+    const buffer = await renderAnswerSheetPdf(quiz);
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { items } = await extractTextItems(pdf);
+
+    // Every text item belonging to a heading's wrapped Category-name run
+    // (the runs of 5-or-more "A"s produced by the fixture above) must stay
+    // left of the right edge of the section it's rendered in — a Text
+    // Round section is one grid column wide, the Music Round section
+    // (rendered in the last two columns of row 2) is two columns wide.
+    const headingRunItems = items[0].filter((item) => /A{5,}/.test(item.str));
+    expect(headingRunItems.length).toBeGreaterThan(0);
+
+    for (const item of headingRunItems) {
+      const startColumn = Math.round((item.x - PAGE_MARGIN) / CELL_WIDTH);
+      const isMusicSection = startColumn >= GRID_COLUMNS - 2 && item.y < ROW_HEIGHT;
+      const columnSpan = isMusicSection ? 2 : 1;
+      const rightEdge = sectionRightEdge(startColumn, columnSpan);
+
+      expect(
+        item.x + item.width,
+        `expected heading text item "${item.str}" (x=${item.x}, width=${item.width}) to stay ` +
+          `within its section's right edge of ${rightEdge}, not overflow into the next section`,
+      ).toBeLessThanOrEqual(rightEdge);
+    }
+  });
+
+  test.each([
+    ["a 40-character unbroken Category name", "A".repeat(40)],
+    ["a wordy ~40-character Category name", "Nederlandse popmuziek uit de jaren tachtig"],
+  ])(
+    "the heading and the team-name label never overlap, even with %s",
+    async (_description, categoryName) => {
+      const quiz: QuizContent = {
+        ...buildQuizContentFixture({ locale: "nl" }),
+        rounds: buildQuizContentFixture({ locale: "nl" }).rounds.map((round) => ({
+          ...round,
+          categoryName,
+        })),
+      };
+
+      const buffer = await renderAnswerSheetPdf(quiz);
+      const pdf = await getDocumentProxy(new Uint8Array(buffer));
+      const { items } = await extractTextItems(pdf);
+
+      const rowTopYs = [
+        PAGE_HEIGHT - PAGE_MARGIN,
+        PAGE_HEIGHT - PAGE_MARGIN - ROW_HEIGHT,
+      ];
+
+      const pairs = rowTopYs.flatMap((rowTopY) => headerPairsForRow(items[0], rowTopY));
+      // Row 1: GRID_COLUMNS Text Round sections. Row 2: (GRID_COLUMNS - 2)
+      // Text Round sections plus the Music Round section, which spans the
+      // last two columns but is still a single section with one header.
+      const rowOneSectionCount = GRID_COLUMNS;
+      const rowTwoSectionCount = GRID_COLUMNS - 2 + 1;
+      expect(pairs.length).toBe(rowOneSectionCount + rowTwoSectionCount);
+
+      for (const { heading, teamNameLabel, headingText } of pairs) {
+        expect(
+          boxesIntersect(heading, teamNameLabel),
+          `expected the heading "${headingText}" (x ${heading.minX}-${heading.maxX}, ` +
+            `y ${heading.minY}-${heading.maxY}) not to overlap its section's team-name label ` +
+            `(x ${teamNameLabel.minX}-${teamNameLabel.maxX}, y ${teamNameLabel.minY}-${teamNameLabel.maxY})`,
+        ).toBe(false);
+      }
+    },
+  );
 
   test("contains the six Text Round names and the Music Round heading in nl", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });

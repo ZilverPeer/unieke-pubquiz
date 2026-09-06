@@ -1,25 +1,18 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { wrapLongRuns } from "../pdf/hyphenation";
 import { CELL_WIDTH } from "./layout";
 import { sectionStyles } from "./section-styles";
 
-const ITEMS_PER_COLUMN = 5;
+const ITEM_COUNT = 10;
 
 const styles = StyleSheet.create({
   cell: {
     width: CELL_WIDTH,
   },
-  answerColumns: {
-    flexDirection: "row",
-    flexGrow: 1,
-  },
   answerColumn: {
-    width: "50%",
     flexDirection: "column",
+    flexGrow: 1,
     justifyContent: "space-between",
-  },
-  answerLine: {
-    fontSize: 7,
-    flexDirection: "row",
   },
 });
 
@@ -31,32 +24,32 @@ export interface TextRoundSectionProps {
 }
 
 /**
- * One eighth-page section for a Text Round: a heading line, a team-name
- * field, and 10 numbered answer lines in two columns of 5.
+ * One grid-cell section for a Text Round: the heading and the team-name
+ * field share a header line (the heading wraps to a second line instead of
+ * clipping when a long Category name doesn't fit), followed by 10 numbered
+ * answer rows stacked in one column, each a full-width ruled line.
  */
 export function TextRoundSection({ heading, teamNameLabel }: TextRoundSectionProps) {
-  const leftNumbers = Array.from({ length: ITEMS_PER_COLUMN }, (_, i) => i + 1);
-  const rightNumbers = Array.from({ length: ITEMS_PER_COLUMN }, (_, i) => i + 1 + ITEMS_PER_COLUMN);
+  const numbers = Array.from({ length: ITEM_COUNT }, (_, i) => i + 1);
 
   return (
     <View style={[sectionStyles.cell, styles.cell]} wrap={false}>
-      <Text style={sectionStyles.heading}>{heading}</Text>
-      <Text style={sectionStyles.teamName}>{teamNameLabel}: ______________</Text>
-      <View style={styles.answerColumns} wrap={false}>
-        <View style={styles.answerColumn} wrap={false}>
-          {leftNumbers.map((n) => (
-            <Text key={n} style={styles.answerLine}>
-              {n}. ________________________
-            </Text>
-          ))}
+      <View style={sectionStyles.header} wrap={false}>
+        <Text style={sectionStyles.heading} hyphenationCallback={wrapLongRuns}>
+          {heading}
+        </Text>
+        <View style={sectionStyles.teamNameGroup} wrap={false}>
+          <Text style={sectionStyles.teamNameLabel}>{teamNameLabel}:</Text>
+          <View style={sectionStyles.teamNameLine} />
         </View>
-        <View style={styles.answerColumn} wrap={false}>
-          {rightNumbers.map((n) => (
-            <Text key={n} style={styles.answerLine}>
-              {n}. ________________________
-            </Text>
-          ))}
-        </View>
+      </View>
+      <View style={styles.answerColumn} wrap={false}>
+        {numbers.map((n) => (
+          <View key={n} style={sectionStyles.answerRow} wrap={false}>
+            <Text style={sectionStyles.answerNumber}>{n}.</Text>
+            <View style={sectionStyles.answerLine} />
+          </View>
+        ))}
       </View>
     </View>
   );
