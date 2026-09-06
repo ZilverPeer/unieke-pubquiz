@@ -35,9 +35,10 @@ function isEligible(
  * Builds the requested-Difficulty quota for one slot as a flat list of one
  * entry per requested Item: a single Difficulty requests `itemsPerSlot` of
  * that level; `mixed` splits it 4/3/3 across easy/medium/hard, with the
- * level getting the extra one chosen by `random` first - the same call
- * order as before this module switched to exact matching, so seed-dependent
- * outcomes change as little as possible.
+ * level getting the extra one chosen by `random` here, before any matching
+ * draws. This is the only draw shared with the pre-matching implementation -
+ * every later draw differs, so a given seed does not reproduce the same
+ * Composition as the old greedy fill.
  */
 function buildQuota(
   requestedDifficulty: RequestedDifficulty,
