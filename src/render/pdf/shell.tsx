@@ -43,15 +43,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#333333",
   },
-  footer: {
-    position: "absolute",
-    bottom: 20,
-    left: 36,
-    right: 36,
-    fontSize: 8,
-    textAlign: "center",
-    color: "#666666",
-  },
   content: {
     flexGrow: 1,
   },
@@ -64,8 +55,8 @@ export interface PdfPageProps {
 }
 
 /**
- * Branded A4 page frame: a minimal header ("Unieke Pubquiz") and footer,
- * shared by every PDF Deliverable. Renderer tickets place content in `children`.
+ * Branded A4 page frame: a minimal header ("Unieke Pubquiz"), shared by every
+ * PDF Deliverable. Renderer tickets place content in `children`.
  */
 export function PdfPage({ children, orientation = "portrait" }: PdfPageProps) {
   return (
@@ -74,11 +65,6 @@ export function PdfPage({ children, orientation = "portrait" }: PdfPageProps) {
         Unieke Pubquiz
       </Text>
       <View style={styles.content}>{children}</View>
-      <Text
-        style={styles.footer}
-        fixed
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-      />
     </Page>
   );
 }
