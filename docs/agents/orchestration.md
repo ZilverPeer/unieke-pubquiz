@@ -26,7 +26,7 @@ Every brief contains, in this order:
 - Ticket number, worktree path, and "work only there".
 - Fixed file layout: which files to create, which to touch, which are off limits.
 - Named tdd seams (what gets a red test first) and which boundaries may be faked. Renderers and the sampler are never mocked.
-- Acceptance criteria restated as checks the Spec reviewer will run.
+- Acceptance criteria restated as checks the Spec reviewer will run. For renderer tickets the visual criteria are numbers (row pitch, minimum image height, margins), never "pick what fits"; the implementer rasterises the worst-case fixture (`pdftoppm -png -r 100`) and reports the PNG paths (wave 4: #27 needed three fix rounds without this).
 - Verification budget (see below).
 - Stack rule for this ticket: "the stack is running and seeded, use it, do not start/stop/reset it" or "this ticket does not need the stack, do not start it".
 - Out-of-scope rule: if something outside the ticket looks wrong, report it in the PR body rather than fixing it in the ticket. The orchestrator decides whether it becomes an issue.
@@ -72,7 +72,7 @@ Reports findings tagged HARD or JUDGEMENT with `file:line`, then a one-paragraph
 
 ### Spec reviewer
 
-Empirical, in PowerShell (the user's shell), in the persistent review clone `%LOCALAPPDATA%\Temp\pubquiz-review` (`git fetch && git checkout <branch> && git reset --hard && git clean -fdx -e node_modules && npm install`). A fresh clone is only worth its install time when the ticket touches `package.json` or build config. Reproduces every acceptance criterion with the real tools (real render, real ffprobe, real database counts), records the exact evidence, and proves any new failing-test claim by checking out master's version of the file under test. Uses the running stack; never starts, stops or resets it. Cleans up its own output folders.
+Empirical, in PowerShell (the user's shell), in the persistent review clone `%LOCALAPPDATA%\Temp\pubquiz-review` (`git fetch && git checkout <branch> && git reset --hard && git clean -fdx -e node_modules && npm install`). A fresh clone is only worth its install time when the ticket touches `package.json` or build config. Reproduces every acceptance criterion with the real tools (real render, real ffprobe, real database counts), records the exact evidence, and proves any new failing-test claim by checking out master's version of the file under test. Uses the running stack; never starts, stops or resets it. Regenerates every sample from the branch tip; never inspects files an implementer left in its worktree (wave 4: a stale sample produced a false clipping finding). Cleans up its own output folders.
 
 ### Fix round
 
