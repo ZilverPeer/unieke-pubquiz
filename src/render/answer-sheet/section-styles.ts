@@ -13,6 +13,9 @@ import { ROW_HEIGHT } from "./layout";
  */
 export const MIN_TEAM_NAME_WIDTH = 90;
 
+/** Horizontal and vertical inset applied inside every section's dashed-line cell. */
+export const CELL_PADDING = 6;
+
 /**
  * Styles shared by every Answer sheet section (Text Round and Music Round):
  * the dashed-cut-line cell frame, the header row (heading and team-name
@@ -27,7 +30,7 @@ export const sectionStyles = StyleSheet.create({
     borderStyle: "dashed",
     borderWidth: 1,
     borderColor: "#000000",
-    padding: 6,
+    padding: CELL_PADDING,
     fontFamily: PDF_FONT_FAMILY,
   },
   header: {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractText, getDocumentProxy } from "unpdf";
+import { extractText, extractTextItems, getDocumentProxy } from "unpdf";
 import { describe, expect, test } from "vitest";
 import type { QuizContent } from "@/domain";
 import { buildQuizContentFixture } from "@/domain";
@@ -15,7 +15,19 @@ import {
   PAGE_WIDTH,
   ROW_HEIGHT,
 } from "./answer-sheet/layout";
-import { sectionStyles } from "./answer-sheet/section-styles";
+import { CELL_PADDING, sectionStyles } from "./answer-sheet/section-styles";
+
+/** Every cell's dashed border, inside which CELL_PADDING is also applied. */
+const CELL_BORDER_WIDTH = 1;
+
+/**
+ * The x-coordinate a heading's glyphs must stay left of: the right edge of
+ * the grid cell(s) a section occupies (2 for the Music section, 1 for a
+ * Text Round section), minus the cell's own border and padding inset.
+ */
+function sectionRightEdge(startColumn: number, columnSpan: number): number {
+  return PAGE_MARGIN + CELL_WIDTH * (startColumn + columnSpan) - CELL_PADDING - CELL_BORDER_WIDTH;
+}
 
 const scratchDir = path.join(process.cwd(), ".scratch");
 
@@ -111,22 +123,72 @@ describe("renderAnswerSheetPdf", () => {
       expect(enPdf.numPages).toBe(1);
 
       // A 40-character Category name doesn't fit a Text Round section's
-      // ~205pt-wide header alongside "Teamnaam" at 9pt. Chosen behaviour:
-      // the full Category name still renders, on its own line, and the
-      // team-name field moves to a following line — neither is clipped or
-      // overlaps the other.
+      // ~205pt-wide header alongside "Teamnaam" at 9pt, nor even on a single
+      // wrapped line of its own (~193pt of usable width holds ~31 characters
+      // of this font). Chosen behaviour: the full Category name still
+      // renders in full — reflowed across as many of its own lines as it
+      // needs — and "Teamnaam" moves to a following line of its own;
+      // neither is clipped, and no line mixes the two.
       const { text } = await extractText(nlPdf, { mergePages: true });
       const lines = text.split("\n");
 
-      const categoryLine = lines.find((line) => line.includes(longCategoryName));
+      const reflowedWithoutBreaks = lines.join("");
       expect(
-        categoryLine,
-        "expected the full 40-character Category name on its own line, not clipped",
-      ).toBeDefined();
-      expect(categoryLine).not.toContain("Teamnaam");
+        reflowedWithoutBreaks,
+        'expected the full 40-character Category name to still appear intact once its wrapped lines are rejoined, not clipped',
+      ).toContain(longCategoryName);
+
+      // The Music Round section is two grid columns wide, so it has enough
+      // room to fit its heading and "Teamnaam" on one line even with a
+      // 40-character Category name — only the (single-column) Text Round
+      // sections are expected to need the heading-wraps-to-its-own-line
+      // fallback under test here.
+      const textSectionCategoryLines = lines.filter(
+        (line) => /A{5,}/.test(line) && !line.includes("Muziekronde") && !line.includes("Music Round"),
+      );
+      expect(textSectionCategoryLines.length).toBeGreaterThan(0);
+      for (const line of textSectionCategoryLines) {
+        expect(line).not.toContain("Teamnaam");
+      }
       expect(lines.some((line) => line.includes("Teamnaam"))).toBe(true);
     },
   );
+
+  test("a wrapped heading never overflows its section's right edge into the next section", async () => {
+    const longCategoryName = "A".repeat(40);
+    const quiz: QuizContent = {
+      ...buildQuizContentFixture({ locale: "nl" }),
+      rounds: buildQuizContentFixture({ locale: "nl" }).rounds.map((round) => ({
+        ...round,
+        categoryName: longCategoryName,
+      })),
+    };
+
+    const buffer = await renderAnswerSheetPdf(quiz);
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { items } = await extractTextItems(pdf);
+
+    // Every text item belonging to a heading's wrapped Category-name run
+    // (the runs of 5-or-more "A"s produced by the fixture above) must stay
+    // left of the right edge of the section it's rendered in — a Text
+    // Round section is one grid column wide, the Music Round section
+    // (rendered in the last two columns of row 2) is two columns wide.
+    const headingRunItems = items[0].filter((item) => /A{5,}/.test(item.str));
+    expect(headingRunItems.length).toBeGreaterThan(0);
+
+    for (const item of headingRunItems) {
+      const startColumn = Math.round((item.x - PAGE_MARGIN) / CELL_WIDTH);
+      const isMusicSection = startColumn >= GRID_COLUMNS - 2 && item.y < ROW_HEIGHT;
+      const columnSpan = isMusicSection ? 2 : 1;
+      const rightEdge = sectionRightEdge(startColumn, columnSpan);
+
+      expect(
+        item.x + item.width,
+        `expected heading text item "${item.str}" (x=${item.x}, width=${item.width}) to stay ` +
+          `within its section's right edge of ${rightEdge}, not overflow into the next section`,
+      ).toBeLessThanOrEqual(rightEdge);
+    }
+  });
 
   test("contains the six Text Round names and the Music Round heading in nl", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
