@@ -7,9 +7,9 @@
  * Subsubcategory per Difficulty per kind, a subset of Items translated for
  * only one Locale) so runs stay fast; property 4's Subsubcategory count
  * (1-7) is bound tightly enough for a brute-force search over assignments
- * to be feasible; properties 1-3 use a wider Subsubcategory count (8-14, see
- * worldArb) since anything smaller can never fill a full 10-Item slot at
- * all - see worldArb's own comment for why.
+ * to be feasible; properties 1-3 use a wider Subsubcategory count (14-20,
+ * see worldArb's own comment) since anything smaller can never fill a
+ * full 10-Item slot at all.
  */
 import * as fc from "fast-check";
 import { describe, expect, test } from "vitest";
@@ -45,23 +45,49 @@ function itemById(pool: readonly PoolItem[], id: string): PoolItem {
 }
 
 /**
- * A pool with 1-4 Categories, each with 8-14 Subsubcategories, and 0-4
- * Items per (Subsubcategory, Difficulty) - every combination gets its own
- * independently generated count (dense, not a sparse sample of cells), the
- * same count reused for all 3 kinds so a full 8-slot Composition (6 text, 1
- * picture, 1 music slots) is reachable.
+ * Builds a `PoolItem` for a test pool. `subcategoryId` is not exercised by
+ * any property here (sampling only branches on categoryId/subsubcategoryId),
+ * so it's always set equal to `categoryId` - shared by both generators below.
+ */
+function makePoolItem(fields: {
+  id: string;
+  kind: ItemKind;
+  difficulty: Difficulty;
+  categoryId: string;
+  subsubcategoryId: string;
+  locales: readonly Locale[];
+}): PoolItem {
+  return { ...fields, subcategoryId: fields.categoryId };
+}
+
+/**
+ * A pool with 1-4 Categories, each with 14-20 Subsubcategories, and a 0-4
+ * Item count per (Subsubcategory, Difficulty) - every combination gets its
+ * own independently generated count (dense, not a sparse sample of cells),
+ * the same count reused for all 3 kinds so a full 8-slot Composition (6
+ * text, 1 picture, 1 music slots) is reachable.
  *
  * The no-shared-Subsubcategory rule applies across a whole slot's quota,
  * combining all Difficulty levels for `mixed` requests, so a slot needs
  * `ITEMS_PER_SLOT` (10) distinct eligible Subsubcategories regardless of the
  * Difficulty split - fewer than that (the ticket's suggested 1-6) makes
  * `sampleComposition` shortfall on every single generated scenario, leaving
- * properties 1-3 nothing to check. 8-14 keeps pools small while making both
- * success and genuine shortfall common. A per-cell Locale pattern picks
- * translations for both Locales, or only "nl", or only "en".
+ * properties 1-3 nothing to check.
+ *
+ * A per-cell Locale pattern picks translations for both Locales, or only
+ * "nl", or only "en"; per-cell item counts are occasionally 0. Each of
+ * those independently knocks a Subsubcategory out of eligibility for a
+ * given request's Locale/Difficulty, so both are weighted towards "eligible"
+ * (item count non-zero 6-in-7; Locale pattern "both" 3-in-5) - uniform 1-in-3
+ * odds on each, as a first attempt, drove real Composition successes down to
+ * ~5/100 (measured), leaving nothing for properties 1-3 to check on most
+ * runs. 14-20 Subsubcategories with these weights measured ~70/100 full
+ * Compositions while still leaving genuine shortfalls (and the `mixed`-mode,
+ * `categoryId: null` shortfall from too few Categories) common enough to
+ * exercise the `!result.ok` path too.
  */
 const worldArb: fc.Arbitrary<World> = fc
-  .array(fc.integer({ min: 8, max: 14 }), { minLength: 1, maxLength: 4 })
+  .array(fc.integer({ min: 14, max: 20 }), { minLength: 1, maxLength: 4 })
   .chain((subsubCounts) => {
     const categoryIds = subsubCounts.map((_, index) => `category-${index}`);
     const subsubs = subsubCounts.flatMap((count, categoryIndex) =>
@@ -72,8 +98,15 @@ const worldArb: fc.Arbitrary<World> = fc
     );
 
     const cellArb = fc.record({
-      count: fc.integer({ min: 0, max: 4 }),
-      localePatternIndex: fc.integer({ min: 0, max: LOCALE_PATTERNS.length - 1 }),
+      count: fc.oneof(
+        { weight: 6, arbitrary: fc.integer({ min: 1, max: 4 }) },
+        { weight: 1, arbitrary: fc.constant(0) },
+      ),
+      localePatternIndex: fc.oneof(
+        { weight: 3, arbitrary: fc.constant(0) }, // both Locales
+        { weight: 1, arbitrary: fc.constant(1) }, // "nl" only
+        { weight: 1, arbitrary: fc.constant(2) }, // "en" only
+      ),
     });
     const cellCount = subsubs.length * DIFFICULTIES.length;
 
@@ -86,15 +119,16 @@ const worldArb: fc.Arbitrary<World> = fc
           const locales = LOCALE_PATTERNS[cell.localePatternIndex];
           for (const kind of KINDS) {
             for (let i = 0; i < cell.count; i++) {
-              pool.push({
-                id: `item-${itemCounter++}`,
-                kind,
-                difficulty,
-                categoryId: subsub.categoryId,
-                subcategoryId: subsub.categoryId,
-                subsubcategoryId: subsub.id,
-                locales,
-              });
+              pool.push(
+                makePoolItem({
+                  id: `item-${itemCounter++}`,
+                  kind,
+                  difficulty,
+                  categoryId: subsub.categoryId,
+                  subsubcategoryId: subsub.id,
+                  locales,
+                }),
+              );
             }
           }
         });
@@ -171,6 +205,7 @@ const scenarioArb: fc.Arbitrary<Scenario> = worldArb.chain((world) =>
 
 describe("sampleComposition properties", () => {
   test("property 1: no duplicate, no excluded, no missing-locale Item", () => {
+    let successCount = 0;
     fc.assert(
       fc.property(scenarioArb, ({ world, request, excludedIds, seed }) => {
         const result = sampleComposition({
@@ -180,6 +215,7 @@ describe("sampleComposition properties", () => {
           random: createSeededRandom(seed),
         });
         if (!result.ok) return;
+        successCount++;
 
         const allIds = result.composition.slots.flat();
         for (const id of allIds) {
@@ -202,16 +238,22 @@ describe("sampleComposition properties", () => {
         // SAME Category to all 8 slots (6 of them "text"), and sampleComposition
         // does not track Items already used by earlier slots of the same
         // Composition (only past-order `excludedItemIds`) - a real,
-        // pre-existing bug this property found; see the PR body for the
+        // pre-existing bug this property found; see issue #34 for the
         // minimal counterexample. Left production code untouched per brief.
         if (request.quizMode === "mixed") {
           expect(new Set(allIds).size).toBe(allIds.length);
         }
       }),
     );
+    // Measured: 70/100 runs reached a full Composition (the rest hit a
+    // genuine content shortfall or a missing Category, both exercised on
+    // purpose by scenarioArb). A sampler that always fails would score 0/100
+    // here and the assertions above would never run - guard against that.
+    expect(successCount).toBeGreaterThanOrEqual(50);
   });
 
   test("property 2: every filled slot meets its Difficulty quota exactly and has no shared Subsubcategory", () => {
+    let successCount = 0;
     fc.assert(
       fc.property(scenarioArb, ({ world, request, excludedIds, seed }) => {
         const result = sampleComposition({
@@ -221,6 +263,7 @@ describe("sampleComposition properties", () => {
           random: createSeededRandom(seed),
         });
         if (!result.ok) return;
+        successCount++;
 
         result.composition.slots.forEach((slot, slotIndex) => {
           const items = slot.map((id) => itemById(world.pool, id));
@@ -244,9 +287,13 @@ describe("sampleComposition properties", () => {
         });
       }),
     );
+    // Measured: 70/100 runs reached a full Composition, same generator and
+    // global seed as property 1 above.
+    expect(successCount).toBeGreaterThanOrEqual(50);
   });
 
   test("property 3: the same seed and input yields a deep-equal Composition", () => {
+    let successCount = 0;
     fc.assert(
       fc.property(scenarioArb, ({ world, request, excludedIds, seed }) => {
         const first = sampleComposition({
@@ -261,9 +308,17 @@ describe("sampleComposition properties", () => {
           excludedItemIds: excludedIds,
           random: createSeededRandom(seed),
         });
+        if (first.ok) successCount++;
+        // toEqual compares the full result either way, including `ok: false`
+        // failures - a mismatched slotIndex/categoryId/shortfall on an
+        // unsuccessful run is just as much a determinism violation as a
+        // mismatched Composition, so this assertion is never skipped.
         expect(second).toEqual(first);
       }),
     );
+    // Measured: 70/100 runs reached a full Composition, same generator and
+    // global seed as property 1 above.
+    expect(successCount).toBeGreaterThanOrEqual(50);
   });
 });
 
@@ -328,15 +383,16 @@ describe("fillSlot shortfall genuineness (property 4, sampler half)", () => {
           if (!hasEligibleItem[i]) continue;
           const subsubcategoryId = `sub-${i}`;
           eligibleSubsubIds.push(subsubcategoryId);
-          pool.push({
-            id: `item-${i}`,
-            kind: "text",
-            difficulty,
-            categoryId: "cat",
-            subcategoryId: "cat",
-            subsubcategoryId,
-            locales: [locale],
-          });
+          pool.push(
+            makePoolItem({
+              id: `item-${i}`,
+              kind: "text",
+              difficulty,
+              categoryId: "cat",
+              subsubcategoryId,
+              locales: [locale],
+            }),
+          );
         }
 
         const result = fillSlot({
