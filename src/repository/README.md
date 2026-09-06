@@ -9,6 +9,8 @@ Repository: the only module that talks to Postgres (via Supabase). Loads the sam
 - `persistComposition(record)` -- writes one `compositions` row plus its `composition_items` rows (`slot_index`, `position`).
 - `downloadPicture(storagePath)` / `downloadMusicClip(storagePath)` -- raw bytes from the `pictures` / `music-clips` Storage buckets.
 
+`src/repository/index.ts` also exports `createDeliverableUploader(config): UploadDeliverable` (spec #36, ticket #40) -- `(storagePath, data, contentType) => Promise<void>`, uploading to the private `deliverables` bucket with `upsert: true` (a retried or re-rendered Quiz overwrites its own prior files at the same `<quiz id>/<file name>` path). A sibling factory, not a method on `ContentRepository`: it's needed only by the worker's write side.
+
 Private helpers live alongside it: `client.ts` (Supabase client construction), `pool.ts`, `compositions.ts`, `storage.ts`, `types.ts` (the `PoolEntry` / `ItemTranslation` shapes).
 
 `pool.ts`'s two queries that scale with the Item count (the main Items query and the other-Locale translations lookup) are paginated in pages of 1000 (`fetchAllPages`, ordered by a stable key) rather than issued as a single request, so the pool is never silently truncated once the Item count passes PostgREST's `api.max_rows` cap (1000 locally).
@@ -29,6 +31,7 @@ Private helpers live alongside it: `client.ts` (Supabase client construction), `
 - `listQuizzesDeliveredBefore(cutoff)` -- `delivered` Quizzes with a non-null token whose `deliveredAt` is before `cutoff` (the pruning job's candidate set; a Quiz whose token was already cleared is excluded).
 - `getQuizById(quizId)` / `getQuizByDownloadToken(downloadToken)` -- `null` when not found.
 - `listPendingQuizzes()` -- for the worker's startup sweep.
+- `getOrderById(orderId)` -- `null` when not found. Added for the worker (ticket #40): `generateQuiz` needs the order's billing email, which `QuizRecord` doesn't carry (billing email lives on `orders`, never denormalised onto `quizzes`). The ticket #40 brief named `storage.ts` as the only repository change; this one small, same-shape addition (mirrors `getQuizById`) turned out to be required too -- see that ticket's PR for the note.
 
 `orders.ts` holds the implementation. `CategoryPick`'s `undefined` (an unassigned slot) has no jsonb equivalent, so it round-trips through `category_picks` as `null` and is converted back to `undefined` on read (`toCategoryPicks`), keeping `QuizRecord` exactly matching the pinned `src/domain/orders.ts` shapes.
 

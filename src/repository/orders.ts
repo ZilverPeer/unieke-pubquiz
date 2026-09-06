@@ -287,3 +287,15 @@ export async function listPendingQuizzes(client: SupabaseClient<Database>): Prom
   if (error) throw error;
   return data.map(toQuizRecord);
 }
+
+/**
+ * Added for the worker (ticket #40): generateQuiz needs the order's billing
+ * email, which QuizRecord doesn't carry (billing email lives on `orders`,
+ * not denormalised onto `quizzes` -- see CONTEXT.md "Order"/"Quiz"). Mirrors
+ * getQuizById's null-when-missing shape.
+ */
+export async function getOrderById(client: SupabaseClient<Database>, orderId: string): Promise<OrderRecord | null> {
+  const { data, error } = await client.from("orders").select().eq("id", orderId).maybeSingle();
+  if (error) throw error;
+  return data ? toOrderRecord(data) : null;
+}

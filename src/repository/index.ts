@@ -13,6 +13,7 @@ import {
 } from "./compositions";
 import {
   clearDownloadToken as clearDownloadTokenImpl,
+  getOrderById as getOrderByIdImpl,
   getQuizByDownloadToken as getQuizByDownloadTokenImpl,
   getQuizById as getQuizByIdImpl,
   listPendingQuizzes as listPendingQuizzesImpl,
@@ -26,7 +27,7 @@ import {
   type UpsertOrderInput,
 } from "./orders";
 import { loadPool as loadPoolImpl } from "./pool";
-import { downloadFromBucket } from "./storage";
+import { downloadFromBucket, uploadToDeliverablesBucket } from "./storage";
 import type { PoolEntry } from "./types";
 
 export type { RepositoryConfig } from "./client";
@@ -84,6 +85,8 @@ export interface OrderRepository {
   getQuizById(quizId: string): Promise<QuizRecord | null>;
   getQuizByDownloadToken(downloadToken: string): Promise<QuizRecord | null>;
   listPendingQuizzes(): Promise<QuizRecord[]>;
+  /** Added for the worker (ticket #40): generateQuiz needs the order's billing email. */
+  getOrderById(orderId: string): Promise<OrderRecord | null>;
 }
 
 export function createOrderRepository(config: RepositoryConfig): OrderRepository {
@@ -99,5 +102,20 @@ export function createOrderRepository(config: RepositoryConfig): OrderRepository
     getQuizById: (quizId) => getQuizByIdImpl(client, quizId),
     getQuizByDownloadToken: (downloadToken) => getQuizByDownloadTokenImpl(client, downloadToken),
     listPendingQuizzes: () => listPendingQuizzesImpl(client),
+    getOrderById: (orderId) => getOrderByIdImpl(client, orderId),
   };
+}
+
+/**
+ * Uploads to the private `deliverables` bucket -- a sibling factory, not a
+ * method on ContentRepository or OrderRepository (spec #36, ticket #40): it's
+ * needed only by the worker's write side, and neither existing repository
+ * has a reason to grow a Storage write method the sample/render/order code
+ * paths never call.
+ */
+export type UploadDeliverable = (storagePath: string, data: Uint8Array, contentType: string) => Promise<void>;
+
+export function createDeliverableUploader(config: RepositoryConfig): UploadDeliverable {
+  const client = createSupabaseClient(config);
+  return (storagePath, data, contentType) => uploadToDeliverablesBucket(client, storagePath, data, contentType);
 }
