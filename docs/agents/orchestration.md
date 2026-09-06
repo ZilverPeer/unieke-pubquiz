@@ -29,7 +29,7 @@ Every brief contains, in this order:
 - Acceptance criteria restated as checks the Spec reviewer will run.
 - Verification budget (see below).
 - Stack rule for this ticket: "the stack is running and seeded, use it, do not start/stop/reset it" or "this ticket does not need the stack, do not start it".
-- Out-of-scope rule: if something outside the ticket looks wrong, spend at most 3 minutes confirming it, then report it in the PR body and move on. The orchestrator decides whether it becomes an issue.
+- Out-of-scope rule: if something outside the ticket looks wrong, report it in the PR body rather than fixing it in the ticket. The orchestrator decides whether it becomes an issue.
 - Finish: merge `origin/master`, push, open the PR with `Closes #<n>`, do not merge, report using the report template.
 - Commit trailers and PR footer as given by the session.
 

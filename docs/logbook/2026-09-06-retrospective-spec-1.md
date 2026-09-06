@@ -28,7 +28,7 @@ Comparison: PR #23 (#22 fix, no stack needed, small ticket) took 20 minutes disp
 ## Findings
 
 1. **Verification churn is the largest avoidable cost.** Across the #11 first pass and fix round: five `db:reset` runs, two `npm run build` runs, the full integration suite four times. Around 12 to 15 minutes. Nobody asked for the builds. The stack was started and stopped three times in one ticket because every agent was told to stop it.
-2. **Unbounded side investigation.** 11 minutes on a bug outside the ticket. The finding was valuable, the depth was not; three minutes would have produced the same issue text.
+2. **Side investigation.** 11 minutes on a bug outside the ticket. The finding was valuable (#22). Erik chose not to time-box this; out-of-scope findings are reported in the PR body and the orchestrator decides what to do with them.
 3. **Ticket size.** #11 was four modules plus an integration suite plus docs. Its 19 minutes of core work is fine, but every later phase scales with it too (more to review, more to re-verify).
 4. **Review time is dominated by setup, not thinking.** The Spec reviewer's fresh clone plus install plus stack start is several minutes before the first real check. A fresh clone earned its cost exactly once (#2's typecheck) and that case is about `package.json` changes.
 5. **Bundling reviews cost some wall clock.** The Standards review finished before the Spec review; a HARD finding sat waiting.
@@ -42,7 +42,7 @@ Recorded in `docs/agents/orchestration.md`, referenced from CLAUDE.md:
 
 - Verification budget: typecheck, unit, eslint once before pushing; integration only for tickets touching repository, scripts or supabase; no `next build`; `db:reset` at most once per push.
 - Stack lifecycle belongs to the orchestrator: started once per wave, agents use it and never stop or reset it.
-- Out-of-scope findings are time-boxed to 3 minutes and reported, not chased.
+- Out-of-scope findings are reported in the PR body, not fixed inside the ticket. No time box (Erik's call).
 - Ticket size target: about 20 minutes of implementer first pass; split larger tickets at `to-tickets` time.
 - Spec reviewer uses a persistent review clone (reset and cleaned) unless the ticket touches `package.json` or build config.
 - HARD Standards findings are forwarded immediately; the rest stays bundled.
