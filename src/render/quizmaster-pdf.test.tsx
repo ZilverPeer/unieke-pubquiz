@@ -33,6 +33,20 @@ describe("renderQuizmasterPdf", () => {
     expect(text).toContain("Fixture Track 71");
   });
 
+  test("no page contains a page-number footer", async () => {
+    const quiz = buildQuizContentFixture({ locale: "nl" });
+
+    const buffer = await renderQuizmasterPdf(quiz);
+    const { text } = await extractText(new Uint8Array(buffer), { mergePages: false });
+
+    for (const pageText of text) {
+      const lines = pageText.split("\n").map((line) => line.trim());
+      for (const line of lines) {
+        expect(line).not.toMatch(/^\d+ \/ \d+$/);
+      }
+    }
+  });
+
   test("headings and labels for nl come from the nl message file", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
 
