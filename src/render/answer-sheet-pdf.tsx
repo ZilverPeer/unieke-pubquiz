@@ -37,9 +37,10 @@ const styles = StyleSheet.create({
 });
 
 /**
- * Renders the one-page landscape Answer sheet PDF: a 2-column x 4-row grid
- * of six Text Round sections (two per row, three rows), followed by one
- * full-width Music Round row, with dashed cut lines between every section.
+ * Renders the one-page landscape Answer sheet PDF: a 4-column x 2-row grid
+ * — row 1 holds four Text Round sections, row 2 holds the remaining two
+ * Text Round sections plus the Music Round section spanning the last two
+ * columns — with dashed cut lines between every section.
  */
 export async function renderAnswerSheetPdf(quiz: QuizContent): Promise<Buffer> {
   const { locale, rounds } = quiz;
@@ -56,10 +57,13 @@ export async function renderAnswerSheetPdf(quiz: QuizContent): Promise<Buffer> {
   const artistLabel = message(locale, "artistLabel");
   const titleLabel = message(locale, "titleLabel");
 
-  const rowsOfTextSections: (typeof textRounds)[number][][] = [];
-  for (let i = 0; i < textRounds.length; i += 2) {
-    rowsOfTextSections.push(textRounds.slice(i, i + 2));
-  }
+  const textSectionFor = (round: (typeof textRounds)[number]) => {
+    const headingKey = ROUND_HEADING_KEYS[round.slotIndex];
+    const heading = `${message(locale, headingKey)}: ${round.categoryName}`;
+    return (
+      <TextRoundSection key={round.slotIndex} heading={heading} teamNameLabel={teamNameLabel} />
+    );
+  };
 
   return renderToBuffer(
     <Document>
@@ -67,27 +71,16 @@ export async function renderAnswerSheetPdf(quiz: QuizContent): Promise<Buffer> {
         <Text style={styles.heading} fixed>
           {answerSheetHeading}
         </Text>
-        {rowsOfTextSections.map((pair, rowIndex) => (
-          <View key={rowIndex} style={styles.row} wrap={false}>
-            {pair.map((round) => {
-              const headingKey = ROUND_HEADING_KEYS[round.slotIndex];
-              const heading = `${message(locale, headingKey)}: ${round.categoryName}`;
-              return (
-                <TextRoundSection
-                  key={round.slotIndex}
-                  heading={heading}
-                  teamNameLabel={teamNameLabel}
-                />
-              );
-            })}
-          </View>
-        ))}
-        <MusicRoundSection
-          heading={`${musicRoundHeading}: ${musicRound.categoryName}`}
-          teamNameLabel={teamNameLabel}
-          artistLabel={artistLabel}
-          titleLabel={titleLabel}
-        />
+        <View style={styles.row} wrap={false}>{textRounds.slice(0, 4).map(textSectionFor)}</View>
+        <View style={styles.row} wrap={false}>
+          {textRounds.slice(4, 6).map(textSectionFor)}
+          <MusicRoundSection
+            heading={`${musicRoundHeading}: ${musicRound.categoryName}`}
+            teamNameLabel={teamNameLabel}
+            artistLabel={artistLabel}
+            titleLabel={titleLabel}
+          />
+        </View>
       </Page>
     </Document>,
   );

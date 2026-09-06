@@ -13,10 +13,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "space-between",
   },
-  answerLine: {
-    fontSize: 7,
-    flexDirection: "row",
-  },
 });
 
 export interface TextRoundSectionProps {
@@ -28,8 +24,9 @@ export interface TextRoundSectionProps {
 
 /**
  * One grid-cell section for a Text Round: the heading and the team-name
- * field share a single header line, followed by 10 numbered answer lines
- * stacked in one column.
+ * field share a header line (the heading wraps to a second line instead of
+ * clipping when a long Category name doesn't fit), followed by 10 numbered
+ * answer rows stacked in one column, each a full-width ruled line.
  */
 export function TextRoundSection({ heading, teamNameLabel }: TextRoundSectionProps) {
   const numbers = Array.from({ length: ITEM_COUNT }, (_, i) => i + 1);
@@ -38,13 +35,17 @@ export function TextRoundSection({ heading, teamNameLabel }: TextRoundSectionPro
     <View style={[sectionStyles.cell, styles.cell]} wrap={false}>
       <View style={sectionStyles.header} wrap={false}>
         <Text style={sectionStyles.heading}>{heading}</Text>
-        <Text style={sectionStyles.teamName}>{teamNameLabel}: ______________</Text>
+        <View style={sectionStyles.teamNameGroup} wrap={false}>
+          <Text style={sectionStyles.teamNameLabel}>{teamNameLabel}:</Text>
+          <View style={sectionStyles.teamNameLine} />
+        </View>
       </View>
       <View style={styles.answerColumn} wrap={false}>
         {numbers.map((n) => (
-          <Text key={n} style={styles.answerLine}>
-            {n}. ________________________
-          </Text>
+          <View key={n} style={sectionStyles.answerRow} wrap={false}>
+            <Text style={sectionStyles.answerNumber}>{n}.</Text>
+            <View style={sectionStyles.answerLine} />
+          </View>
         ))}
       </View>
     </View>

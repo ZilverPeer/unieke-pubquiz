@@ -6,6 +6,16 @@ import { describe, expect, test } from "vitest";
 import type { QuizContent } from "@/domain";
 import { buildQuizContentFixture } from "@/domain";
 import { renderAnswerSheetPdf } from "./answer-sheet-pdf";
+import {
+  CELL_WIDTH,
+  GRID_COLUMNS,
+  GRID_ROWS,
+  PAGE_HEIGHT,
+  PAGE_MARGIN,
+  PAGE_WIDTH,
+  ROW_HEIGHT,
+} from "./answer-sheet/layout";
+import { sectionStyles } from "./answer-sheet/section-styles";
 
 const scratchDir = path.join(process.cwd(), ".scratch");
 
@@ -19,6 +29,27 @@ async function writeScratch(name: string, buffer: Buffer): Promise<void> {
   fs.mkdirSync(scratchDir, { recursive: true });
   fs.writeFileSync(path.join(scratchDir, name), buffer);
 }
+
+describe("Answer sheet grid geometry", () => {
+  test("is a 4-column x 2-row grid of ~205pt x ~288pt cells", () => {
+    expect(GRID_COLUMNS).toBe(4);
+    expect(GRID_ROWS).toBe(2);
+    expect(CELL_WIDTH).toBeCloseTo((PAGE_WIDTH - PAGE_MARGIN * 2) / 4, 5);
+    expect(ROW_HEIGHT).toBeCloseTo((PAGE_HEIGHT - PAGE_MARGIN * 2) / 2, 5);
+    // A cell this narrow only has room for a single stacked answer column,
+    // not the two-columns-of-five that a wider (2x4-grid) cell could fit.
+    expect(CELL_WIDTH).toBeLessThan(250);
+    // A cell this tall gives a legible (>20pt) pitch across 10 stacked rows.
+    expect(ROW_HEIGHT).toBeGreaterThan(250);
+  });
+});
+
+describe("Answer sheet answer-line style", () => {
+  test("the answer line fills the remaining row width instead of a fixed-length blank", () => {
+    expect(sectionStyles.answerLine.flexGrow).toBe(1);
+    expect(sectionStyles.answerLine.borderBottomWidth).toBeGreaterThan(0);
+  });
+});
 
 describe("renderAnswerSheetPdf", () => {
   test("renders exactly one landscape A4 page", async () => {
@@ -56,25 +87,46 @@ describe("renderAnswerSheetPdf", () => {
     }
   });
 
-  test("still fits on one page with nl, en and a 40-character Category name", async () => {
-    const longCategoryName = "A".repeat(40);
-    const withLongCategoryNames = (quiz: QuizContent): QuizContent => ({
-      ...quiz,
-      rounds: quiz.rounds.map((round) => ({ ...round, categoryName: longCategoryName })),
-    });
+  test(
+    "still fits on one page with nl, en and a 40-character Category name, wrapping the " +
+      "heading instead of clipping it or the team-name field when the two don't fit on one line",
+    async () => {
+      const longCategoryName = "A".repeat(40);
+      const withLongCategoryNames = (quiz: QuizContent): QuizContent => ({
+        ...quiz,
+        rounds: quiz.rounds.map((round) => ({ ...round, categoryName: longCategoryName })),
+      });
 
-    const nlQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "nl" }));
-    const enQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "en" }));
+      const nlQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "nl" }));
+      const enQuiz = withLongCategoryNames(buildQuizContentFixture({ locale: "en" }));
 
-    const nlBuffer = await renderAnswerSheetPdf(nlQuiz);
-    const enBuffer = await renderAnswerSheetPdf(enQuiz);
+      const nlBuffer = await renderAnswerSheetPdf(nlQuiz);
+      const enBuffer = await renderAnswerSheetPdf(enQuiz);
+      await writeScratch("answer-sheet-nl-long-category.pdf", nlBuffer);
 
-    const nlPdf = await getDocumentProxy(new Uint8Array(nlBuffer));
-    const enPdf = await getDocumentProxy(new Uint8Array(enBuffer));
+      const nlPdf = await getDocumentProxy(new Uint8Array(nlBuffer));
+      const enPdf = await getDocumentProxy(new Uint8Array(enBuffer));
 
-    expect(nlPdf.numPages).toBe(1);
-    expect(enPdf.numPages).toBe(1);
-  });
+      expect(nlPdf.numPages).toBe(1);
+      expect(enPdf.numPages).toBe(1);
+
+      // A 40-character Category name doesn't fit a Text Round section's
+      // ~205pt-wide header alongside "Teamnaam" at 9pt. Chosen behaviour:
+      // the full Category name still renders, on its own line, and the
+      // team-name field moves to a following line — neither is clipped or
+      // overlaps the other.
+      const { text } = await extractText(nlPdf, { mergePages: true });
+      const lines = text.split("\n");
+
+      const categoryLine = lines.find((line) => line.includes(longCategoryName));
+      expect(
+        categoryLine,
+        "expected the full 40-character Category name on its own line, not clipped",
+      ).toBeDefined();
+      expect(categoryLine).not.toContain("Teamnaam");
+      expect(lines.some((line) => line.includes("Teamnaam"))).toBe(true);
+    },
+  );
 
   test("contains the six Text Round names and the Music Round heading in nl", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });

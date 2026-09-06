@@ -1,13 +1,14 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
-import { PAGE_WIDTH, PAGE_MARGIN } from "./layout";
+import { CELL_WIDTH } from "./layout";
 import { sectionStyles } from "./section-styles";
 
 const ITEMS_PER_COLUMN = 5;
-const CELL_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+/** The Music Round section spans the last two grid columns, not the full page width. */
+const SECTION_WIDTH = CELL_WIDTH * 2;
 
 const styles = StyleSheet.create({
   cell: {
-    width: CELL_WIDTH,
+    width: SECTION_WIDTH,
   },
   entryColumns: {
     flexDirection: "row",
@@ -19,13 +20,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   entry: {
-    fontSize: 7,
+    flexDirection: "column",
   },
-  entryNumber: {
-    fontWeight: "bold",
+  fieldLabel: {
+    fontSize: 9,
+    marginRight: 4,
   },
-  entryLine: {
-    flexDirection: "row",
+  titleRow: {
+    marginLeft: 14,
   },
 });
 
@@ -41,10 +43,10 @@ export interface MusicRoundSectionProps {
 }
 
 /**
- * The full-width Music Round row: the heading and the team-name field
- * share a single header line, followed by 10 numbered entries in two
- * columns of 5, each entry showing its Artist and Title fields stacked
- * on two lines.
+ * The Music Round section, spanning two grid columns: the heading and the
+ * team-name field share a header line (see TextRoundSection for the
+ * long-heading fallback), followed by 10 numbered entries in two columns
+ * of 5, each entry showing its Artist and Title fields on two ruled lines.
  */
 export function MusicRoundSection({
   heading,
@@ -57,11 +59,15 @@ export function MusicRoundSection({
 
   const renderEntry = (n: number) => (
     <View key={n} style={styles.entry} wrap={false}>
-      <Text style={styles.entryLine}>
-        <Text style={styles.entryNumber}>{n}. </Text>
-        {artistLabel}: ________________________
-      </Text>
-      <Text style={styles.entryLine}>{titleLabel}: ________________________</Text>
+      <View style={sectionStyles.answerRow} wrap={false}>
+        <Text style={sectionStyles.answerNumber}>{n}.</Text>
+        <Text style={styles.fieldLabel}>{artistLabel}:</Text>
+        <View style={sectionStyles.answerLine} />
+      </View>
+      <View style={[sectionStyles.answerRow, styles.titleRow]} wrap={false}>
+        <Text style={styles.fieldLabel}>{titleLabel}:</Text>
+        <View style={sectionStyles.answerLine} />
+      </View>
     </View>
   );
 
@@ -69,7 +75,10 @@ export function MusicRoundSection({
     <View style={[sectionStyles.cell, styles.cell]} wrap={false}>
       <View style={sectionStyles.header} wrap={false}>
         <Text style={sectionStyles.heading}>{heading}</Text>
-        <Text style={sectionStyles.teamName}>{teamNameLabel}: ______________</Text>
+        <View style={sectionStyles.teamNameGroup} wrap={false}>
+          <Text style={sectionStyles.teamNameLabel}>{teamNameLabel}:</Text>
+          <View style={sectionStyles.teamNameLine} />
+        </View>
       </View>
       <View style={styles.entryColumns} wrap={false}>
         <View style={styles.entryColumn} wrap={false}>
