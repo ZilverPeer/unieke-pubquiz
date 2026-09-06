@@ -4,12 +4,14 @@ import { ROW_HEIGHT } from "./layout";
 
 /**
  * Minimum width (points) reserved for the team-name field (its label plus
- * a usable blank line) in every section header. The heading gets whatever
- * width is left: `flexShrink` on `heading` combined with `flexGrow` +
- * `minWidth` here means a short heading and the team-name field share one
- * line with the blank line filling the remainder, while a heading too wide
- * for the cell is squeezed until react-pdf's own text layout wraps it onto
- * a second line — no manual text-width estimation needed.
+ * a usable blank line) in every section header. The header row wraps
+ * (`flexWrap: "wrap"`): the heading takes its natural width, and the
+ * team-name group has `flexGrow` plus this `minWidth`, so a short heading
+ * and the team-name field share one line with the blank line filling the
+ * remainder, while a heading too wide to leave at least
+ * MIN_TEAM_NAME_WIDTH on the same line pushes the whole team-name group
+ * onto its own following line at full row width — the two never share a
+ * line without enough room for both, so their boxes never overlap.
  */
 export const MIN_TEAM_NAME_WIDTH = 90;
 
@@ -35,21 +37,20 @@ export const sectionStyles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
     marginBottom: 4,
   },
   heading: {
     fontSize: 9,
     fontWeight: "bold",
-    flexGrow: 0,
-    flexShrink: 1,
+    maxWidth: "100%",
     marginRight: 8,
   },
   teamNameGroup: {
     flexDirection: "row",
     alignItems: "flex-end",
     flexGrow: 1,
-    flexShrink: 0,
     minWidth: MIN_TEAM_NAME_WIDTH,
   },
   teamNameLabel: {
