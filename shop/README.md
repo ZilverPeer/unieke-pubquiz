@@ -1,16 +1,16 @@
 # Local shop (ticket #37)
 
 A local WooCommerce shop, run entirely in Docker via `@wordpress/env`, that
-lets you place a paid Pubquiz order end-to-end and inspect what the future
-webhook receiver (#39) will see. Nothing here talks to Vercel, Supabase, or
-any other part of this repo except reading `src/domain/checkout.ts` and
+lets you place a paid Pubquiz order end-to-end and inspect what the webhook
+receiver (#39) and the deliver module (#41) see. Nothing here talks to
+Vercel or Supabase; it reads `src/domain/checkout.ts` and
 `src/domain/types.ts` for the pinned meta-key/slot constants.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Starts wp-env, then idempotently: starts the Mailpit mail catcher, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), and creates/updates the `order.updated` webhook. Safe to re-run any time. |
+| `npm run shop:up` | Starts wp-env, then idempotently: starts the Mailpit mail catcher, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env and the Mailpit container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
@@ -212,6 +212,27 @@ this way, from an order with 3 Category picks (slots 1-3), and contains
 the full captured HTTP request: headers (including
 `X-WC-Webhook-Signature`) and the JSON body with the order's `line_items[].meta_data`
 containing all four keys per Item plus every filled Category slot.
+
+## REST credentials
+
+`npm run shop:up` also creates (or, on rerun, rotates) a WooCommerce REST API
+key so the deliver module (#41) can reach this shop over `WOOCOMMERCE_URL` /
+`WOOCOMMERCE_CONSUMER_KEY` / `WOOCOMMERCE_CONSUMER_SECRET`. There is no
+supported WP-CLI command to create or read back a REST API key, and
+WooCommerce stores only a one-way hash of the consumer key (`wc_api_hash()`)
+-- the plaintext secret is shown once, at creation, and can never be
+recovered. So rather than try to reuse an existing key, `shop:up` deletes any
+row with description `pubquiz-pipeline` from the
+`wp_woocommerce_api_keys` table and creates a fresh one every run
+(`shop/mu-plugins/wp-cli-scripts/create-rest-api-key.php`, invoked via
+`wp eval-file` by `scripts/shop/lib/rest-api-key.ts`). This is safe: nothing
+in this repo persists the old key across a `shop:up`, and the worker reads
+the current one from `.env.shop.local` each time it starts.
+
+The three values are written to a gitignored `.env.shop.local` at the repo
+root (never printed to the console, never committed). Copy them into your
+own environment (e.g. `.env.local`) to run the worker against this shop
+outside `npm run shop:*` -- see `src/deliver/README.md`.
 
 ## Interface gaps
 

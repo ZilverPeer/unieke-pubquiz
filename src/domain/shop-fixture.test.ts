@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { CHECKOUT_META_KEYS, OPERATOR_NOTE_PREFIX } from "./checkout";
+import { CHECKOUT_META_KEYS, downloadMetaKey, OPERATOR_NOTE_PREFIX } from "./checkout";
 import { SLOT_COUNT } from "./types";
 
 /**
@@ -54,6 +54,14 @@ describe("shop/mu-plugins/pubquiz-operator-mail.php", () => {
   test("references OPERATOR_NOTE_PREFIX's literal value", () => {
     const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-operator-mail.php"), "utf8");
     expect(php).toContain(OPERATOR_NOTE_PREFIX);
+  });
+});
+
+describe("shop/mu-plugins/pubquiz-downloads.php", () => {
+  test("declares the PUBQUIZ_DOWNLOAD_META_PREFIX literal matching downloadMetaKey's stem", () => {
+    const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
+    const stem = downloadMetaKey("quizmaster.pdf").replace("quizmaster.pdf", "");
+    expect(php).toContain(`PUBQUIZ_DOWNLOAD_META_PREFIX = '${stem}'`);
   });
 });
 

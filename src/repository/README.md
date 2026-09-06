@@ -32,6 +32,7 @@ Private helpers live alongside it: `client.ts` (Supabase client construction), `
 - `getQuizById(quizId)` / `getQuizByDownloadToken(downloadToken)` -- `null` when not found.
 - `listPendingQuizzes()` -- for the worker's startup sweep.
 - `getOrderById(orderId)` -- `null` when not found. Added for the worker (ticket #40): `generateQuiz` needs the order's billing email, which `QuizRecord` doesn't carry (billing email lives on `orders`, never denormalised onto `quizzes`). The ticket #40 brief named `storage.ts` as the only repository change; this one small, same-shape addition (mirrors `getQuizById`) turned out to be required too -- see that ticket's PR for the note.
+- `listQuizzesByOrderId(orderId)` -- every Quiz of one order, same ordering as the list `upsertOrder` returns. Added for the deliver module's order-lookup adapter (ticket #41, `src/deliver/order-lookup.ts`): deciding whether an order is ready to complete needs every sibling Quiz's status, and the caller already has the order id (from `getQuizById`), so this is a plain id lookup rather than the billing-email-scoped `listQuizzesByBillingEmail`.
 
 `orders.ts` holds the implementation. `CategoryPick`'s `undefined` (an unassigned slot) has no jsonb equivalent, so it round-trips through `category_picks` as `null` and is converted back to `undefined` on read (`toCategoryPicks`), keeping `QuizRecord` exactly matching the pinned `src/domain/orders.ts` shapes.
 

@@ -299,3 +299,21 @@ export async function getOrderById(client: SupabaseClient<Database>, orderId: st
   if (error) throw error;
   return data ? toOrderRecord(data) : null;
 }
+
+/**
+ * Added for the deliver module (ticket #41): its order-lookup adapter needs
+ * every sibling Quiz's status to decide whether an order is ready to
+ * complete. Mirrors getOrderById/getQuizById's shape; not billing-email
+ * scoped like listQuizzesByBillingEmail since the caller already has the
+ * order id.
+ */
+export async function listQuizzesByOrderId(client: SupabaseClient<Database>, orderId: string): Promise<QuizRecord[]> {
+  const { data, error } = await client
+    .from("quizzes")
+    .select()
+    .eq("order_id", orderId)
+    .order("woo_line_item_id", { ascending: true })
+    .order("sequence", { ascending: true });
+  if (error) throw error;
+  return data.map(toQuizRecord);
+}

@@ -4,7 +4,7 @@
  * src/instrumentation.ts calls when `PUBQUIZ_WORKER=1`. See README.md.
  */
 import type { PgBoss } from "pg-boss";
-import { createDeliverer } from "@/deliver";
+import { createDeliverer, createOrderLookup, resolveDelivererConfigFromEnv } from "@/deliver";
 import {
   createDeliverableUploader,
   createOrderRepository,
@@ -31,11 +31,12 @@ export interface Worker {
  * boss.ts), registers the job handler, sweeps `pending` Quizzes without a
  * live job, and returns a handle to stop it.
  *
- * `createDeliverer()` (ticket #41, not yet implemented -- currently always
- * throws) is called lazily, once per job about to run, rather than here at
- * startup: nothing about a Quiz has been touched yet at that point, so a
- * thrown error there is a plain retryable failure pg-boss handles on its
- * own, and startup itself never depends on the deliver module being ready.
+ * `createDeliverer(...)` (ticket #41) is called lazily, once per job about
+ * to run, rather than here at startup: nothing about a Quiz has been
+ * touched yet at that point, so a thrown error there (e.g. a missing
+ * WOOCOMMERCE_* env var) is a plain retryable failure pg-boss handles on
+ * its own, and startup itself never depends on the deliver module's
+ * environment being configured.
  */
 export async function startWorker(): Promise<Worker> {
   const config = resolveLocalStackConfig();
@@ -53,7 +54,7 @@ export async function startWorker(): Promise<Worker> {
       orderRepository,
       contentRepository,
       uploadDeliverable,
-      deliverer: createDeliverer(),
+      deliverer: createDeliverer(resolveDelivererConfigFromEnv(), createOrderLookup(orderRepository)),
       appBaseUrl,
     };
     await handleQuizJob(job, deps);

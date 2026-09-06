@@ -7,6 +7,7 @@
  * RequestedDifficulty "easy" | "medium" | "hard" | "mixed",
  * QuizMode "mixed" | "single_category", Category picks are Category ids.
  */
+import type { DeliverableFile } from "./orders";
 import { SLOT_COUNT } from "./types";
 
 export const CHECKOUT_META_KEYS = {
@@ -24,3 +25,14 @@ export const CHECKOUT_META_KEYS = {
 
 /** Prefix of private order notes that the shop's mail plugin forwards to the operator. */
 export const OPERATOR_NOTE_PREFIX = "[pubquiz]";
+
+/**
+ * The line item meta_data key the deliver module (#41) writes a Deliverable's
+ * download URL under. `shop/mu-plugins/pubquiz-downloads.php` reads this same
+ * key stem to find and render the download links; a fixture test
+ * (shop-fixture.test.ts) checks the PHP literal stays in sync by hand (PHP
+ * cannot import this constant).
+ */
+export function downloadMetaKey(file: DeliverableFile): string {
+  return `pubquiz_download_${file}`;
+}

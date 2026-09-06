@@ -18,6 +18,7 @@ import {
   getQuizById as getQuizByIdImpl,
   listPendingQuizzes as listPendingQuizzesImpl,
   listQuizzesByBillingEmail as listQuizzesByBillingEmailImpl,
+  listQuizzesByOrderId as listQuizzesByOrderIdImpl,
   listQuizzesDeliveredBefore as listQuizzesDeliveredBeforeImpl,
   recordDelivery as recordDeliveryImpl,
   transitionQuizStatus as transitionQuizStatusImpl,
@@ -81,6 +82,8 @@ export interface OrderRepository {
   recordDelivery(quizId: string, input: RecordDeliveryInput): Promise<QuizRecord>;
   clearDownloadToken(quizId: string): Promise<void>;
   listQuizzesByBillingEmail(billingEmail: string): Promise<QuizRecord[]>;
+  /** Added for the deliver module's order-lookup adapter (ticket #41): sibling Quiz statuses for one order. */
+  listQuizzesByOrderId(orderId: string): Promise<QuizRecord[]>;
   listQuizzesDeliveredBefore(cutoff: Date): Promise<QuizRecord[]>;
   getQuizById(quizId: string): Promise<QuizRecord | null>;
   getQuizByDownloadToken(downloadToken: string): Promise<QuizRecord | null>;
@@ -98,6 +101,7 @@ export function createOrderRepository(config: RepositoryConfig): OrderRepository
     recordDelivery: (quizId, input) => recordDeliveryImpl(client, quizId, input),
     clearDownloadToken: (quizId) => clearDownloadTokenImpl(client, quizId),
     listQuizzesByBillingEmail: (billingEmail) => listQuizzesByBillingEmailImpl(client, billingEmail),
+    listQuizzesByOrderId: (orderId) => listQuizzesByOrderIdImpl(client, orderId),
     listQuizzesDeliveredBefore: (cutoff) => listQuizzesDeliveredBeforeImpl(client, cutoff),
     getQuizById: (quizId) => getQuizByIdImpl(client, quizId),
     getQuizByDownloadToken: (downloadToken) => getQuizByDownloadTokenImpl(client, downloadToken),
