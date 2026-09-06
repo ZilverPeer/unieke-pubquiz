@@ -14,7 +14,11 @@
     "announcements:generate": "tsx scripts/announcements/generate.ts",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/repository/database.types.ts",
-    "generate": "tsx src/scripts/generate.ts"
+    "generate": "tsx src/scripts/generate.ts",
+    "shop:up": "wp-env start && tsx scripts/shop/setup.ts",
+    "shop:down": "wp-env stop && (docker stop pubquiz-mailpit || exit 0)",
+    "shop:order": "tsx scripts/shop/place-order.ts",
+    "shop:capture": "tsx scripts/shop/capture-webhook.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
@@ -33,6 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.1",
+    "@wordpress/env": "^11.14.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "fast-check": "^4.9.0",
