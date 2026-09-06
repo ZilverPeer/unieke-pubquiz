@@ -423,19 +423,13 @@ describe("sampleComposition", () => {
   });
 
   test("a zero-slack mixed pool still succeeds after excluding a prior mixed sample's Items", () => {
-    // 1 Category, 10 Subsubcategories, exactly one Item per (kind,
-    // Difficulty, Subsubcategory) - i.e. zero slack. A greedy per-level fill
-    // (easy first, then medium, then hard) can exhaust the Subsubcategories
-    // a later level needed, even though a valid 4/3/3 assignment exists.
-    const { pool, categories } = buildPoolFixture({
-      locales: ["nl"],
-      categories: 1,
-      subsubcategoriesPerCategory: 10,
-      itemsPerKindPerDifficulty: 10,
-    });
-
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    // 8 Categories (one per slot, so Category assignment itself has zero
+    // slack too), each with 10 Subsubcategories and exactly one Item per
+    // (kind, Difficulty, Subsubcategory) - i.e. zero slack throughout. A
+    // greedy per-level fill (easy first, then medium, then hard) can
+    // exhaust the Subsubcategories a later level needed, even though a
+    // valid 4/3/3 assignment exists.
+    const { pool } = buildFullPool();
 
     let failures = 0;
     for (let seedPair = 0; seedPair < 20; seedPair++) {
@@ -443,11 +437,7 @@ describe("sampleComposition", () => {
       const secondSeed = seedPair * 2 + 2;
 
       const first = sampleComposition({
-        request: baseRequest({
-          quizMode: "single_category",
-          categoryPicks: picks,
-          requestedDifficulty: "mixed",
-        }),
+        request: baseRequest({ requestedDifficulty: "mixed" }),
         pool,
         excludedItemIds: new Set(),
         random: createSeededRandom(firstSeed),
@@ -458,11 +448,7 @@ describe("sampleComposition", () => {
       const excludedItemIds = new Set(first.composition.slots.flat());
 
       const second = sampleComposition({
-        request: baseRequest({
-          quizMode: "single_category",
-          categoryPicks: picks,
-          requestedDifficulty: "mixed",
-        }),
+        request: baseRequest({ requestedDifficulty: "mixed" }),
         pool,
         excludedItemIds,
         random: createSeededRandom(secondSeed),

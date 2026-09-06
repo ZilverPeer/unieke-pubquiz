@@ -5,6 +5,7 @@
  */
 import type { Difficulty, ItemKind, PoolItem, RequestedDifficulty } from "@/domain";
 import { pickIndex, shuffleInPlace } from "./shuffle";
+import { maximumBipartiteMatching } from "./matching";
 import type { RandomSource } from "./random";
 
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
@@ -15,58 +16,48 @@ export interface SlotPickResult {
   shortfall: number;
 }
 
-interface SubsubcategoryPickResult extends SlotPickResult {
-  subsubcategoryIds: string[];
-}
-
-/**
- * Picks up to `needed` Items from `eligible`, choosing at most one Item per
- * Subsubcategory so a shortfall only happens when there are genuinely fewer
- * than `needed` distinct eligible Subsubcategories - never from an unlucky
- * greedy pick. Which Subsubcategories (and which Item within one) are chosen
- * is driven by `random`.
- */
-function pickWithSubsubcategoryLimit(
-  eligible: readonly PoolItem[],
-  needed: number,
-  random: RandomSource,
-): SubsubcategoryPickResult {
-  const bySubsubcategory = new Map<string, PoolItem[]>();
-  for (const item of eligible) {
-    const group = bySubsubcategory.get(item.subsubcategoryId);
-    if (group) {
-      group.push(item);
-    } else {
-      bySubsubcategory.set(item.subsubcategoryId, [item]);
-    }
-  }
-
-  const subsubcategoryIds = shuffleInPlace(Array.from(bySubsubcategory.keys()), random);
-  const chosenSubsubcategoryIds = subsubcategoryIds.slice(0, needed);
-
-  const itemIds = chosenSubsubcategoryIds.map((subsubcategoryId) => {
-    const group = bySubsubcategory.get(subsubcategoryId)!;
-    return group[pickIndex(group.length, random)].id;
-  });
-
-  return { itemIds, subsubcategoryIds: chosenSubsubcategoryIds, shortfall: needed - itemIds.length };
-}
-
 function isEligible(
   item: PoolItem,
   kind: ItemKind,
   categoryId: string,
   locale: PoolItem["locales"][number],
   excludedItemIds: ReadonlySet<string>,
-  usedSubsubcategoryIds: ReadonlySet<string>,
 ): boolean {
   return (
     item.kind === kind &&
     item.categoryId === categoryId &&
     item.locales.includes(locale) &&
-    !excludedItemIds.has(item.id) &&
-    !usedSubsubcategoryIds.has(item.subsubcategoryId)
+    !excludedItemIds.has(item.id)
   );
+}
+
+/**
+ * Builds the requested-Difficulty quota for one slot as a flat list of one
+ * entry per requested Item: a single Difficulty requests `itemsPerSlot` of
+ * that level; `mixed` splits it 4/3/3 across easy/medium/hard, with the
+ * level getting the extra one chosen by `random` first - the same call
+ * order as before this module switched to exact matching, so seed-dependent
+ * outcomes change as little as possible.
+ */
+function buildQuota(
+  requestedDifficulty: RequestedDifficulty,
+  itemsPerSlot: number,
+  random: RandomSource,
+): Difficulty[] {
+  if (requestedDifficulty !== "mixed") {
+    return new Array(itemsPerSlot).fill(requestedDifficulty) as Difficulty[];
+  }
+
+  const extraIndex = pickIndex(DIFFICULTIES.length, random);
+  const base = Math.floor(itemsPerSlot / DIFFICULTIES.length);
+  const extra = itemsPerSlot - base * DIFFICULTIES.length;
+
+  const quota: Difficulty[] = [];
+  DIFFICULTIES.forEach((difficulty, index) => {
+    const needed = index === extraIndex ? base + extra : base;
+    for (let i = 0; i < needed; i++) quota.push(difficulty);
+  });
+  return quota;
 }
 
 export interface FillSlotInput {
@@ -81,47 +72,50 @@ export interface FillSlotInput {
 }
 
 /**
- * Fills one Round slot: single-Difficulty requests pick `itemsPerSlot` Items
- * of that Difficulty; `mixed` picks a 4/3/3 split across easy/medium/hard,
- * with the Difficulty that gets 4 chosen by `random`, while still honouring
- * the no-shared-Subsubcategory rule across all three Difficulties combined.
- * Final position order is randomised.
+ * Fills one Round slot with an exact assignment: the requested Difficulty
+ * quota (single-Difficulty is just `itemsPerSlot` of one level; `mixed` is
+ * the 4/3/3 split) is expanded into one "quota slot" per requested Item.
+ * Each quota slot has an edge to every Subsubcategory that has at least one
+ * eligible Item of that quota slot's Difficulty; a maximum bipartite
+ * matching (`maximumBipartiteMatching`) assigns each quota slot to a
+ * distinct Subsubcategory wherever an assignment exists. A shortfall is
+ * therefore only reported when no full assignment exists at all - never
+ * from an unlucky greedy per-level pick order, for single-Difficulty and
+ * mixed requests alike. Final position order is randomised.
  */
 export function fillSlot(input: FillSlotInput): SlotPickResult {
   const { kind, categoryId, locale, requestedDifficulty, pool, excludedItemIds, random, itemsPerSlot } =
     input;
 
-  if (requestedDifficulty !== "mixed") {
-    const noneUsed = new Set<string>();
-    const eligible = pool.filter((item) =>
-      isEligible(item, kind, categoryId, locale, excludedItemIds, noneUsed) &&
-      item.difficulty === requestedDifficulty,
-    );
-    const result = pickWithSubsubcategoryLimit(eligible, itemsPerSlot, random);
-    return { itemIds: shuffleInPlace(result.itemIds, random), shortfall: result.shortfall };
+  const eligibleByDifficulty = new Map<Difficulty, Map<string, PoolItem[]>>();
+  for (const difficulty of DIFFICULTIES) {
+    eligibleByDifficulty.set(difficulty, new Map());
+  }
+  for (const item of pool) {
+    if (!isEligible(item, kind, categoryId, locale, excludedItemIds)) continue;
+    const bySubsubcategory = eligibleByDifficulty.get(item.difficulty)!;
+    const group = bySubsubcategory.get(item.subsubcategoryId);
+    if (group) {
+      group.push(item);
+    } else {
+      bySubsubcategory.set(item.subsubcategoryId, [item]);
+    }
   }
 
-  const extraIndex = pickIndex(DIFFICULTIES.length, random);
-  const base = Math.floor(itemsPerSlot / DIFFICULTIES.length);
-  const extra = itemsPerSlot - base * DIFFICULTIES.length;
+  const quota = buildQuota(requestedDifficulty, itemsPerSlot, random);
+  const slotEligibleIds = quota.map((difficulty) =>
+    Array.from(eligibleByDifficulty.get(difficulty)!.keys()),
+  );
 
-  const usedSubsubcategoryIds = new Set<string>();
+  const { assignment, matchingSize } = maximumBipartiteMatching(slotEligibleIds, random);
+
   const itemIds: string[] = [];
-  let shortfall = 0;
-
-  DIFFICULTIES.forEach((difficulty, index) => {
-    const needed = index === extraIndex ? base + extra : base;
-    const eligible = pool.filter((item) =>
-      isEligible(item, kind, categoryId, locale, excludedItemIds, usedSubsubcategoryIds) &&
-      item.difficulty === difficulty,
-    );
-    const result = pickWithSubsubcategoryLimit(eligible, needed, random);
-    for (const subsubcategoryId of result.subsubcategoryIds) {
-      usedSubsubcategoryIds.add(subsubcategoryId);
-    }
-    itemIds.push(...result.itemIds);
-    shortfall += result.shortfall;
+  assignment.forEach((subsubcategoryId, index) => {
+    if (subsubcategoryId === undefined) return;
+    const difficulty = quota[index];
+    const group = eligibleByDifficulty.get(difficulty)!.get(subsubcategoryId)!;
+    itemIds.push(group[pickIndex(group.length, random)].id);
   });
 
-  return { itemIds: shuffleInPlace(itemIds, random), shortfall };
+  return { itemIds: shuffleInPlace(itemIds, random), shortfall: itemsPerSlot - matchingSize };
 }
