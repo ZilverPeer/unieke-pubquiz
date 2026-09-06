@@ -21,8 +21,22 @@ const logoPath = path.join(
 // failing the image load. A Buffer src skips that path-resolution step entirely.
 const logoBytes = fs.readFileSync(logoPath);
 
-const COLUMNS = 2;
-const CELL_HEIGHT = 108;
+// Landscape A4's content area (after PdfPage's padding) is roughly
+// 770 x 487pt, of which the heading/instruction/team-name block above the
+// grid takes up ~90-130pt (the heading can wrap to two lines for a long
+// Category name), leaving ~360-395pt of grid height. For 11 cells (10
+// images + the logo), a c-columns x r-rows grid wastes c*r - 11 slots, and
+// its cells get width = pageWidth / c, height = gridHeight / r. Cell *area*
+// is roughly conserved across choices of (c, r) with c*r fixed, so the
+// deciding factor is matching the cell's aspect ratio to the grid area's
+// aspect ratio (~770/380 ≈ 2) so a photo of any orientation fills as much of
+// its cell as possible: 4 columns x 3 rows gives a cell aspect
+// (770/4)/(380/3) ≈ 1.5, closer to that target than the other 12-slot
+// options (6x2 ≈ 5.9, 3x4 ≈ 0.66), while wasting only a single slot.
+// CELL_HEIGHT=130 (3 rows = 390pt) is the tallest that still leaves one page
+// even when the heading wraps to two lines for a 60-character Category name.
+const COLUMNS = 4;
+const CELL_HEIGHT = 130;
 const MAX_UNBROKEN_RUN = 14;
 
 /**
@@ -45,9 +59,10 @@ function wrapLongRuns(word: string, builtinHyphenate?: (word: string) => string[
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    width: 90,
-    marginBottom: 12,
+  logoImage: {
+    maxWidth: "100%",
+    maxHeight: "100%",
+    objectFit: "contain",
   },
   heading: {
     fontSize: 16,
@@ -103,9 +118,10 @@ const styles = StyleSheet.create({
 });
 
 /**
- * Renders the Picture Round handout PDF: one A4 page with the 10 numbered
- * images of the Picture Round slot in a 2x5 grid, each with an answer line
- * underneath, so it doubles as the round's answer sheet.
+ * Renders the Picture Round handout PDF: one landscape A4 page with the 10
+ * numbered images of the Picture Round slot plus the brand logo in an 11-cell
+ * 4x3 grid (see COLUMNS/CELL_HEIGHT above for why), each image cell with an
+ * answer line underneath, so it doubles as the round's answer sheet.
  */
 export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer> {
   const round = quiz.rounds.find((r) => r.kind === "picture");
@@ -115,8 +131,7 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
 
   const document = (
     <Document>
-      <PdfPage>
-        <Image src={logoBytes} style={styles.logo} />
+      <PdfPage orientation="landscape">
         <Text style={styles.heading} hyphenationCallback={wrapLongRuns}>
           {message(quiz.locale, "pictureRoundHeading")}: {round.categoryName}
         </Text>
@@ -143,6 +158,13 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
               </View>
             );
           })}
+          <View key="logo" style={styles.cell} wrap={false}>
+            <View style={styles.cellInner}>
+              <View style={styles.imageWrapper}>
+                <Image src={logoBytes} style={styles.logoImage} />
+              </View>
+            </View>
+          </View>
         </View>
       </PdfPage>
     </Document>
