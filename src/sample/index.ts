@@ -93,6 +93,12 @@ export function sampleComposition(input: SampleInput): SampleResult {
   }
   const { slotCategories } = resolved;
   const slots: string[][] = [];
+  // Items placed in earlier slots must not be reused by later slots of the
+  // same Composition (in single_category mode several slots share a
+  // Category). Seed the union with the caller's own exclusions, then grow it
+  // as each slot is filled; a later slot that cannot be filled without
+  // repeating an already-placed Item is a genuine shortfall for that slot.
+  const placedItemIds = new Set<string>(excludedItemIds);
 
   for (let slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++) {
     const categoryId = slotCategories[slotIndex];
@@ -102,13 +108,16 @@ export function sampleComposition(input: SampleInput): SampleResult {
       locale: request.locale,
       requestedDifficulty: request.requestedDifficulty,
       pool,
-      excludedItemIds,
+      excludedItemIds: placedItemIds,
       random,
       itemsPerSlot: ITEMS_PER_SLOT,
     });
 
     if (result.shortfall > 0) {
       return { ok: false, failure: { slotIndex, categoryId, shortfall: result.shortfall } };
+    }
+    for (const id of result.itemIds) {
+      placedItemIds.add(id);
     }
     slots.push(result.itemIds);
   }

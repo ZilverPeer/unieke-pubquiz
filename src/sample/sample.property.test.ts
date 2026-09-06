@@ -61,7 +61,7 @@ function makePoolItem(fields: {
 }
 
 /**
- * A pool with 1-4 Categories, each with 14-20 Subsubcategories, and a 0-4
+ * A pool with 1-4 Categories, each with 25-35 Subsubcategories, and a 0-10
  * Item count per (Subsubcategory, Difficulty) - every combination gets its
  * own independently generated count (dense, not a sparse sample of cells),
  * the same count reused for all 3 kinds so a full 8-slot Composition (6
@@ -78,16 +78,27 @@ function makePoolItem(fields: {
  * "nl", or only "en"; per-cell item counts are occasionally 0. Each of
  * those independently knocks a Subsubcategory out of eligibility for a
  * given request's Locale/Difficulty, so both are weighted towards "eligible"
- * (item count non-zero 6-in-7; Locale pattern "both" 3-in-5) - uniform 1-in-3
+ * (item count non-zero 8-in-9; Locale pattern "both" 5-in-7) - uniform 1-in-3
  * odds on each, as a first attempt, drove real Composition successes down to
  * ~5/100 (measured), leaving nothing for properties 1-3 to check on most
- * runs. 14-20 Subsubcategories with these weights measured ~70/100 full
- * Compositions while still leaving genuine shortfalls (and the `mixed`-mode,
- * `categoryId: null` shortfall from too few Categories) common enough to
- * exercise the `!result.ok` path too.
+ * runs.
+ *
+ * `sampleComposition` now excludes Items already placed by earlier slots of
+ * the same Composition (see issue #34), so `single_category` mode - where up
+ * to 6 "text" slots share one Category and its pool never refills between
+ * slots - needs noticeably more headroom per (Subsubcategory, Difficulty)
+ * cell than before that fix to still reach a full Composition most of the
+ * time: 14-20 Subsubcategories with a 1-4 item count measured only ~9/100
+ * full Compositions once duplicate Items across slots were correctly turned
+ * into shortfalls instead of being silently allowed. Widening to 25-35
+ * Subsubcategories with a 3-10 item count and a locale pattern weighted more
+ * heavily towards "both" restores headroom, measuring ~83/100 full
+ * Compositions - the remainder are all genuine `mixed`-mode `categoryId:
+ * null` shortfalls from too few pool Categories (unrelated to slot-sharing),
+ * still exercising the `!result.ok` path.
  */
 const worldArb: fc.Arbitrary<World> = fc
-  .array(fc.integer({ min: 14, max: 20 }), { minLength: 1, maxLength: 4 })
+  .array(fc.integer({ min: 25, max: 35 }), { minLength: 1, maxLength: 4 })
   .chain((subsubCounts) => {
     const categoryIds = subsubCounts.map((_, index) => `category-${index}`);
     const subsubs = subsubCounts.flatMap((count, categoryIndex) =>
@@ -99,11 +110,11 @@ const worldArb: fc.Arbitrary<World> = fc
 
     const cellArb = fc.record({
       count: fc.oneof(
-        { weight: 6, arbitrary: fc.integer({ min: 1, max: 4 }) },
+        { weight: 8, arbitrary: fc.integer({ min: 3, max: 10 }) },
         { weight: 1, arbitrary: fc.constant(0) },
       ),
       localePatternIndex: fc.oneof(
-        { weight: 3, arbitrary: fc.constant(0) }, // both Locales
+        { weight: 5, arbitrary: fc.constant(0) }, // both Locales
         { weight: 1, arbitrary: fc.constant(1) }, // "nl" only
         { weight: 1, arbitrary: fc.constant(2) }, // "en" only
       ),
@@ -231,23 +242,18 @@ describe("sampleComposition properties", () => {
           expect(new Set(slot).size).toBe(slot.length);
         }
 
-        // No duplicate Item across the whole Composition: only asserted for
-        // `mixed` mode, where every slot has a distinct Category (enforced
-        // by resolveSlotCategories) and an Item's Category is fixed, so two
-        // slots can never share an Item. `single_category` mode assigns the
-        // SAME Category to all 8 slots (6 of them "text"), and sampleComposition
-        // does not track Items already used by earlier slots of the same
-        // Composition (only past-order `excludedItemIds`) - a real,
-        // pre-existing bug this property found; see issue #34 for the
-        // minimal counterexample. Left production code untouched per brief.
-        if (request.quizMode === "mixed") {
-          expect(new Set(allIds).size).toBe(allIds.length);
-        }
+        // No duplicate Item across the whole Composition, in either mode:
+        // `mixed` mode gives every slot a distinct Category (enforced by
+        // resolveSlotCategories) so two slots can never share an Item;
+        // `single_category` mode assigns the SAME Category to all 8 slots
+        // (6 of them "text"), so sampleComposition itself must track Items
+        // already placed by earlier slots of the same Composition and
+        // exclude them from later slots' pools.
+        expect(new Set(allIds).size).toBe(allIds.length);
       }),
     );
-    // Measured: 70/100 runs reached a full Composition (the rest hit a
-    // genuine content shortfall or a missing Category, both exercised on
-    // purpose by scenarioArb). A sampler that always fails would score 0/100
+    // Measured: see the comment above the assertion for the current
+    // threshold rationale - a sampler that always fails would score 0/100
     // here and the assertions above would never run - guard against that.
     expect(successCount).toBeGreaterThanOrEqual(50);
   });
