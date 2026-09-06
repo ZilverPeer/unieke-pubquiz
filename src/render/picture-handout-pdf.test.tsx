@@ -1,11 +1,90 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 import { buildQuizContentFixture } from "@/domain";
 import type { QuizContent } from "@/domain";
-import { extractImages, extractText, getDocumentProxy } from "unpdf";
+import { extractImages, extractText, getDocumentProxy, getResolvedPDFJS } from "unpdf";
 import { describe, expect, test } from "vitest";
 import { renderPictureHandoutPdf } from "./picture-handout-pdf";
+
+/**
+ * Builds a minimal valid single-color 8-bit grayscale PNG at the given
+ * dimensions — enough for @react-pdf/image (png-js) and pdfkit's own PNG
+ * parser to read real width/height metadata, without needing an image
+ * encoding library as a dependency.
+ */
+function buildGrayscalePng(width: number, height: number): Uint8Array {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+  function chunk(type: string, data: Buffer): Buffer {
+    const typeBuf = Buffer.from(type, "ascii");
+    const lengthBuf = Buffer.alloc(4);
+    lengthBuf.writeUInt32BE(data.length, 0);
+    const crcBuf = Buffer.alloc(4);
+    crcBuf.writeUInt32BE(zlib.crc32(Buffer.concat([typeBuf, data])), 0);
+    return Buffer.concat([lengthBuf, typeBuf, data, crcBuf]);
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 0; // color type: grayscale
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  // One filter-type byte (0 = none) followed by `width` gray pixel bytes, per row.
+  const raw = Buffer.alloc(height * (1 + width), 0xcc);
+  for (let y = 0; y < height; y++) {
+    raw[y * (1 + width)] = 0;
+  }
+  const idat = zlib.deflateSync(raw);
+
+  return new Uint8Array(
+    Buffer.concat([
+      signature,
+      chunk("IHDR", ihdr),
+      chunk("IDAT", idat),
+      chunk("IEND", Buffer.alloc(0)),
+    ]),
+  );
+}
+
+/**
+ * Builds a minimal valid single-color baseline JPEG at the given dimensions:
+ * SOI, a bare SOF0 header carrying width/height, an SOS marker, a few
+ * non-marker scan bytes, then EOI. Both jay-peg (used by @react-pdf/image
+ * for layout) and pdfkit's own JPEG parser (used when embedding) only read
+ * the SOF0 header for width/height/component count — real entropy-coded
+ * pixel data is never decoded by either, so this is sufficient without an
+ * image encoding library as a dependency.
+ */
+function buildGrayscaleJpeg(width: number, height: number): Uint8Array {
+  const soi = Buffer.from([0xff, 0xd8]);
+
+  const sof0Payload = Buffer.alloc(6);
+  sof0Payload[0] = 8; // precision
+  sof0Payload.writeUInt16BE(height, 1);
+  sof0Payload.writeUInt16BE(width, 3);
+  sof0Payload[5] = 1; // number of components (grayscale)
+  const component = Buffer.from([1, 0x11, 0]); // id, sampling factors, quant table id
+  const sof0Body = Buffer.concat([sof0Payload, component]);
+  const sof0Length = Buffer.alloc(2);
+  sof0Length.writeUInt16BE(sof0Body.length + 2, 0);
+  const sof0 = Buffer.concat([Buffer.from([0xff, 0xc0]), sof0Length, sof0Body]);
+
+  const sosBody = Buffer.from([1, 1, 0, 0, 63, 0]); // 1 component scan, spectral 0-63
+  const sosLength = Buffer.alloc(2);
+  sosLength.writeUInt16BE(sosBody.length + 2, 0);
+  const sos = Buffer.concat([Buffer.from([0xff, 0xda]), sosLength, sosBody]);
+
+  const scanData = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+  const eoi = Buffer.from([0xff, 0xd9]);
+
+  return new Uint8Array(Buffer.concat([soi, sof0, sos, scanData, eoi]));
+}
 
 /** A valid 1x1 white PNG, the same one src/domain/fixtures.ts uses as a default. */
 const ONE_PIXEL_PNG = Buffer.from(
@@ -63,6 +142,59 @@ async function writeScratch(name: string, buffer: Buffer): Promise<void> {
   fs.writeFileSync(path.join(scratchDir, name), buffer);
 }
 
+/** A 2x3 affine matrix [a, b, c, d, e, f], PDF content-stream style. */
+type Matrix = [number, number, number, number, number, number];
+
+function concatMatrix(m1: Matrix, m2: Matrix): Matrix {
+  return [
+    m1[0] * m2[0] + m1[1] * m2[2],
+    m1[0] * m2[1] + m1[1] * m2[3],
+    m1[2] * m2[0] + m1[3] * m2[2],
+    m1[2] * m2[1] + m1[3] * m2[3],
+    m1[4] * m2[0] + m1[5] * m2[2] + m2[4],
+    m1[4] * m2[1] + m1[5] * m2[3] + m2[5],
+  ];
+}
+
+/**
+ * Returns the leftmost and rightmost page-space x-coordinate of every
+ * embedded image on the given page, by replaying the page's real PDF
+ * content-stream operators (save/restore/cm/Do) — the same instructions any
+ * PDF viewer executes — rather than trusting @react-pdf's layout inputs.
+ * Each image is drawn as a unit square scaled/translated by the current
+ * transformation matrix, so its horizontal placement is `current[4]`
+ * (translation) to `current[4] + current[0]` (translation + x-scale).
+ */
+async function imageHorizontalEdges(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  pageNumber: number,
+): Promise<{ left: number; right: number }> {
+  const page = await pdf.getPage(pageNumber);
+  const pdfjs = await getResolvedPDFJS();
+  const { fnArray, argsArray } = await page.getOperatorList();
+
+  let current: Matrix = [1, 0, 0, 1, 0, 0];
+  const stack: Matrix[] = [];
+  let left = Infinity;
+  let right = -Infinity;
+
+  for (let i = 0; i < fnArray.length; i++) {
+    const fn = fnArray[i];
+    if (fn === pdfjs.OPS.save) {
+      stack.push(current);
+    } else if (fn === pdfjs.OPS.restore) {
+      current = stack.pop() ?? current;
+    } else if (fn === pdfjs.OPS.transform) {
+      current = concatMatrix(argsArray[i] as Matrix, current);
+    } else if (fn === pdfjs.OPS.paintImageXObject) {
+      left = Math.min(left, current[4]);
+      right = Math.max(right, current[4] + current[0]);
+    }
+  }
+
+  return { left, right };
+}
+
 describe("renderPictureHandoutPdf", () => {
   test("renders a one-page PDF buffer", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
@@ -71,6 +203,43 @@ describe("renderPictureHandoutPdf", () => {
     await writeScratch("picture-handout-nl.pdf", buffer);
 
     expect(buffer.subarray(0, 4).toString("latin1")).toBe("%PDF");
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    expect(pdf.numPages).toBe(1);
+  });
+
+  test("renders landscape A4 (page wider than it is tall)", async () => {
+    const quiz = buildQuizContentFixture({ locale: "nl" });
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    expect(viewport.width).toBeGreaterThan(viewport.height);
+  });
+
+  test("stays on one page with a wide JPEG image", async () => {
+    const quiz = buildQuizContentFixture({
+      locale: "nl",
+      image: buildGrayscaleJpeg(800, 100),
+    });
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+    await writeScratch("picture-handout-nl-wide-jpeg.pdf", buffer);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    expect(pdf.numPages).toBe(1);
+  });
+
+  test("stays on one page with a tall PNG image", async () => {
+    const quiz = buildQuizContentFixture({
+      locale: "nl",
+      image: buildGrayscalePng(100, 800),
+    });
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+    await writeScratch("picture-handout-nl-tall-png.pdf", buffer);
+
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     expect(pdf.numPages).toBe(1);
   });
@@ -122,6 +291,27 @@ describe("renderPictureHandoutPdf", () => {
     expect(text.replace(/[\n-]/g, "")).toContain(longName);
   });
 
+  test("stays on one page when a wordy Category name wraps the heading to two lines", async () => {
+    // Ordinary words with spaces, long enough to genuinely wrap at word
+    // boundaries into two lines at the heading's font size within the
+    // landscape page width — unlike the 60-character unbroken-run case
+    // above, this exercises the worst-case (two-line) header height that
+    // the grid's row height must still leave room for.
+    const wordyName =
+      "Uitgebreide categorie naam met heel veel woorden om zeker te weten dat de kop twee regels beslaat";
+    const quiz = withDistinctPictureImages(
+      withPictureCategoryName(buildQuizContentFixture({ locale: "nl" }), wordyName),
+    );
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+    await writeScratch("picture-handout-nl-two-line-heading.pdf", buffer);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    expect(pdf.numPages).toBe(1);
+    const images = await extractImages(pdf, 1);
+    expect(images.length).toBe(11);
+  });
+
   test("isolates locale: nl output has no en labels, en output has no nl labels", async () => {
     const nlBuffer = await renderPictureHandoutPdf(buildQuizContentFixture({ locale: "nl" }));
     await writeScratch("picture-handout-nl.pdf", nlBuffer);
@@ -168,5 +358,27 @@ describe("renderPictureHandoutPdf", () => {
     for (const word of labelWords) {
       expect(codeOnly).not.toContain(word);
     }
+  });
+
+  test("keeps every image cell inside the page's horizontal content margin", async () => {
+    // A wide image, scaled by objectFit: contain to the full width of its
+    // cell's inner content area, makes the rightmost/leftmost column's image
+    // edge a direct proxy for that cell's inner content edge — so if the
+    // grid ever overflows its cell's horizontal budget (e.g. a padding vs.
+    // width box-model regression), the rightmost image edge moves past the
+    // page's right content margin instead of stopping short of it.
+    const quiz = buildQuizContentFixture({ locale: "nl", image: buildGrayscalePng(2000, 50) });
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { width: pageWidth } = (await pdf.getPage(1)).getViewport({ scale: 1 });
+    const { left, right } = await imageHorizontalEdges(pdf, 1);
+
+    // PdfPage's own horizontal padding is 36pt each side; every image sits
+    // further inset than that inside its cell's padding and border, so both
+    // edges must clear it with room to spare.
+    expect(left).toBeGreaterThan(36);
+    expect(right).toBeLessThan(pageWidth - 36);
   });
 });

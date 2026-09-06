@@ -21,8 +21,29 @@ const logoPath = path.join(
 // failing the image load. A Buffer src skips that path-resolution step entirely.
 const logoBytes = fs.readFileSync(logoPath);
 
-const COLUMNS = 2;
-const CELL_HEIGHT = 108;
+// Landscape A4's content area (after PdfPage's padding of paddingTop 60 +
+// paddingBottom 48, paddingHorizontal 36 each side) is 841.89 - 72 = 769.89pt
+// wide by 595.28 - 108 = 487.28pt tall. For 11 cells (10 images + the logo),
+// a c-columns x r-rows grid wastes c*r - 11 slots, and its cells get width =
+// pageWidth / c, height = gridHeight / r. Cell *area* is roughly conserved
+// across choices of (c, r) with c*r fixed, so the deciding factor is
+// matching the cell's aspect ratio to the grid area's aspect ratio so a
+// photo of any orientation fills as much of its cell as possible. With
+// ~380pt of grid height (see below) that ratio is 770/380 ≈ 2; 4 columns x 3
+// rows gives a cell aspect (770/4)/(380/3) ≈ 1.5, closer to that target than
+// the other 12-slot options (6x2 ≈ 5.9, 3x4 ≈ 0.66), while wasting only a
+// single slot.
+//
+// The header above the grid is a one-line heading (~23pt incl. margin) plus
+// a shared instruction/team-name row (~21pt incl. margin) — but the heading
+// can wrap to two lines for a long Category name, adding one more line
+// (~19pt) in the worst case: ~63pt worst-case header vs ~44pt normal. Budget
+// for the worst case: 487.28 - 63 ≈ 424pt of grid height / 3 rows ≈ 141pt
+// per row. CELL_HEIGHT=135 stays comfortably inside that (measured empirically
+// against a two-line-wrapping Category name; 140 already overflows to a
+// second page), leaving a small margin for font-metric variance.
+const COLUMNS = 4;
+const CELL_HEIGHT = 135;
 const MAX_UNBROKEN_RUN = 14;
 
 /**
@@ -45,22 +66,29 @@ function wrapLongRuns(word: string, builtinHyphenate?: (word: string) => string[
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    width: 90,
-    marginBottom: 12,
+  logoImage: {
+    maxWidth: "100%",
+    maxHeight: "100%",
+    objectFit: "contain",
   },
   heading: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 4,
   },
+  // Instruction and the team-name blank share one row instead of two stacked
+  // lines, winning back header height for the grid below.
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 8,
+  },
   instruction: {
     fontSize: 10,
-    marginBottom: 8,
   },
   teamName: {
     fontSize: 11,
-    marginBottom: 12,
   },
   grid: {
     flexDirection: "row",
@@ -78,10 +106,12 @@ const styles = StyleSheet.create({
     border: "1pt solid #333333",
     padding: 6,
   },
-  number: {
-    fontSize: 11,
-    fontWeight: "bold",
-    marginBottom: 4,
+  // The logo cell is plain branding, not an answer cell, so it gets no
+  // border frame.
+  logoCellInner: {
+    flex: 1,
+    flexDirection: "column",
+    padding: 6,
   },
   imageWrapper: {
     flexGrow: 1,
@@ -93,19 +123,33 @@ const styles = StyleSheet.create({
     maxHeight: "100%",
     objectFit: "contain",
   },
+  // The number lives inline with the answer line ("1  __________") instead
+  // of on its own line above the image, winning back cell height for the
+  // image.
+  answerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginTop: 4,
+  },
+  number: {
+    fontSize: 11,
+    fontWeight: "bold",
+    marginRight: 6,
+  },
   answerLine: {
+    flexGrow: 1,
     borderBottomWidth: 1,
     borderBottomColor: "#333333",
     borderBottomStyle: "solid",
     height: 14,
-    marginTop: 4,
   },
 });
 
 /**
- * Renders the Picture Round handout PDF: one A4 page with the 10 numbered
- * images of the Picture Round slot in a 2x5 grid, each with an answer line
- * underneath, so it doubles as the round's answer sheet.
+ * Renders the Picture Round handout PDF: one landscape A4 page with the 10
+ * numbered images of the Picture Round slot plus the brand logo in an 11-cell
+ * 4x3 grid (see COLUMNS/CELL_HEIGHT above for why), each image cell with an
+ * answer line underneath, so it doubles as the round's answer sheet.
  */
 export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer> {
   const round = quiz.rounds.find((r) => r.kind === "picture");
@@ -115,17 +159,18 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
 
   const document = (
     <Document>
-      <PdfPage>
-        <Image src={logoBytes} style={styles.logo} />
+      <PdfPage orientation="landscape">
         <Text style={styles.heading} hyphenationCallback={wrapLongRuns}>
           {message(quiz.locale, "pictureRoundHeading")}: {round.categoryName}
         </Text>
-        <Text style={styles.instruction}>
-          {message(quiz.locale, "pictureHandoutInstruction")}
-        </Text>
-        <Text style={styles.teamName}>
-          {message(quiz.locale, "teamNameLabel")}: ____________________
-        </Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.instruction}>
+            {message(quiz.locale, "pictureHandoutInstruction")}
+          </Text>
+          <Text style={styles.teamName}>
+            {message(quiz.locale, "teamNameLabel")}: ____________________
+          </Text>
+        </View>
         <View style={styles.grid}>
           {round.items.map((item, index) => {
             if (item.kind !== "picture") {
@@ -134,15 +179,24 @@ export async function renderPictureHandoutPdf(quiz: QuizContent): Promise<Buffer
             return (
               <View key={item.id} style={styles.cell} wrap={false}>
                 <View style={styles.cellInner}>
-                  <Text style={styles.number}>{index + 1}</Text>
                   <View style={styles.imageWrapper}>
                     <Image src={Buffer.from(item.image)} style={styles.image} />
                   </View>
-                  <View style={styles.answerLine} />
+                  <View style={styles.answerRow}>
+                    <Text style={styles.number}>{index + 1}</Text>
+                    <View style={styles.answerLine} />
+                  </View>
                 </View>
               </View>
             );
           })}
+          <View key="logo" style={styles.cell} wrap={false}>
+            <View style={styles.logoCellInner}>
+              <View style={styles.imageWrapper}>
+                <Image src={logoBytes} style={styles.logoImage} />
+              </View>
+            </View>
+          </View>
         </View>
       </PdfPage>
     </Document>
