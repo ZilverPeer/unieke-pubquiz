@@ -30,7 +30,7 @@
 
 Every Round — Text, Picture, or Music — contains exactly 10 Items. (60 Text Items total across the 6 Text Rounds, 10 Picture Items, 10 Music Items.)
 
-A Quiz has a **Quiz mode**: `mixed` (the default flow above — up to 8 customer-picked Categories, unique across all 8 slots, rest randomized) or `single_category` (all 8 slots use one customer-chosen Category — the uniqueness rule doesn't apply here, it's a different mode, not an exception to it).
+A Quiz has a **Quiz mode**: `mixed` (the default flow above — up to 8 customer-picked Categories, unique across all 8 slots, rest randomized) or `single_category` (all 8 slots use one customer-chosen Category — the uniqueness rule doesn't apply here, it's a different mode, not an exception to it). Within a single Quiz, in either mode, an Item never appears twice across its 8 Round slots (a separate rule from the cross-order no-repeat rule below, which spans a customer's full order history).
 
 **Composition** — the exact list of Item ids per Round slot that a generated Quiz consists of, stored permanently per Quiz. It is the source for the no-repeat rule and allows any Quiz to be re-rendered later without re-sampling.
 

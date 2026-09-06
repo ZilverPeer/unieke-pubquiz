@@ -33,7 +33,7 @@ async function itemIdsMissingLocale(kind: "text" | "picture" | "music", missing:
 }
 
 describe("loadPool", () => {
-  it("returns only Items with an nl translation, 717 entries", async () => {
+  it("returns only Items with an nl translation, 2157 entries", async () => {
     const enOnlyIds = [
       ...(await itemIdsMissingLocale("text", "nl")),
       ...(await itemIdsMissingLocale("picture", "nl")),
@@ -43,7 +43,9 @@ describe("loadPool", () => {
 
     const pool = await repository.loadPool("nl");
 
-    expect(pool).toHaveLength(717);
+    // 2160 seed Items total (see supabase/seed.sql's header and
+    // supabase/README.md "Pool coverage") minus the 3 en-only Items.
+    expect(pool).toHaveLength(2157);
     for (const entry of pool) {
       expect(entry.item.locales).toContain("nl");
       expect(entry.item.kind).toBeTruthy();
@@ -57,7 +59,7 @@ describe("loadPool", () => {
     }
   });
 
-  it("returns only Items with an en translation, 717 entries", async () => {
+  it("returns only Items with an en translation, 2157 entries", async () => {
     const nlOnlyIds = [
       ...(await itemIdsMissingLocale("text", "en")),
       ...(await itemIdsMissingLocale("picture", "en")),
@@ -67,7 +69,8 @@ describe("loadPool", () => {
 
     const pool = await repository.loadPool("en");
 
-    expect(pool).toHaveLength(717);
+    // 2160 seed Items total minus the 3 nl-only Items.
+    expect(pool).toHaveLength(2157);
     for (const entry of pool) {
       expect(entry.item.locales).toContain("en");
     }

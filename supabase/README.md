@@ -61,29 +61,38 @@ reset role;
 
 The seed (`supabase/seed.sql`) needs to make a full Quiz fillable at every
 requested Difficulty, in both Locales: 6 Text Rounds + 1 Picture Round + 1
-Music Round, 10 Items each, no two Items in a Round sharing a Subsubcategory.
+Music Round, 10 Items each, no two Items in a Round sharing a Subsubcategory,
+and no Item repeating anywhere else in the same Quiz (see `src/sample`'s
+README for the exact rules, including issue #34's cross-Round fix).
 
 Shape: 8 Categories, each with 2 Subcategories, each with 5 Subsubcategories
-(10 Subsubcategories per Category). Every Subsubcategory gets exactly one
-Item per (kind, difficulty) combination — 9 Items per Subsubcategory, 720
-Items total.
+(10 Subsubcategories per Category). Every Subsubcategory gets 7 text Items
+and 1 picture + 1 music Item per (kind, difficulty) combination — 27 Items
+per Subsubcategory, 2160 Items total (1680 text, 240 picture, 240 music).
 
 This means, per Category and per kind, there are exactly 10 Subsubcategories
 carrying an Item of any given Difficulty: the minimum for a Round of 10 to
-never repeat a Subsubcategory, with no slack — the check below verifies this
-holds everywhere it needs to. Per Locale and per Difficulty this yields 80
-Items of each kind (8 Categories x 10 Subsubcategories), well over the
-"at least 60 text + 10 picture + 10 music" floor, and spread across all 8
-Categories rather than concentrated in one. That covers both Quiz modes:
+never repeat a Subsubcategory. Picture and music keep zero slack here
+(exactly 10 Items per Category/Difficulty) — the check below verifies this
+holds everywhere it needs to. Text is 7x denser (70 Items per
+Category/Difficulty) because a single-category Quiz draws 6 distinct Text
+Rounds — 60 Items, none repeated — from one Category, leaving 10 Items of
+slack over that floor. Per Locale and per Difficulty this yields 560 text
+Items and 80 picture / 80 music Items (8 Categories x 10 Subsubcategories,
+x7 for text), well over the "at least 60 text + 10 picture + 10 music" floor
+for a mixed-mode Quiz, and spread across all 8 Categories rather than
+concentrated in one. That covers both Quiz modes:
 
 - **Mixed mode** (up to 8 distinct Categories, one Round per Category): each
   of the 8 Categories independently has enough Items and Subsubcategories to
   fill whichever Round type lands on it.
 - **Single-category mode** (one Category fills all 8 Rounds): a Category
-  supplies 60 Text Items for its 6 Text Rounds by reusing its 10
-  Subsubcategories across Rounds — reuse is fine because the
-  no-duplicate-Subsubcategory rule only applies within a single Round, not
-  across Rounds.
+  supplies 60 *distinct* Text Items for its 6 Text Rounds — `sampleComposition`
+  excludes every Item already placed earlier in the same Quiz, so Rounds
+  cannot reuse each other's Items even though they may reuse a
+  Subsubcategory (the no-duplicate-Subsubcategory rule only applies within a
+  single Round). 70 Items per Category/Difficulty covers the 60 needed with
+  10 to spare.
 
 A documented handful of Items (6, listed in `supabase/seed.sql` section 5) get
 a translation in only one Locale, so ticket #6's repository tests can prove
