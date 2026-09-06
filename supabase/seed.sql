@@ -143,7 +143,7 @@ select
         else 'Answer ' || s.seq
       end
   end,
-  case when s.seq % 37 = 0 then
+  case when s.kind <> 'music' and s.seq % 5 <> 0 then
     case loc
       when 'nl' then 'Feit bij vraag ' || s.seq
       else 'Fact for question ' || s.seq
