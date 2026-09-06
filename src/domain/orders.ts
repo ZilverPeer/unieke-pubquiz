@@ -60,3 +60,8 @@ export const DELIVERABLE_FILES = [
 ] as const;
 
 export type DeliverableFile = (typeof DELIVERABLE_FILES)[number];
+
+/** Path of the app download route for one Deliverable (ticket #42 serves it). */
+export function downloadPath(token: string, file: DeliverableFile): string {
+  return `/download/${token}/${file}`;
+}

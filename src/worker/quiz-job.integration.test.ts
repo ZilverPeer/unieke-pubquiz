@@ -13,6 +13,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PgBoss } from "pg-boss";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CategoryPick, Locale, QuizConfig } from "@/domain";
+import { downloadPath } from "@/domain";
 import { generateQuiz } from "@/scripts/generate-quiz";
 import {
   createDeliverableUploader,
@@ -22,7 +23,7 @@ import {
 } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
-import type { Deliverer } from "@/deliver";
+import type { Deliverer, DeliveredFile } from "@/deliver";
 import { createQuizQueue, QUIZ_QUEUE, resolveDatabaseUrl } from "./boss";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "./quiz-job";
 import { sweepPendingQuizzes } from "./sweep";
@@ -72,10 +73,10 @@ async function insertPendingQuiz(billingEmail: string, config: QuizConfig): Prom
 
 /** In-memory stand-in for the pinned Deliverer interface, recording every call. */
 function createRecordingDeliverer(): Deliverer & {
-  deliverCalls: { quizId: string; files: readonly { file: string; url: string }[] }[];
+  deliverCalls: { quizId: string; files: readonly DeliveredFile[] }[];
   failureCalls: { quizId: string; reason: string }[];
 } {
-  const deliverCalls: { quizId: string; files: readonly { file: string; url: string }[] }[] = [];
+  const deliverCalls: { quizId: string; files: readonly DeliveredFile[] }[] = [];
   const failureCalls: { quizId: string; reason: string }[] = [];
   return {
     deliverCalls,
@@ -147,7 +148,7 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
       ["answer-sheet.pdf", "music-round.mp3", "picture-handout.pdf", "quizmaster.pdf"].sort(),
     );
     for (const file of call.files) {
-      expect(file.url).toBe(`${APP_BASE_URL}/download/${quiz?.downloadToken}/${file.file}`);
+      expect(file.url).toBe(`${APP_BASE_URL}${downloadPath(quiz!.downloadToken!, file.file)}`);
     }
   });
 
@@ -208,6 +209,38 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
       expect(deliverer.failureCalls).toEqual([
         { quizId, reason: `slot 1, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10` },
       ]);
+    },
+  );
+
+  it(
+    'a Quiz stuck in "generating" from a crashed prior attempt ends failed with a note on the last allowed attempt, instead of being dead-lettered',
+    async () => {
+      const email = freshEmail("worker-stale-generating");
+      const quizId = await insertPendingQuiz(email, buildConfig());
+      // Simulates a prior attempt that crashed (killed process, not a
+      // thrown/caught error) mid-generation: the Quiz is left in
+      // "generating" with no live job. A fresh attempt landing here can
+      // never legally re-enter "generating" (QUIZ_STATUS_TRANSITIONS has no
+      // generating -> generating edge) -- on the last allowed attempt, that
+      // must still end the Quiz "failed" with noteFailure called, not
+      // propagate and dead-letter the job (see quiz-job.ts).
+      await orderRepository.transitionQuizStatus(quizId, "generating");
+
+      const deliverer = createRecordingDeliverer();
+      const lastAttempt: QuizJobLike = { data: { quizId }, retryCount: 0, retryLimit: 0 };
+
+      await handleQuizJob(lastAttempt, buildDeps(deliverer));
+
+      const quiz = await orderRepository.getQuizById(quizId);
+      expect(quiz?.status).toBe("failed");
+      expect(quiz?.failureReason).toContain('cannot transition from "generating" to "generating"');
+
+      const objectNames = await listDeliverableObjectNames(quizId);
+      expect(objectNames).toEqual([]);
+
+      expect(deliverer.deliverCalls).toHaveLength(0);
+      expect(deliverer.failureCalls).toHaveLength(1);
+      expect(deliverer.failureCalls[0].quizId).toBe(quizId);
     },
   );
 });

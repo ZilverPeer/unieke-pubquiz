@@ -11,9 +11,10 @@
  */
 import { randomBytes } from "node:crypto";
 import type { DeliverableFile } from "@/domain";
-import { DELIVERABLE_FILES } from "@/domain";
+import { DELIVERABLE_FILES, downloadPath } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
+import { QuizStatusChangedConcurrentlyError } from "@/repository";
 import type { QuizRecord } from "@/domain";
 import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import type { GenerateOptions } from "@/scripts/cli-args";
@@ -74,7 +75,7 @@ function generateDownloadToken(): string {
 }
 
 function buildDownloadUrl(appBaseUrl: string, token: string, file: DeliverableFile): string {
-  return `${appBaseUrl}/download/${token}/${file}`;
+  return `${appBaseUrl}${downloadPath(token, file)}`;
 }
 
 /**
@@ -115,8 +116,36 @@ function formatShortfallReason(slotIndex: number, categoryLabel: string, shortfa
   return `slot ${slotIndex}, Category ${categoryLabel}, shortfall ${shortfall}`;
 }
 
+/**
+ * Marks a Quiz `failed` and notifies the deliverer. `transitionQuizStatus`
+ * re-reads the Quiz's current status itself and validates the edge, so this
+ * needs no special-casing for *which* status the Quiz is coming from --
+ * both `pending -> failed` and `generating -> failed` are legal
+ * (QUIZ_STATUS_TRANSITIONS) -- only for a lost compare-and-swap race: if
+ * another writer changed the status between our read and this write
+ * (`QuizStatusChangedConcurrentlyError`), re-read before deciding what to
+ * do rather than assume the race means anything in particular.
+ */
 async function failQuiz(deps: QuizJobDeps, quizId: string, reason: string): Promise<void> {
-  await deps.orderRepository.transitionQuizStatus(quizId, "failed", { failureReason: reason });
+  try {
+    await deps.orderRepository.transitionQuizStatus(quizId, "failed", { failureReason: reason });
+  } catch (error) {
+    if (!(error instanceof QuizStatusChangedConcurrentlyError)) {
+      throw error;
+    }
+
+    const current = await deps.orderRepository.getQuizById(quizId);
+    if (current?.status === "failed" || current?.status === "delivered") {
+      // Another writer already moved it somewhere terminal -- nothing left
+      // for this attempt to do (a concurrent `failed` already ran
+      // noteFailure of its own; a concurrent `delivered` means generation
+      // won the race after all).
+      return;
+    }
+    // Still live (pending/generating): the race is worth one retry.
+    await deps.orderRepository.transitionQuizStatus(quizId, "failed", { failureReason: reason });
+  }
+
   await deps.deliverer.noteFailure({ quizId, reason });
 }
 
@@ -167,10 +196,15 @@ function filesFromDelivered(appBaseUrl: string, token: string): { file: Delivera
 /**
  * The job handler. Never throws for a terminal failure (shortfall, invalid
  * config): it completes the job after recording `failed` and calling
- * `noteFailure`, so pg-boss never retries it. Any other error during
- * generation moves the Quiz back to `pending` and rethrows so pg-boss
- * retries it (up to the queue's retryLimit), unless this is already the
- * final attempt, in which case it marks `failed` instead and completes.
+ * `noteFailure`, so pg-boss never retries it. Any other error before
+ * delivery -- including a lookup coming back empty, a lost compare-and-swap
+ * race, or an illegal transition (e.g. a stale `generating` Quiz whose prior
+ * attempt crashed instead of throwing) -- is treated as retryable: rethrown
+ * so pg-boss retries it (up to the queue's retryLimit), unless this is
+ * already the final attempt. On the final attempt *every* such error --
+ * including the ones above that don't come from generation itself -- still
+ * marks the Quiz `failed` and calls `noteFailure` instead of propagating,
+ * so pg-boss never dead-letters the job leaving the Quiz stuck.
  *
  * A retry can land here with the Quiz already `delivered`, if a prior
  * attempt generated and recorded delivery successfully but `deliverQuiz`
@@ -185,43 +219,55 @@ export async function handleQuizJob(job: QuizJobLike, deps: QuizJobDeps): Promis
   const { quizId } = job.data;
   const isLastAttempt = job.retryCount >= job.retryLimit;
 
-  const current = await deps.orderRepository.getQuizById(quizId);
-  if (!current) {
-    throw new Error(`Quiz ${quizId} not found`);
-  }
-
   let files: readonly { file: DeliverableFile; url: string }[];
+  // Only true once this attempt has itself moved the Quiz to "generating" --
+  // guards the retry path below from attempting a transition that either
+  // never applies (nothing was transitioned yet) or is no longer legal.
+  let transitionedToGenerating = false;
 
-  if (current.status === "delivered") {
-    if (!current.downloadToken) {
-      throw new Error(`Quiz ${quizId} is "delivered" without a download token`);
-    }
-    files = filesFromDelivered(deps.appBaseUrl, current.downloadToken);
-  } else {
-    const quiz = await deps.orderRepository.transitionQuizStatus(quizId, "generating");
-
-    const order = await deps.orderRepository.getOrderById(quiz.orderId);
-    if (!order) {
-      throw new Error(`Quiz ${quizId} references missing order ${quiz.orderId}`);
+  try {
+    const current = await deps.orderRepository.getQuizById(quizId);
+    if (!current) {
+      throw new Error(`Quiz ${quizId} not found`);
     }
 
-    try {
+    if (current.status === "delivered") {
+      if (!current.downloadToken) {
+        throw new Error(`Quiz ${quizId} is "delivered" without a download token`);
+      }
+      files = filesFromDelivered(deps.appBaseUrl, current.downloadToken);
+    } else {
+      const quiz = await deps.orderRepository.transitionQuizStatus(quizId, "generating");
+      transitionedToGenerating = true;
+
+      const order = await deps.orderRepository.getOrderById(quiz.orderId);
+      if (!order) {
+        throw new Error(`Quiz ${quizId} references missing order ${quiz.orderId}`);
+      }
+
       files = (await generateAndRecord(deps, quiz, order.billingEmail)).files;
-    } catch (error) {
-      if (error instanceof InvalidQuizConfigError || error instanceof QuizShortfallError) {
-        await failQuiz(deps, quizId, error.message);
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      if (isLastAttempt) {
-        await failQuiz(deps, quizId, message);
-        return;
-      }
-
-      await deps.orderRepository.transitionQuizStatus(quizId, "pending");
-      throw error;
     }
+  } catch (error) {
+    if (error instanceof InvalidQuizConfigError || error instanceof QuizShortfallError) {
+      await failQuiz(deps, quizId, error.message);
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    if (isLastAttempt) {
+      await failQuiz(deps, quizId, message);
+      return;
+    }
+
+    if (transitionedToGenerating) {
+      // This attempt itself moved the Quiz to "generating"; undo that so
+      // the next attempt starts from "pending" again. A failure that
+      // happened before any transition (Quiz not found, the transition
+      // itself losing a race) leaves nothing to undo -- the next attempt's
+      // own fresh lookup picks the right path regardless.
+      await deps.orderRepository.transitionQuizStatus(quizId, "pending");
+    }
+    throw error;
   }
 
   try {
