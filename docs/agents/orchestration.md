@@ -82,7 +82,7 @@ Empirical, in PowerShell (the user's shell), in the persistent review clone `%LO
 
 ## Merge
 
-Orchestrator: inspect the fix diff, `git merge-tree --write-tree master origin/<branch>` for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master, remove the worktree, append to the wave logbook.
+Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master, remove the worktree, append to the wave logbook.
 
 ## Logbook
 
