@@ -20,6 +20,10 @@ Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 `grilling` or `grill-with-docs` → `to-spec` (spec as a GitHub issue) → `to-tickets` (tracer-bullet issues with blocking edges) → `implement` per ticket via Sonnet subagents using `tdd` → `code-review` against the ticket → merge.
 
+### Orchestration playbook
+
+How a ticket runs from dispatch to merge (roles, brief template, verification budget, stack lifecycle, review templates, fix rounds, logbook): `docs/agents/orchestration.md`. Follow it for every ticket; change it only with a logbook entry saying why.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
