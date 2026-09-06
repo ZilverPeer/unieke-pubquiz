@@ -7,7 +7,7 @@
  * `src/scripts/generate.ts` dev script find the local stack. Never use this
  * against a hosted project.
  */
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import type { RepositoryConfig } from "./client";
 
 // Supabase CLI's well-known local demo service role key. Only ever valid
@@ -33,12 +33,12 @@ export function resolveLocalStackConfig(): RepositoryConfig {
     };
   }
 
-  // `shell: true` is required for Node to resolve `npx` (a .cmd shim) on
-  // Windows; the args here are fixed literals, never user input, so the
-  // escaping caveat Node warns about does not apply.
-  const output = execFileSync("npx", ["supabase", "status", "-o", "env"], {
+  // A single command string (not execFileSync + shell:true) so Node can
+  // resolve `npx` (a .cmd shim) on Windows without the shell-injection
+  // DeprecationWarning; the command is a fixed literal, never built from
+  // user input, so there is no injection concern here.
+  const output = execSync("npx supabase status -o env", {
     encoding: "utf-8",
-    shell: true,
     // The Supabase CLI logs container housekeeping (e.g. "Stopped
     // services: [...]") to stderr on every invocation; only stdout carries
     // the env output this function parses.

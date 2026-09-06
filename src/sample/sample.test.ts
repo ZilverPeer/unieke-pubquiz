@@ -422,6 +422,44 @@ describe("sampleComposition", () => {
     expect(third.composition).not.toEqual(first.composition);
   });
 
+  test("a zero-slack mixed pool still succeeds after excluding a prior mixed sample's Items", () => {
+    // 8 Categories (one per slot, so Category assignment itself has zero
+    // slack too), each with 10 Subsubcategories and exactly one Item per
+    // (kind, Difficulty, Subsubcategory) - i.e. zero slack throughout. A
+    // greedy per-level fill (easy first, then medium, then hard) can
+    // exhaust the Subsubcategories a later level needed, even though a
+    // valid 4/3/3 assignment exists.
+    const { pool } = buildFullPool();
+
+    let failures = 0;
+    for (let seedPair = 0; seedPair < 20; seedPair++) {
+      const firstSeed = seedPair * 2 + 1;
+      const secondSeed = seedPair * 2 + 2;
+
+      const first = sampleComposition({
+        request: baseRequest({ requestedDifficulty: "mixed" }),
+        pool,
+        excludedItemIds: new Set(),
+        random: createSeededRandom(firstSeed),
+      });
+      expect(first.ok).toBe(true);
+      if (!first.ok) continue;
+
+      const excludedItemIds = new Set(first.composition.slots.flat());
+
+      const second = sampleComposition({
+        request: baseRequest({ requestedDifficulty: "mixed" }),
+        pool,
+        excludedItemIds,
+        random: createSeededRandom(secondSeed),
+      });
+
+      if (!second.ok) failures++;
+    }
+
+    expect(failures).toBe(0);
+  });
+
   test("position order within a slot is randomised, not pool order", () => {
     const { pool, categories } = buildPoolFixture({
       locales: ["nl"],
