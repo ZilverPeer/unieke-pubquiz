@@ -32,6 +32,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "fast-check": "^4.9.0",
     "msedge-tts": "^2.0.7",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
