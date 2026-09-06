@@ -57,3 +57,6 @@ content/
 # static app audio (announcements) and non-copyrighted seed assets are code, not content
 !public/audio/**
 !supabase/seed-assets/**
+
+# documents which env vars exist; contains no secrets
+!.env.example

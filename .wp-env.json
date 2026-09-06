@@ -1,0 +1,16 @@
+{
+  "core": null,
+  "port": 45330,
+  "testsPort": 45331,
+  "plugins": [
+    "https://downloads.wordpress.org/plugin/woocommerce.zip",
+    "https://downloads.wordpress.org/plugin/advanced-product-fields-for-woocommerce.zip"
+  ],
+  "mappings": {
+    "wp-content/mu-plugins": "./shop/mu-plugins"
+  },
+  "config": {
+    "WP_DEBUG": true,
+    "WP_ENVIRONMENT_TYPE": "local"
+  }
+}
