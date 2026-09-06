@@ -3,23 +3,31 @@
 -- Shape (see supabase/README.md "Pool coverage" for the full reasoning):
 --   8 Categories, each with 2 Subcategories, each with 5 Subsubcategories
 --   => 10 Subsubcategories per Category.
---   Each Subsubcategory gets exactly one Item per (kind, difficulty)
---   combination: 3 kinds x 3 difficulties = 9 Items per Subsubcategory.
---   8 x 10 x 9 = 720 Items total.
+--   Each Subsubcategory gets 7 text Items and 1 picture + 1 music Item per
+--   Difficulty (3 kinds x 3 difficulties, text at 7x density): 27 Items per
+--   Subsubcategory. 8 x 10 x 27 = 2160 Items total (1680 text, 240 picture,
+--   240 music).
 --
--- Why this satisfies the ticket's pool-coverage requirement:
+-- Invariants this shape must hold (see src/sample and its README for the
+-- rules being served):
+--   - An Item never appears twice within the same Quiz, in either Quiz
+--     mode. Within a single Round of 10 Items, that's also guaranteed by
+--     the no-two-Items-share-a-Subsubcategory rule; across Rounds of the
+--     same Quiz it's enforced by sampleComposition itself excluding every
+--     Item already placed earlier in that Quiz (see issue #34).
 --   - Per Category, per kind, there are exactly 10 Subsubcategories with an
 --     Item of any given Difficulty -- the minimum for a Round of 10 Items to
---     never need two Items from the same Subsubcategory, with no slack.
---   - Per Locale, per Difficulty: 8 Categories x 10 Subsubcategories = 80
---     Items of each kind (text/picture/music), comfortably over the "at
---     least 60 text + 10 picture + 10 music" floor, and spread across all 8
---     Categories (not concentrated in one), so a full mixed-mode Quiz (up to
---     8 distinct Categories, one Round each) and a single-category Quiz (one
---     Category supplying 6 Text Rounds = 60 Text Items, reusing
---     Subsubcategories across Rounds since the no-duplicate rule is only
---     within a Round) are both fillable at every Difficulty, in both
---     Locales.
+--     never need two Items from the same Subsubcategory. Picture and music
+--     keep zero slack here (exactly 10 Items per Category/Difficulty, one
+--     Round's worth). Text needs more: a single-category Quiz draws 6
+--     distinct Text Rounds (60 Items, no repeats across Rounds) from ONE
+--     Category, unlike mixed mode where every Round's Category differs. 7x
+--     density gives 70 text Items per (Category, Difficulty) -- 10 Items of
+--     slack over the 60 needed, at every requested Difficulty.
+--   - Per Locale, per Difficulty: 8 Categories x 10 Subsubcategories x 7 =
+--     560 text Items, and 80 picture / 80 music Items, comfortably over the
+--     "at least 60 text + 10 picture + 10 music" floor for one mixed-mode
+--     Quiz, spread across all 8 Categories (not concentrated in one).
 --
 -- Text is deterministic placeholder content, not real quiz material:
 -- "Vraag <n> over <Category>" / "Question <n> about <Category>".
@@ -86,10 +94,12 @@ join category_translations cnl on cnl.category_id = sc.category_id and cnl.local
 join category_translations cen on cen.category_id = sc.category_id and cen.locale = 'en'
 cross join unnest(array['nl', 'en']::locale[]) as loc;
 
--- 4. Items: one per (Subsubcategory, kind, difficulty) -> 80 x 3 x 3 = 720 --
+-- 4. Items: text at 7 per (Subsubcategory, difficulty), picture/music at 1 --
+--    -> 80 x 3 x (7 + 1 + 1) = 2160 --------------------------------------
 --
--- seq order: all 240 text Items first (seq 1-240), then 240 picture (241-480),
--- then 240 music (481-720), each block ordered by subsubcategory then
+-- seq order: all 1680 text Items first (seq 1-1680, 7 per (subsubcategory,
+-- difficulty) cell, repeat 1-7 innermost), then 240 picture (1681-1920),
+-- then 240 music (1921-2160), each block ordered by subsubcategory then
 -- difficulty (easy, medium, hard).
 
 create temporary table item_seed on commit drop as
@@ -103,14 +113,17 @@ select
   k.kind_ord,
   d.difficulty,
   d.difficulty_ord,
-  row_number() over (order by k.kind_ord, ss.id, d.difficulty_ord) as seq
+  row_number() over (order by k.kind_ord, ss.id, d.difficulty_ord, rep.n) as seq
 from subsubcategories ss
 join subcategories sc on sc.id = ss.subcategory_id
 join categories c on c.id = sc.category_id
 join category_translations cnl on cnl.category_id = c.id and cnl.locale = 'nl'
 join category_translations cen on cen.category_id = c.id and cen.locale = 'en'
-cross join (values ('text', 1), ('picture', 2), ('music', 3)) as k(kind, kind_ord)
-cross join (values ('easy', 1), ('medium', 2), ('hard', 3)) as d(difficulty, difficulty_ord);
+-- text repeats 7x per (Subsubcategory, difficulty) cell; picture/music stay
+-- at 1x (see the file header for why text alone needs the extra density).
+cross join (values ('text', 1, 7), ('picture', 2, 1), ('music', 3, 1)) as k(kind, kind_ord, per_cell)
+cross join (values ('easy', 1), ('medium', 2), ('hard', 3)) as d(difficulty, difficulty_ord)
+cross join lateral generate_series(1, k.per_cell) as rep(n);
 
 insert into items (id, kind, subsubcategory_id, difficulty)
 select item_id, kind::item_kind, subsubcategory_id, difficulty::difficulty
@@ -118,9 +131,9 @@ from item_seed;
 
 -- 5. Item translations -------------------------------------------------------
 --
--- Locale-exception handful: seq 1 and 481 are nl-only, seq 2 and 482 are
--- en-only (text and music, one pair each); seq 241 is nl-only and seq 242 is
--- en-only (picture). Six Items total, so both Locale pools still meet the
+-- Locale-exception handful: seq 1 and 1921 are nl-only, seq 2 and 1922 are
+-- en-only (text and music, one pair each); seq 1681 is nl-only and seq 1682
+-- is en-only (picture). Six Items total, so both Locale pools still meet the
 -- coverage floor above.
 
 insert into item_translations (item_id, locale, question, answer, fact)
@@ -151,8 +164,8 @@ select
   else null end
 from item_seed s
 cross join unnest(array['nl', 'en']::locale[]) as loc
-where not (loc = 'en' and s.seq in (1, 241, 481))
-  and not (loc = 'nl' and s.seq in (2, 242, 482));
+where not (loc = 'en' and s.seq in (1, 1681, 1921))
+  and not (loc = 'nl' and s.seq in (2, 1682, 1922));
 
 -- 6. Picture and Music detail rows ------------------------------------------
 -- Reuse the same 4 seed asset files across many Items (storage_path is not

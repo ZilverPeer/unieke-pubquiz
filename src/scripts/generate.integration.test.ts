@@ -43,12 +43,15 @@ afterEach(async () => {
 const noopWriteDeliverables: WriteDeliverables = async () => {};
 
 // Category id 1 is "Sport" (nl) / "Sports" (en) -- see supabase/seed.sql
-// section 1. Every Category gets exactly 10 hard Text Items (one per
-// Subsubcategory, zero slack -- see supabase/README.md "Pool coverage"), so
-// picking it for slot 0 (a Text slot) at --difficulty hard consumes exactly
-// its 10 hard Text Items. A second run with the same pick therefore fails
-// slot 0 with shortfall 10, deterministically, regardless of how the other
-// 7 slots' categories are randomised.
+// section 1. Every Category gets 7 hard Text Items per Subsubcategory (70
+// total, 10 Items of slack over the 60 a single_category Quiz's 6 Text
+// Rounds need -- see supabase/README.md "Pool coverage"). A first
+// single_category run at --difficulty hard against this Category consumes
+// 60 of those 70 (one per Subsubcategory per Round, 6 Rounds), leaving
+// exactly 10 (one per Subsubcategory). A second single_category run against
+// the same Category and Difficulty then succeeds at slot 0 -- drawing those
+// last 10 -- and genuinely shortfalls at slot 1 (the next Text Round), which
+// finds zero hard Text Items left in any of the Category's Subsubcategories.
 const HARD_TEXT_CATEGORY_ID = "1";
 const HARD_TEXT_CATEGORY_NAME: Record<Locale, string> = { nl: "Sport", en: "Sports" };
 
@@ -222,18 +225,16 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
 });
 
 describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)", () => {
-  it("a second --difficulty hard run for the same email with the same Category pick fails slot 0 with shortfall 10, persists nothing, and writes no output folder", async () => {
+  it("a second single_category --difficulty hard run for the same email and Category pick fails slot 1 with shortfall 10, persists nothing, and writes no output folder", async () => {
     const email = freshEmail("unsatisfiable");
-    const categoryPicks = fullyRandomCategoryPicks();
-    categoryPicks[0] = HARD_TEXT_CATEGORY_ID;
     const outDir = join(await makeTmpDir(), "run-2");
 
     try {
       const firstResult = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "mixed",
-          categoryPicks,
+          quizMode: "single_category",
+          categoryPicks: singleCategoryPick(HARD_TEXT_CATEGORY_ID),
           requestedDifficulty: "hard",
           billingEmail: email,
           seed: 200,
@@ -251,7 +252,7 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
         "--locale",
         "nl",
         "--mode",
-        "mixed",
+        "single_category",
         "--difficulty",
         "hard",
         "--email",
@@ -266,7 +267,7 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
 
       expect(status).toBe(1);
       expect(stderr).toContain(
-        `Generation failed: slot 0, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10`,
+        `Generation failed: slot 1, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10`,
       );
       expect(stdout).not.toContain("Composition id");
 
