@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { buildQuizContentFixture } from "@/domain";
 import type { QuizContent } from "@/domain";
-import { extractImages, extractText, getDocumentProxy } from "unpdf";
+import { extractImages, extractText, getDocumentProxy, getResolvedPDFJS } from "unpdf";
 import { describe, expect, test } from "vitest";
 import { renderPictureHandoutPdf } from "./picture-handout-pdf";
 
@@ -142,6 +142,59 @@ async function writeScratch(name: string, buffer: Buffer): Promise<void> {
   fs.writeFileSync(path.join(scratchDir, name), buffer);
 }
 
+/** A 2x3 affine matrix [a, b, c, d, e, f], PDF content-stream style. */
+type Matrix = [number, number, number, number, number, number];
+
+function concatMatrix(m1: Matrix, m2: Matrix): Matrix {
+  return [
+    m1[0] * m2[0] + m1[1] * m2[2],
+    m1[0] * m2[1] + m1[1] * m2[3],
+    m1[2] * m2[0] + m1[3] * m2[2],
+    m1[2] * m2[1] + m1[3] * m2[3],
+    m1[4] * m2[0] + m1[5] * m2[2] + m2[4],
+    m1[4] * m2[1] + m1[5] * m2[3] + m2[5],
+  ];
+}
+
+/**
+ * Returns the leftmost and rightmost page-space x-coordinate of every
+ * embedded image on the given page, by replaying the page's real PDF
+ * content-stream operators (save/restore/cm/Do) — the same instructions any
+ * PDF viewer executes — rather than trusting @react-pdf's layout inputs.
+ * Each image is drawn as a unit square scaled/translated by the current
+ * transformation matrix, so its horizontal placement is `current[4]`
+ * (translation) to `current[4] + current[0]` (translation + x-scale).
+ */
+async function imageHorizontalEdges(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  pageNumber: number,
+): Promise<{ left: number; right: number }> {
+  const page = await pdf.getPage(pageNumber);
+  const pdfjs = await getResolvedPDFJS();
+  const { fnArray, argsArray } = await page.getOperatorList();
+
+  let current: Matrix = [1, 0, 0, 1, 0, 0];
+  const stack: Matrix[] = [];
+  let left = Infinity;
+  let right = -Infinity;
+
+  for (let i = 0; i < fnArray.length; i++) {
+    const fn = fnArray[i];
+    if (fn === pdfjs.OPS.save) {
+      stack.push(current);
+    } else if (fn === pdfjs.OPS.restore) {
+      current = stack.pop() ?? current;
+    } else if (fn === pdfjs.OPS.transform) {
+      current = concatMatrix(argsArray[i] as Matrix, current);
+    } else if (fn === pdfjs.OPS.paintImageXObject) {
+      left = Math.min(left, current[4]);
+      right = Math.max(right, current[4] + current[0]);
+    }
+  }
+
+  return { left, right };
+}
+
 describe("renderPictureHandoutPdf", () => {
   test("renders a one-page PDF buffer", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
@@ -238,6 +291,27 @@ describe("renderPictureHandoutPdf", () => {
     expect(text.replace(/[\n-]/g, "")).toContain(longName);
   });
 
+  test("stays on one page when a wordy Category name wraps the heading to two lines", async () => {
+    // Ordinary words with spaces, long enough to genuinely wrap at word
+    // boundaries into two lines at the heading's font size within the
+    // landscape page width — unlike the 60-character unbroken-run case
+    // above, this exercises the worst-case (two-line) header height that
+    // the grid's row height must still leave room for.
+    const wordyName =
+      "Uitgebreide categorie naam met heel veel woorden om zeker te weten dat de kop twee regels beslaat";
+    const quiz = withDistinctPictureImages(
+      withPictureCategoryName(buildQuizContentFixture({ locale: "nl" }), wordyName),
+    );
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+    await writeScratch("picture-handout-nl-two-line-heading.pdf", buffer);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    expect(pdf.numPages).toBe(1);
+    const images = await extractImages(pdf, 1);
+    expect(images.length).toBe(11);
+  });
+
   test("isolates locale: nl output has no en labels, en output has no nl labels", async () => {
     const nlBuffer = await renderPictureHandoutPdf(buildQuizContentFixture({ locale: "nl" }));
     await writeScratch("picture-handout-nl.pdf", nlBuffer);
@@ -284,5 +358,27 @@ describe("renderPictureHandoutPdf", () => {
     for (const word of labelWords) {
       expect(codeOnly).not.toContain(word);
     }
+  });
+
+  test("keeps every image cell inside the page's horizontal content margin", async () => {
+    // A wide image, scaled by objectFit: contain to the full width of its
+    // cell's inner content area, makes the rightmost/leftmost column's image
+    // edge a direct proxy for that cell's inner content edge — so if the
+    // grid ever overflows its cell's horizontal budget (e.g. a padding vs.
+    // width box-model regression), the rightmost image edge moves past the
+    // page's right content margin instead of stopping short of it.
+    const quiz = buildQuizContentFixture({ locale: "nl", image: buildGrayscalePng(2000, 50) });
+
+    const buffer = await renderPictureHandoutPdf(quiz);
+
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { width: pageWidth } = (await pdf.getPage(1)).getViewport({ scale: 1 });
+    const { left, right } = await imageHorizontalEdges(pdf, 1);
+
+    // PdfPage's own horizontal padding is 36pt each side; every image sits
+    // further inset than that inside its cell's padding and border, so both
+    // edges must clear it with room to spare.
+    expect(left).toBeGreaterThan(36);
+    expect(right).toBeLessThan(pageWidth - 36);
   });
 });
