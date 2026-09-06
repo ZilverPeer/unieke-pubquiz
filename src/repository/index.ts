@@ -33,6 +33,7 @@ export type { RepositoryConfig } from "./client";
 export type { ItemTranslation, PoolEntry } from "./types";
 export {
   IllegalQuizTransitionError,
+  QuizStatusChangedConcurrentlyError,
   type OrderLineItem,
   type RecordDeliveryInput,
   type TransitionQuizStatusOptions,

@@ -154,6 +154,24 @@ function assertLegalTransition(quizId: string, from: QuizStatus, to: QuizStatus)
   }
 }
 
+/**
+ * Thrown when the compare-and-swap `.eq("status", expectedFrom)` guard in
+ * transitionQuizStatus/recordDelivery matches zero rows: another writer
+ * changed the Quiz's status between the read and the write. Distinct from
+ * IllegalQuizTransitionError (which fires before any write, from a status
+ * this caller itself observed) so a caller such as the worker can retry a
+ * lost race instead of treating it as an illegal edge.
+ */
+export class QuizStatusChangedConcurrentlyError extends Error {
+  constructor(
+    readonly quizId: string,
+    readonly expectedFrom: QuizStatus,
+  ) {
+    super(`Quiz ${quizId} was expected to still be "${expectedFrom}" but changed concurrently`);
+    this.name = "QuizStatusChangedConcurrentlyError";
+  }
+}
+
 export interface TransitionQuizStatusOptions {
   /** Stored on `failed`; ignored otherwise. Cleared automatically on `pending`. */
   failureReason?: string;
@@ -177,8 +195,9 @@ export async function transitionQuizStatus(
     .eq("id", quizId)
     .eq("status", current.status)
     .select()
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new QuizStatusChangedConcurrentlyError(quizId, current.status);
 
   return toQuizRecord(data);
 }
@@ -207,8 +226,9 @@ export async function recordDelivery(
     .eq("id", quizId)
     .eq("status", current.status)
     .select()
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new QuizStatusChangedConcurrentlyError(quizId, current.status);
 
   return toQuizRecord(data);
 }

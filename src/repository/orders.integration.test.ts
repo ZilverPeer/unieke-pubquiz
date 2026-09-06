@@ -157,6 +157,10 @@ describe("upsertOrder", () => {
     });
 
     expect(order.wooStatus).toBe("completed");
+
+    const { data, error } = await db.from("orders").select("raw_payload").eq("id", order.id).single();
+    if (error) throw error;
+    expect(data.raw_payload).toEqual({ id: wooOrderId, note: "second" });
   });
 });
 
@@ -451,6 +455,27 @@ describe("order deletion is blocked while Quizzes reference it", () => {
     });
 
     const { error } = await db.from("orders").delete().eq("id", order.id);
+
+    expect(error).not.toBeNull();
+  });
+});
+
+describe("Composition deletion is blocked while a Quiz references it", () => {
+  it("fails to delete a compositions row that a Quiz's composition_id points at", async () => {
+    const wooOrderId = freshWooOrderId();
+    const { quizzes } = await repository.upsertOrder({
+      wooOrderId,
+      billingEmail: "composition-delete-blocked@example.com",
+      wooStatus: "processing",
+      rawPayload: {},
+      lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
+    });
+    const quizId = quizzes[0].id;
+    await repository.transitionQuizStatus(quizId, "generating");
+    const compositionId = await createComposition();
+    await repository.recordDelivery(quizId, { compositionId, downloadToken: "tok-composition-delete-blocked-1" });
+
+    const { error } = await db.from("compositions").delete().eq("id", compositionId);
 
     expect(error).not.toBeNull();
   });
