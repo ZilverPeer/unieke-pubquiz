@@ -29,6 +29,85 @@ function sectionRightEdge(startColumn: number, columnSpan: number): number {
   return PAGE_MARGIN + CELL_WIDTH * (startColumn + columnSpan) - CELL_PADDING - CELL_BORDER_WIDTH;
 }
 
+/**
+ * Generous enough to cover the header's worst case: a two-line-wrapped
+ * heading (18pt) plus the team-name group pushed onto its own following
+ * line (another ~13pt), plus inter-line spacing.
+ */
+const HEADER_ZONE_HEIGHT = 45;
+
+const HEADING_START_PATTERN = /^(Ronde|Round|Muziekronde|Music Round)\b/;
+const TEAM_NAME_LABEL_PATTERN = /^(Teamnaam|Team name):$/;
+/** A numbered answer/entry row ("1.", "1. Artiest:", ...) — never part of a header. */
+const ANSWER_ROW_PATTERN = /^\d+\./;
+
+interface TextBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+function boxOf(item: { x: number; y: number; width: number; height: number }): TextBox {
+  return { minX: item.x, maxX: item.x + item.width, minY: item.y, maxY: item.y + item.height };
+}
+
+function unionBox(items: { x: number; y: number; width: number; height: number }[]): TextBox {
+  const boxes = items.map(boxOf);
+  return {
+    minX: Math.min(...boxes.map((b) => b.minX)),
+    maxX: Math.max(...boxes.map((b) => b.maxX)),
+    minY: Math.min(...boxes.map((b) => b.minY)),
+    maxY: Math.max(...boxes.map((b) => b.maxY)),
+  };
+}
+
+function boxesIntersect(a: TextBox, b: TextBox): boolean {
+  return a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+}
+
+/**
+ * For one grid row, pairs up each section's heading (its start item plus any
+ * wrapped continuation lines, grouped by sharing the heading start's exact
+ * x) with that section's team-name label item — sections left-to-right in
+ * both lists line up because both are read in the same left-to-right x
+ * order — and returns each pair's bounding boxes for an overlap check.
+ */
+function headerPairsForRow(
+  items: { str: string; x: number; y: number; width: number; height: number }[],
+  rowTopY: number,
+): { heading: TextBox; teamNameLabel: TextBox; headingText: string }[] {
+  const zoneItems = items.filter(
+    (item) =>
+      item.str.trim() !== "" &&
+      !ANSWER_ROW_PATTERN.test(item.str) &&
+      item.y <= rowTopY - CELL_PADDING &&
+      item.y > rowTopY - CELL_PADDING - HEADER_ZONE_HEIGHT,
+  );
+
+  const headingStarts = zoneItems
+    .filter((item) => HEADING_START_PATTERN.test(item.str))
+    .sort((a, b) => a.x - b.x);
+  const teamNameLabels = zoneItems
+    .filter((item) => TEAM_NAME_LABEL_PATTERN.test(item.str))
+    .sort((a, b) => a.x - b.x);
+
+  expect(headingStarts.length, "expected one heading start item per section in this row").toBe(
+    teamNameLabels.length,
+  );
+
+  return headingStarts.map((start, i) => {
+    const headingLines = zoneItems.filter(
+      (item) => item.x === start.x && !TEAM_NAME_LABEL_PATTERN.test(item.str),
+    );
+    return {
+      heading: unionBox(headingLines),
+      teamNameLabel: boxOf(teamNameLabels[i]),
+      headingText: headingLines.map((line) => line.str).join(" "),
+    };
+  });
+}
+
 const scratchDir = path.join(process.cwd(), ".scratch");
 
 /**
@@ -189,6 +268,48 @@ describe("renderAnswerSheetPdf", () => {
       ).toBeLessThanOrEqual(rightEdge);
     }
   });
+
+  test.each([
+    ["a 40-character unbroken Category name", "A".repeat(40)],
+    ["a wordy ~40-character Category name", "Nederlandse popmuziek uit de jaren tachtig"],
+  ])(
+    "the heading and the team-name label never overlap, even with %s",
+    async (_description, categoryName) => {
+      const quiz: QuizContent = {
+        ...buildQuizContentFixture({ locale: "nl" }),
+        rounds: buildQuizContentFixture({ locale: "nl" }).rounds.map((round) => ({
+          ...round,
+          categoryName,
+        })),
+      };
+
+      const buffer = await renderAnswerSheetPdf(quiz);
+      const pdf = await getDocumentProxy(new Uint8Array(buffer));
+      const { items } = await extractTextItems(pdf);
+
+      const rowTopYs = [
+        PAGE_HEIGHT - PAGE_MARGIN,
+        PAGE_HEIGHT - PAGE_MARGIN - ROW_HEIGHT,
+      ];
+
+      const pairs = rowTopYs.flatMap((rowTopY) => headerPairsForRow(items[0], rowTopY));
+      // Row 1: GRID_COLUMNS Text Round sections. Row 2: (GRID_COLUMNS - 2)
+      // Text Round sections plus the Music Round section, which spans the
+      // last two columns but is still a single section with one header.
+      const rowOneSectionCount = GRID_COLUMNS;
+      const rowTwoSectionCount = GRID_COLUMNS - 2 + 1;
+      expect(pairs.length).toBe(rowOneSectionCount + rowTwoSectionCount);
+
+      for (const { heading, teamNameLabel, headingText } of pairs) {
+        expect(
+          boxesIntersect(heading, teamNameLabel),
+          `expected the heading "${headingText}" (x ${heading.minX}-${heading.maxX}, ` +
+            `y ${heading.minY}-${heading.maxY}) not to overlap its section's team-name label ` +
+            `(x ${teamNameLabel.minX}-${teamNameLabel.maxX}, y ${teamNameLabel.minY}-${teamNameLabel.maxY})`,
+        ).toBe(false);
+      }
+    },
+  );
 
   test("contains the six Text Round names and the Music Round heading in nl", async () => {
     const quiz = buildQuizContentFixture({ locale: "nl" });
