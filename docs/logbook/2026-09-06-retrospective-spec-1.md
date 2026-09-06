@@ -54,5 +54,5 @@ Expected effect on a #11-sized ticket: roughly 20 to 25 minutes less wall clock 
 
 ## Open
 
-- Whether asset-only or SQL-only tickets should get a single empirical check instead of two reviewers. Deferred; cost is acceptable, and the wave-1 reviewers each found one real item on those tickets.
+- ~~Whether asset-only or SQL-only tickets should get a single empirical check instead of two reviewers.~~ Decided 2026-09-06 (Erik left it to the orchestrator): single empirical reviewer, recorded in the playbook under Ticket size.
 - Visual acceptance of the four Deliverables against the legacy look is Erik's call; samples are under `content/generated/samples-2026-09-06/`.
