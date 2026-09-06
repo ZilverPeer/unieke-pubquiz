@@ -240,6 +240,36 @@ export type Database = {
           },
         ]
       }
+      orders: {
+        Row: {
+          billing_email: string
+          created_at: string
+          id: string
+          raw_payload: Json
+          status: string
+          updated_at: string
+          woo_order_id: number
+        }
+        Insert: {
+          billing_email: string
+          created_at?: string
+          id?: string
+          raw_payload: Json
+          status: string
+          updated_at?: string
+          woo_order_id: number
+        }
+        Update: {
+          billing_email?: string
+          created_at?: string
+          id?: string
+          raw_payload?: Json
+          status?: string
+          updated_at?: string
+          woo_order_id?: number
+        }
+        Relationships: []
+      }
       picture_item_details: {
         Row: {
           item_id: string
@@ -259,6 +289,75 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: true
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          category_picks: Json
+          composition_id: string | null
+          created_at: string
+          delivered_at: string | null
+          download_token: string | null
+          failure_reason: string | null
+          id: string
+          locale: Database["public"]["Enums"]["locale"]
+          order_id: string
+          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
+          requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
+          sequence: number
+          status: Database["public"]["Enums"]["quiz_status"]
+          updated_at: string
+          woo_line_item_id: number
+        }
+        Insert: {
+          category_picks: Json
+          composition_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          download_token?: string | null
+          failure_reason?: string | null
+          id?: string
+          locale: Database["public"]["Enums"]["locale"]
+          order_id: string
+          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
+          requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
+          sequence: number
+          status?: Database["public"]["Enums"]["quiz_status"]
+          updated_at?: string
+          woo_line_item_id: number
+        }
+        Update: {
+          category_picks?: Json
+          composition_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          download_token?: string | null
+          failure_reason?: string | null
+          id?: string
+          locale?: Database["public"]["Enums"]["locale"]
+          order_id?: string
+          quiz_mode?: Database["public"]["Enums"]["quiz_mode"]
+          requested_difficulty?: Database["public"]["Enums"]["requested_difficulty"]
+          sequence?: number
+          status?: Database["public"]["Enums"]["quiz_status"]
+          updated_at?: string
+          woo_line_item_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_composition_id_fkey"
+            columns: ["composition_id"]
+            isOneToOne: false
+            referencedRelation: "compositions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -379,6 +478,7 @@ export type Database = {
       item_kind: "text" | "picture" | "music"
       locale: "nl" | "en"
       quiz_mode: "mixed" | "single_category"
+      quiz_status: "pending" | "generating" | "delivered" | "failed"
       requested_difficulty: "easy" | "medium" | "hard" | "mixed"
     }
     CompositeTypes: {
@@ -514,6 +614,7 @@ export const Constants = {
       item_kind: ["text", "picture", "music"],
       locale: ["nl", "en"],
       quiz_mode: ["mixed", "single_category"],
+      quiz_status: ["pending", "generating", "delivered", "failed"],
       requested_difficulty: ["easy", "medium", "hard", "mixed"],
     },
   },
