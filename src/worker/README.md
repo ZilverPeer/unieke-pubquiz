@@ -5,8 +5,10 @@ The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its four 
 - `boss.ts` -- pg-boss instance lifecycle: `startBoss`/`stopBoss`, the `quiz-generation` queue (`createQuizQueue`), and `resolveDatabaseUrl()` (`DATABASE_URL`, falling back to the local Supabase stack's Postgres port).
 - `quiz-job.ts` -- `handleQuizJob`, the job handler. Pure with respect to pg-boss: takes a `QuizJobLike` (the small subset of a pg-boss job it needs) and a `QuizJobDeps` bag, so it can be driven directly in tests without a running queue.
 - `sweep.ts` -- `sweepPendingQuizzes`, the startup sweep.
+- `prune.ts` -- `pruneDeliverables`, the daily pruning job (ticket #42). See "Pruning" below.
 - `index.ts` -- the composition root: `startWorker()` wires the repository, the deliverer and pg-boss together, registers the handler, and runs the sweep once.
 - `quiz-job.integration.test.ts` -- see "Testing" below.
+- `prune.integration.test.ts` -- integration tests for `pruneDeliverables`, same conventions as `quiz-job.integration.test.ts`.
 
 ## The queue
 

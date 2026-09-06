@@ -6,12 +6,14 @@
 import type { PgBoss } from "pg-boss";
 import { createDeliverer } from "@/deliver";
 import {
+  createDeliverableRemover,
   createDeliverableUploader,
   createOrderRepository,
   createRepository,
   resolveLocalStackConfig,
 } from "@/repository";
 import { QUIZ_QUEUE, startBoss, stopBoss } from "./boss";
+import { PRUNE_QUEUE, pruneDeliverables, schedulePruneJob } from "./prune";
 import { handleQuizJob, type QuizJobData, type QuizJobDeps } from "./quiz-job";
 import { sweepPendingQuizzes } from "./sweep";
 
@@ -42,6 +44,7 @@ export async function startWorker(): Promise<Worker> {
   const orderRepository = createOrderRepository(config);
   const contentRepository = createRepository(config);
   const uploadDeliverable = createDeliverableUploader(config);
+  const removeDeliverables = createDeliverableRemover(config);
   const appBaseUrl = resolveAppBaseUrl();
 
   const boss = await startBoss();
@@ -59,6 +62,16 @@ export async function startWorker(): Promise<Worker> {
     await handleQuizJob(job, deps);
   });
 
+  // Daily pruning job (ticket #42): its own queue/schedule, registered
+  // alongside the quiz-generation one. See prune.ts.
+  await schedulePruneJob(boss);
+  await boss.work(PRUNE_QUEUE, async () => {
+    const result = await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
+    console.log(
+      `[worker] pruned ${result.prunedQuizIds.length} expired Quiz(zes), cleaned up ${result.cleanedFailedQuizIds.length} failed Quiz(zes)`,
+    );
+  });
+
   const enqueued = await sweepPendingQuizzes(boss, orderRepository);
   console.log(`[worker] started (queue "${QUIZ_QUEUE}"); swept ${enqueued} pending Quiz job(s)`);
 
@@ -68,6 +81,7 @@ export async function startWorker(): Promise<Worker> {
   };
 }
 
-export { QUIZ_QUEUE } from "./boss";
+export { QUIZ_QUEUE, startBoss, stopBoss } from "./boss";
+export { PRUNE_QUEUE, pruneDeliverables, schedulePruneJob } from "./prune";
 export { handleQuizJob, type QuizJobData, type QuizJobDeps, type QuizJobLike } from "./quiz-job";
 export { sweepPendingQuizzes } from "./sweep";
