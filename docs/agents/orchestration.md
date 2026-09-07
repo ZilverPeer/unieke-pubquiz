@@ -56,6 +56,10 @@ Out of scope: <anything noticed, one line each, or "none">
 Interface gaps: <anything the brief got wrong, or "none">
 ```
 
+### 30-minute check-in
+
+Any agent (implementer or reviewer) still running 30 minutes after dispatch gets a check-in, and again every 30 minutes after that. The orchestrator runs `npx tsx scripts/agents/peek.ts <agentId>` (prints the agent's last tool calls and results from its transcript; subagent output files are often empty) and compares what it sees with the brief. On plan: nothing. Off plan (retrying a denied action, cleaning up things it was not asked to clean, waiting on a background command, running a suite the brief forbids): one `SendMessage` naming the deviation and the next step; a second deviation means stop the agent and redispatch with a tightened brief. Why: the PR #53 Spec reviewer spent 20 minutes retrying blocked `DELETE`s against the shared stack and Erik saw the permission prompts before the orchestrator did. The orchestrator schedules the check-in with a session cron at dispatch of the first agent of a wave and deletes it when the wave ends.
+
 ## Review
 
 Both reviewers are dispatched the moment the PR opens, in one message, so they run in parallel.
