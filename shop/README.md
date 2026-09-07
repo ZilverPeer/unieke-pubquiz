@@ -18,8 +18,8 @@ that only asks for a name and an email. See "Dutch storefront" below.
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
-| `npm run shop:down` | Stops wp-env and the Mailpit container. Data is preserved (see "Reset"). |
+| `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, starts the cron ticker container (see "The webhook" below), then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
+| `npm run shop:down` | Stops wp-env, the Mailpit container, and the cron ticker container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
 
@@ -54,11 +54,9 @@ to 3000, so stop one before starting the other, or pass `--port` to
 npm run shop:up
 npm run shop:capture -- --out shop/fixtures/order-updated-processing.json &
 npm run shop:order -- --email you@example.com --locale nl --difficulty easy --mode single_category --pick 0=1
-# WooCommerce webhooks are delivered async via Action Scheduler/WP-Cron, which
-# is pseudo-cron and only runs on real HTTP traffic. A pure WP-CLI order
-# update won't kick it by itself in this environment; simplest reliable way
-# to fire it locally:
-npx wp-env run cli -- wp action-scheduler run --user=admin
+# WooCommerce webhooks are delivered async via Action Scheduler/WP-Cron; the
+# cron ticker container shop:up started ticks it automatically within a few
+# seconds -- no manual step needed (see "The webhook" below).
 ```
 
 The capture listener writes headers (including `X-WC-Webhook-Signature`)
@@ -433,10 +431,65 @@ matching `shop:capture`'s default port) with secret `WOOCOMMERCE_WEBHOOK_SECRET`
 (default `test-secret` locally; see `.env.example`). WooCommerce signs each
 delivery with `X-WC-Webhook-Signature: base64(hmac-sha256(body, secret))`.
 
-Because WP-CLI order creation/update doesn't run through a normal HTTP
-request, WordPress's pseudo-cron (which drives Action Scheduler, which
-drives webhook delivery) never fires on its own after a scripted order
-change. Kick it manually with:
+### Cron ticker (ticket #58)
+
+WordPress's pseudo-cron (which drives Action Scheduler, which drives
+webhook delivery) only runs on real HTTP traffic, and neither WP-CLI order
+creation/update nor `place-order.ts` generates any. Delivering the webhook
+within seconds of an order, with no manual step, needs **two** pieces, not
+one:
+
+1. **The cron ticker container.** `npm run shop:up` starts a small
+   `pubquiz-cron-ticker` container (`curlimages/curl`,
+   `scripts/shop/lib/cron-ticker.ts`) that requests
+   `http://host.docker.internal:45330/wp-cron.php?doing_wp_cron` every 5
+   seconds, silently, for as long as the shop is up; `npm run shop:down`
+   stops it. Idempotent like Mailpit's container: a running ticker is
+   reused, a stopped one restarted, an absent one created, so running
+   `shop:up` twice never starts a second one. This makes WordPress's
+   pseudo-cron actually run (check for due cron events) every 5 seconds
+   instead of only on the rare real HTTP request this local shop otherwise
+   gets.
+2. **The fast queue-runner schedule.** Ticking wp-cron.php more often is
+   not, by itself, enough: Action Scheduler's queue runner -- the thing
+   that actually processes the queued `order.updated` delivery -- is
+   itself a WP-Cron *event* (`ActionScheduler_QueueRunner::WP_CRON_HOOK`)
+   scheduled on the `every_minute` schedule
+   (`ActionScheduler_QueueRunner::WP_CRON_SCHEDULE`), and once scheduled it
+   stays on whatever schedule it was given -- a more frequent wp-cron.php
+   tick only checks for due events sooner, it doesn't make that event due
+   sooner. `shop/mu-plugins/pubquiz-fast-scheduler.php` reschedules it onto
+   a `pubquiz_every_5s` schedule via Action Scheduler's own
+   `action_scheduler_run_schedule` filter (`ActionScheduler_QueueRunner.php`
+   line 91), the first time it finds the event on any other schedule; once
+   rescheduled, every later request pays for one `wp_get_schedule()` read
+   against the `cron` option -- autoloaded, so an in-memory lookup, not a
+   query -- and nothing else. **Gated to `local`/`development`**, same as
+   `pubquiz-mailpit-smtp.php`: the 5-second schedule only compensates for
+   this local setup's two broken delivery paths (no real HTTP request for
+   a WP-CLI order change, and the ticker container's requests can't carry
+   Action Scheduler's own async loopback request back out anywhere useful)
+   -- a real deployment's async runner already delivers within the same
+   request cycle, so this plugin is a no-op in production.
+3. **`DISABLE_WP_CRON` (`.wp-env.json`).** Even with both pieces above,
+   latency clustered near 0s or near 60s instead of consistently landing
+   under 30s: WordPress's own page-load cron spawn
+   (`spawn_cron()`/`_wp_cron()`, `wp-includes/cron.php`) writes its
+   `doing_cron` transient lock *before* firing a loopback HTTP request back
+   to `wp-cron.php` -- a loopback that never completes from inside the
+   wp-env container -- so every normal page load (checkout, REST, admin)
+   re-armed a lock that then sat for the full `WP_CRON_LOCK_TIMEOUT` (60s),
+   during which the ticker's own external `wp-cron.php` requests got
+   turned away early by wp-cron.php's own lock check. `DISABLE_WP_CRON`
+   makes `_wp_cron()` a no-op on page loads (it returns before ever taking
+   the lock) without touching `wp-cron.php` itself, which the ticker calls
+   directly and which does not check the constant -- so the ticker's own
+   5-second requests are the only thing spawning cron now, and the lock is
+   never held by a losing loopback.
+
+**Troubleshooting:** if an order sits in `processing` for more than a
+minute, check `docker ps` for `pubquiz-cron-ticker`; if it's missing or
+stuck, kick the scheduler by hand as a fallback:
 
 ```sh
 npx wp-env run cli -- wp action-scheduler run --user=admin
