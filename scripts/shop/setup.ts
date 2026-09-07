@@ -13,11 +13,14 @@
  * against this container on Windows bind mounts, so this cut a ~6 minute
  * `shop:up` to well under 90 seconds. See shop/README.md "Single bootstrap".
  *
- * This file now only does what has to run on the host: the Mailpit
- * mail-catcher container (see lib/mailpit.ts), running that one eval-file
- * call and parsing its single line of JSON output (parseSetupResult, in
- * lib/setup-result.ts so it can be unit-tested without booting the whole
- * shop), and upserting the returned REST API credentials into .env.local.
+ * This file now only does what has to run on the host: loading the running
+ * Supabase stack's Dutch Category names (ticket #57, lib/categories.ts --
+ * before any WP-CLI call, so a stopped/unreachable stack fails fast, named
+ * as the cause), the Mailpit mail-catcher container (see lib/mailpit.ts),
+ * running that one eval-file call and parsing its single line of JSON
+ * output (parseSetupResult, in lib/setup-result.ts so it can be
+ * unit-tested without booting the whole shop), and upserting the returned
+ * REST API credentials into .env.local.
  */
 import "../load-env";
 import { wpCli } from "./lib/wp-cli";
@@ -25,23 +28,31 @@ import { ensureMailpit } from "./lib/mailpit";
 import { parseSetupResult, type SetupResult } from "./lib/setup-result";
 import { upsertRestApiCredentials } from "./lib/env-file";
 import { DEFAULT_WEBHOOK_URL, WP_ENV_PORT } from "./lib/config";
+import { encodeCategoriesForWpCli, loadDutchCategories, type DutchCategory } from "./lib/categories";
 
 const SETUP_SCRIPT_PATH = "wp-content/mu-plugins/wp-cli-scripts/setup-shop.php";
 
-function runSetupShop(): SetupResult {
+function runSetupShop(categories: DutchCategory[]): SetupResult {
   const deliveryUrl = process.env.WOOCOMMERCE_WEBHOOK_URL ?? DEFAULT_WEBHOOK_URL;
   const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET ?? "test-secret";
+  const categoriesArg = encodeCategoriesForWpCli(categories);
 
-  const { stdout } = wpCli(["eval-file", SETUP_SCRIPT_PATH, deliveryUrl, secret]);
+  const { stdout } = wpCli(["eval-file", SETUP_SCRIPT_PATH, deliveryUrl, secret, categoriesArg]);
   return parseSetupResult(stdout);
 }
 
-function main() {
+async function main() {
   const startedAt = Date.now();
+
+  // Before any WP-CLI call (see this file's docblock): a stopped/unreachable
+  // Supabase stack, or a seed with zero Categories, fails fast here with a
+  // message naming the stack as the cause, instead of surfacing later as a
+  // confusing WordPress-side error.
+  const categories = await loadDutchCategories();
 
   const { uiUrl: mailpitUrl } = ensureMailpit();
 
-  const result = runSetupShop();
+  const result = runSetupShop(categories);
 
   // Rotated on every run (see setup-shop.php's docblock for why reuse isn't
   // possible) and upserted into .env.local -- never printed in full here,
@@ -68,4 +79,7 @@ function main() {
   console.log(`shop:up finished in ${elapsedSeconds}s (setup.ts's own work, after "wp-env start").`);
 }
 
-main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

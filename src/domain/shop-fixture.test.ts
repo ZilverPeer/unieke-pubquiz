@@ -81,15 +81,59 @@ describe("shop/mu-plugins/pubquiz-customer-notice.php", () => {
 });
 
 describe("shop/mu-plugins/wp-cli-scripts/setup-field-group.php", () => {
-  test("declares all three fixed CHECKOUT_META_KEYS and the category key stem", () => {
-    const php = readFileSync(
-      join(REPO_ROOT, "shop", "mu-plugins", "wp-cli-scripts", "setup-field-group.php"),
-      "utf8",
-    );
-    expect(php).toContain(CHECKOUT_META_KEYS.locale);
-    expect(php).toContain(CHECKOUT_META_KEYS.requestedDifficulty);
-    expect(php).toContain(CHECKOUT_META_KEYS.quizMode);
-    expect(php).toContain("pubquiz_category_");
+  /**
+   * Ticket #57: field labels are now Dutch (Taal/Moeilijkheid/Soort quiz/
+   * Categorie N), not the literal CHECKOUT_META_KEYS strings -- the wire
+   * format moved to pubquiz-checkout-meta.php's `_wapf_meta` bridge (pinned
+   * below). This file still fixes the field *ids* the bridge plugin reads
+   * (locale/difficulty/mode/category_N) and no longer hardcodes a Category
+   * id list -- Categories come from $pubquiz_categories, set by
+   * setup-shop.php from the Supabase stack (scripts/shop/lib/categories.ts).
+   */
+  const php = readFileSync(
+    join(REPO_ROOT, "shop", "mu-plugins", "wp-cli-scripts", "setup-field-group.php"),
+    "utf8",
+  );
+
+  test("declares field ids matching CHECKOUT_META_KEYS's key stems", () => {
+    expect(php).toContain("'locale'");
+    expect(php).toContain("'difficulty'");
+    expect(php).toContain("'mode'");
+    expect(php).toContain("'category_' . ( $slot + 1 )");
+  });
+
+  test("no longer hardcodes a Category id list", () => {
+    expect(php).not.toContain("[ 1, 2, 3, 4, 5, 6, 7, 8 ]");
+    expect(php).not.toMatch(/\$category_ids\s*=/);
+    expect(php).toContain("$pubquiz_categories");
+  });
+});
+
+describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
+  /**
+   * Ticket #57: bridges the field group's `_wapf_meta` (id/label/value/raw
+   * per field) back to the `pubquiz_*` keys the webhook parser expects.
+   * Pins the four CHECKOUT_META_KEYS literals and the field ids the bridge
+   * matches on -- a mismatch here silently breaks the webhook wire format
+   * without any test in shop-fixture.test.ts's other describe blocks
+   * catching it, since this plugin (not setup-field-group.php) is now the
+   * only place those literals appear together.
+   */
+  const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-checkout-meta.php"), "utf8");
+
+  test("maps the fixed field ids to CHECKOUT_META_KEYS's literal values", () => {
+    expect(php).toContain("'locale'");
+    expect(php).toContain(`=> '${CHECKOUT_META_KEYS.locale}'`);
+    expect(php).toContain("'difficulty'");
+    expect(php).toContain(`=> '${CHECKOUT_META_KEYS.requestedDifficulty}'`);
+    expect(php).toContain("'mode'");
+    expect(php).toContain(`=> '${CHECKOUT_META_KEYS.quizMode}'`);
+  });
+
+  test("maps category_N field ids to the pubquiz_category_ stem", () => {
+    const stem = CHECKOUT_META_KEYS.categoryPick(0).replace("_1", "_");
+    expect(php).toContain(`'${stem}'`);
+    expect(php).toContain("category_(\\d+)");
   });
 });
 

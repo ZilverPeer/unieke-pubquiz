@@ -4,7 +4,7 @@
  * Run via:
  *
  *   wp eval-file wp-content/mu-plugins/wp-cli-scripts/setup-shop.php \
- *     <webhookDeliveryUrl> <webhookSecret>
+ *     <webhookDeliveryUrl> <webhookSecret> <base64CategoriesJson>
  *
  * by scripts/shop/setup.ts, in place of what used to be about 26 separate
  * WP-CLI invocations, each costing roughly 14 seconds against this container
@@ -15,6 +15,16 @@
  * the Advanced Product Fields field group (setup-field-group.php, required
  * below), the classic Cart/Checkout shortcodes, the `order.updated` webhook,
  * and a freshly rotated WooCommerce REST API key.
+ *
+ * `<base64CategoriesJson>` (ticket #57) is base64 of a JSON array of
+ * `{"id": "...", "name": "..."}` -- the running Supabase stack's `nl`
+ * Category translations, loaded and encoded by
+ * scripts/shop/lib/categories.ts before this script ever runs, so a
+ * stopped/unreachable stack (or an empty seed) fails fast on the host, named
+ * as the cause, rather than as a confusing WordPress-side error here. Base64
+ * avoids shell-quoting a JSON array as a `wp eval-file` argument on Windows.
+ * Decoded into `$pubquiz_categories` below and handed to
+ * setup-field-group.php, which builds the Category dropdowns from it.
  *
  * Every step is read-before-write idempotent: it reads the current state
  * first and only writes when something differs, exactly like the individual
@@ -42,9 +52,36 @@ function pubquiz_log( $message ) {
     fwrite( STDERR, $message . "\n" );
 }
 
-global $args;
+// $args is already in scope here as a *local* variable: WP-CLI's
+// EvalFile_Command evaluates this file's contents inside its own method
+// (execute_eval()), passing the file's positional arguments as that
+// method's own $args parameter -- `global $args;` (this file's approach
+// before ticket #57) pulls in $GLOBALS['args'] instead, which WP-CLI never
+// sets, so it was always null and every `isset($args[N])` below always
+// silently fell through to its default. Verified empirically against this
+// wp-env's WP-CLI: a `global $args;` eval-file script sees
+// `isset($GLOBALS['args'])` false and a bare `count($args)` throw a
+// TypeError (null given), while the bare local `$args` (no `global`) has
+// exactly the positional arguments passed on the command line. This means
+// every prior `shop:up` run had already silently ignored a non-default
+// WOOCOMMERCE_WEBHOOK_URL/WOOCOMMERCE_WEBHOOK_SECRET, always using the
+// literal defaults below instead -- undetected until ticket #57 made a
+// third argument required and it never arrived. Fixed here for the
+// existing two arguments too, not just the new third one.
 $webhook_delivery_url = isset( $args[0] ) ? $args[0] : 'http://host.docker.internal:3000/api/webhooks/woocommerce';
 $webhook_secret       = isset( $args[1] ) ? $args[1] : 'test-secret';
+
+if ( ! isset( $args[2] ) || '' === $args[2] ) {
+    WP_CLI::error( 'Missing required third argument: base64-encoded JSON array of Categories ({"id","name"}[]) -- see scripts/shop/lib/categories.ts.' );
+}
+$pubquiz_categories_json = base64_decode( $args[2], true );
+if ( false === $pubquiz_categories_json ) {
+    WP_CLI::error( 'Third argument is not valid base64.' );
+}
+$pubquiz_categories = json_decode( $pubquiz_categories_json, true );
+if ( ! is_array( $pubquiz_categories ) || empty( $pubquiz_categories ) ) {
+    WP_CLI::error( 'Decoded Categories argument is not a non-empty JSON array.' );
+}
 
 // -----------------------------------------------------------------------
 // 1. Theme: Storefront is installed declaratively by .wp-env.json's
