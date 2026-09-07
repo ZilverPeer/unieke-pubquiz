@@ -431,17 +431,41 @@ matching `shop:capture`'s default port) with secret `WOOCOMMERCE_WEBHOOK_SECRET`
 (default `test-secret` locally; see `.env.example`). WooCommerce signs each
 delivery with `X-WC-Webhook-Signature: base64(hmac-sha256(body, secret))`.
 
+### Cron ticker (ticket #58)
+
 WordPress's pseudo-cron (which drives Action Scheduler, which drives
 webhook delivery) only runs on real HTTP traffic, and neither WP-CLI order
-creation/update nor `place-order.ts` generates any -- so, since ticket #58,
-`npm run shop:up` also starts a small `pubquiz-cron-ticker` container
-(`curlimages/curl`, `scripts/shop/lib/cron-ticker.ts`) that requests
-`http://host.docker.internal:45330/wp-cron.php?doing_wp_cron` every 5
-seconds, silently, for as long as the shop is up; `npm run shop:down` stops
-it. This is what makes "place an order and do nothing else" deliver the
-webhook within seconds, with no manual step. Idempotent like Mailpit's
-container: a running ticker is reused, a stopped one restarted, an absent
-one created, so running `shop:up` twice never starts a second one.
+creation/update nor `place-order.ts` generates any. Delivering the webhook
+within seconds of an order, with no manual step, needs **two** pieces, not
+one:
+
+1. **The cron ticker container.** `npm run shop:up` starts a small
+   `pubquiz-cron-ticker` container (`curlimages/curl`,
+   `scripts/shop/lib/cron-ticker.ts`) that requests
+   `http://host.docker.internal:45330/wp-cron.php?doing_wp_cron` every 5
+   seconds, silently, for as long as the shop is up; `npm run shop:down`
+   stops it. Idempotent like Mailpit's container: a running ticker is
+   reused, a stopped one restarted, an absent one created, so running
+   `shop:up` twice never starts a second one. This makes WordPress's
+   pseudo-cron actually run (check for due cron events) every 5 seconds
+   instead of only on the rare real HTTP request this local shop otherwise
+   gets.
+2. **The fast queue-runner schedule.** Ticking wp-cron.php more often is
+   not, by itself, enough: Action Scheduler's queue runner -- the thing
+   that actually processes the queued `order.updated` delivery -- is
+   itself a WP-Cron *event* (`ActionScheduler_QueueRunner::WP_CRON_HOOK`)
+   scheduled on the `every_minute` schedule
+   (`ActionScheduler_QueueRunner::WP_CRON_SCHEDULE`), and once scheduled it
+   stays on whatever schedule it was given -- a more frequent wp-cron.php
+   tick only checks for due events sooner, it doesn't make that event due
+   sooner. `shop/mu-plugins/pubquiz-fast-scheduler.php` reschedules it onto
+   a `pubquiz_every_5s` schedule via Action Scheduler's own
+   `action_scheduler_run_schedule` filter (`ActionScheduler_QueueRunner.php`
+   line 91), the first time it finds the event on any other schedule; once
+   rescheduled, every later request pays for one `wp_get_schedule()` query
+   and nothing else. Not gated to `local`/`development` -- that one query
+   per page load is cheap even in production when the queue is already
+   empty, and ticket #58 did not ask for an environment guard here.
 
 **Troubleshooting:** if an order sits in `processing` for more than a
 minute, check `docker ps` for `pubquiz-cron-ticker`; if it's missing or

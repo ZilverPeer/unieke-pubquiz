@@ -137,6 +137,37 @@ describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
   });
 });
 
+describe("shop/mu-plugins/pubquiz-fast-scheduler.php", () => {
+  /**
+   * Ticket #58 fix round: the cron ticker (scripts/shop/lib/cron-ticker.ts)
+   * pings wp-cron.php every 5 seconds, but Action Scheduler's own queue
+   * runner is itself a WP-Cron *event* scheduled on the `every_minute`
+   * schedule (ActionScheduler_QueueRunner::WP_CRON_SCHEDULE) -- ticking
+   * wp-cron.php more often doesn't make that event due any sooner. This
+   * plugin reschedules it onto a `pubquiz_every_5s` schedule via the
+   * `action_scheduler_run_schedule` filter. Pinned here (PHP can't import a
+   * TS constant) so the schedule name used by the filter and the one this
+   * test expects can't silently drift apart.
+   */
+  const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-fast-scheduler.php"), "utf8");
+
+  test("registers a pubquiz_every_5s cron schedule with a 5-second interval", () => {
+    expect(php).toContain("'pubquiz_every_5s'");
+    expect(php).toContain("'interval' => 5");
+  });
+
+  test("filters action_scheduler_run_schedule to the fast schedule", () => {
+    expect(php).toContain("action_scheduler_run_schedule");
+    expect(php).toContain("return 'pubquiz_every_5s'");
+  });
+
+  test("reschedules ActionScheduler_QueueRunner::WP_CRON_HOOK when it isn't already on the fast schedule", () => {
+    expect(php).toContain("ActionScheduler_QueueRunner::WP_CRON_HOOK");
+    expect(php).toContain("wp_get_schedule(");
+    expect(php).toContain("wp_schedule_event(");
+  });
+});
+
 describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
   /**
    * Ticket #61 (single-bootstrap shop:up) moved the Pubquiz product's slug,
