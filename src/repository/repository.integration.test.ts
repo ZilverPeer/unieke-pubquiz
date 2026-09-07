@@ -39,7 +39,7 @@ async function itemIdsMissingLocale(kind: "text" | "picture" | "music", missing:
 }
 
 describe("loadPool", () => {
-  it("returns only Items with an nl translation, 2157 entries", async () => {
+  it("returns only Items with an nl translation, 2637 entries", async () => {
     const enOnlyIds = [
       ...(await itemIdsMissingLocale("text", "nl")),
       ...(await itemIdsMissingLocale("picture", "nl")),
@@ -49,9 +49,9 @@ describe("loadPool", () => {
 
     const pool = await repository.loadPool("nl");
 
-    // 2160 seed Items total (see supabase/seed.sql's header and
+    // 2640 seed Items total (see supabase/seed.sql's header and
     // supabase/README.md "Pool coverage") minus the 3 en-only Items.
-    expect(pool).toHaveLength(2157);
+    expect(pool).toHaveLength(2637);
     for (const entry of pool) {
       expect(entry.item.locales).toContain("nl");
       expect(entry.item.kind).toBeTruthy();
@@ -65,7 +65,7 @@ describe("loadPool", () => {
     }
   });
 
-  it("returns only Items with an en translation, 2157 entries", async () => {
+  it("returns only Items with an en translation, 2637 entries", async () => {
     const nlOnlyIds = [
       ...(await itemIdsMissingLocale("text", "en")),
       ...(await itemIdsMissingLocale("picture", "en")),
@@ -75,8 +75,8 @@ describe("loadPool", () => {
 
     const pool = await repository.loadPool("en");
 
-    // 2160 seed Items total minus the 3 nl-only Items.
-    expect(pool).toHaveLength(2157);
+    // 2640 seed Items total minus the 3 nl-only Items.
+    expect(pool).toHaveLength(2637);
     for (const entry of pool) {
       expect(entry.item.locales).toContain("en");
     }
@@ -122,6 +122,43 @@ describe("loadPool", () => {
     const pool = await repository.loadPool("nl");
 
     expect(pool).toHaveLength(count ?? -1);
+  });
+
+  it("seeds exactly 20 picture and 20 music Items per Category and Difficulty", async () => {
+    // Raw item counts, independent of Locale (the seed's locale-exception
+    // handful removes one Item from a locale-filtered pool for its own
+    // (Category, kind, Difficulty) cell -- see supabase/seed.sql section 5 --
+    // so this asserts against the underlying seed shape, not loadPool).
+    // .eq("kind", ...) keeps each request under the default 1000-row page
+    // size (2640 Items total) without needing to paginate.
+    const { data: pictureRows, error: pictureError } = await db
+      .from("items")
+      .select("kind, difficulty, subsubcategories(subcategories(category_id))")
+      .eq("kind", "picture");
+    if (pictureError) throw pictureError;
+    const { data: musicRows, error: musicError } = await db
+      .from("items")
+      .select("kind, difficulty, subsubcategories(subcategories(category_id))")
+      .eq("kind", "music");
+    if (musicError) throw musicError;
+    const data = [...pictureRows, ...musicRows];
+
+    const counts = new Map<string, number>();
+    for (const row of data) {
+      if (row.kind !== "picture" && row.kind !== "music") continue;
+      const categoryId = row.subsubcategories?.subcategories?.category_id;
+      const key = `${categoryId}:${row.kind}:${row.difficulty}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    for (const categoryId of Array.from({ length: 8 }, (_, i) => i + 1)) {
+      for (const kind of ["picture", "music"] as const) {
+        for (const difficulty of ["easy", "medium", "hard"] as const) {
+          const key = `${categoryId}:${kind}:${difficulty}`;
+          expect(counts.get(key)).toBe(20);
+        }
+      }
+    }
   });
 });
 
