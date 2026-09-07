@@ -14,6 +14,7 @@
  * needed to re-enqueue a Quiz's job and re-attach its Deliverables the same
  * way the worker itself does.
  */
+import "../../scripts/load-env";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createDeliverer, createOrderLookup, resolveDelivererConfigFromEnv } from "@/deliver";

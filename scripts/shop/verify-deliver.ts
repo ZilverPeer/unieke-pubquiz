@@ -16,6 +16,7 @@
  * `deliver <id> <lineItemId> 0` then `deliver <id> <lineItemId> 1` against
  * the same order/line item and confirm eight distinct meta entries.
  */
+import "../load-env";
 import { createDeliverer, type OrderLookup } from "../../src/deliver";
 import { downloadPath } from "../../src/domain";
 
@@ -53,7 +54,7 @@ const config = {
 };
 
 if (!config.consumerKey || !config.consumerSecret) {
-  console.error("Set WOOCOMMERCE_CONSUMER_KEY / WOOCOMMERCE_CONSUMER_SECRET (see .env.shop.local).");
+  console.error("Set WOOCOMMERCE_CONSUMER_KEY / WOOCOMMERCE_CONSUMER_SECRET (see .env.local, written by npm run shop:up).");
   process.exit(1);
 }
 

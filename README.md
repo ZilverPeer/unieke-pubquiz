@@ -25,13 +25,17 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 | Variable | Used by | Default |
 |---|---|---|
 | `WOOCOMMERCE_WEBHOOK_SECRET` | webhook signature verification (`src/app/api/webhooks/woocommerce`) and `npm run shop:up` | `test-secret` (local only) |
+| `WOOCOMMERCE_URL` / `WOOCOMMERCE_CONSUMER_KEY` / `WOOCOMMERCE_CONSUMER_SECRET` | the deliver module's REST API client (`src/deliver`) | none -- required once the worker actually delivers |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | repository connection to the local Supabase stack (`src/repository/local-stack-config.ts`) | resolved via `supabase status -o env` |
 | `DATABASE_URL` | pg-boss's own store (`src/worker/boss.ts`) | `postgresql://postgres:postgres@127.0.0.1:45322/postgres` |
+| `APP_BASE_URL` | base URL the worker builds each download link from (`src/worker/quiz-job.ts`) | `http://localhost:3000` |
 | `PUBQUIZ_WORKER` | set to `1` to run the pg-boss worker inside `next dev`/the container (`src/instrumentation.ts`) | unset (worker off) |
 
 `WOOCOMMERCE_WEBHOOK_SECRET` is read independently by two separate processes -- `npm run shop:up` rewrites the shop's webhook secret from it on every run, and the app reads it (`route.ts`) to verify each delivery -- so the shell running `shop:up` and the shell running the app must agree on the same value (or both leave it unset, so both fall back to the same `test-secret` default) or every delivery will 401.
 
-See `.env.example`, `src/app/api/webhooks/woocommerce/README.md`, `src/worker/README.md` and `shop/README.md` for the full detail behind each one.
+**One file, `.env.local`, everywhere.** Copy `.env.example` to `.env.local` at the repo root. `next dev` (the webhook route, the worker, the download route) loads it automatically, the way Next.js always does. `npm run shop:up` upserts the three `WOOCOMMERCE_*` deliver credentials into it directly (`scripts/shop/lib/rest-api-key.ts`) -- no separate file, no manual copying. The tsx dev scripts (`src/scripts/generate.ts`, `scripts/shop/*.ts`) and the `npm run test:integration` suite are not Next.js processes, so they load it explicitly via `scripts/load-env.ts` (a side-effect-only import/`setupFiles` entry using `dotenv`); an already-set shell env var always wins over the file.
+
+See `.env.example`, `src/app/api/webhooks/woocommerce/README.md`, `src/worker/README.md`, `src/deliver/README.md` and `shop/README.md` for the full detail behind each one.
 
 ## Public routes
 

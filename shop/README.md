@@ -237,12 +237,14 @@ row with description `pubquiz-pipeline` from the
 (`shop/mu-plugins/wp-cli-scripts/create-rest-api-key.php`, invoked via
 `wp eval-file` by `scripts/shop/lib/rest-api-key.ts`). This is safe: nothing
 in this repo persists the old key across a `shop:up`, and the worker reads
-the current one from `.env.shop.local` each time it starts.
+the current one from `.env.local` each time it starts.
 
-The three values are written to a gitignored `.env.shop.local` at the repo
-root (never printed to the console, never committed). Copy them into your
-own environment (e.g. `.env.local`) to run the worker against this shop
-outside `npm run shop:*` -- see `src/deliver/README.md`.
+The three values are upserted into the repo root's gitignored `.env.local`
+(never printed to the console, never committed) -- the same file Next.js
+loads automatically for `next dev`/the worker, and the one the tsx dev
+scripts and the vitest integration suite load explicitly via
+`scripts/load-env.ts`. One file, no manual copying -- see
+`src/deliver/README.md` and the root `README.md` "Environment variables".
 
 ## Interface gaps
 

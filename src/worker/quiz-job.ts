@@ -16,7 +16,7 @@ import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
 import { QuizStatusChangedConcurrentlyError } from "@/repository";
 import type { QuizRecord } from "@/domain";
-import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
+import { generateQuiz as generateQuizImpl, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import type { GenerateOptions } from "@/scripts/cli-args";
 
 /** Thrown for a Quiz whose checkout configuration cannot be satisfied at all -- never retried. */
@@ -56,6 +56,18 @@ export interface QuizJobDeps {
   contentRepository: ContentRepository;
   uploadDeliverable: UploadDeliverable;
   deliverer: Deliverer;
+  /**
+   * The engine entry point (src/scripts/generate-quiz.ts), injected the same
+   * way `deliverer` is: always provided explicitly by the caller, never
+   * defaulted inside this module. `src/worker/index.ts` wires in the real
+   * `generateQuiz`; `quiz-job.integration.test.ts`'s retry-policy suite
+   * injects a stub that skips actual rendering, since those tests are about
+   * deliverQuiz's retry behaviour, not the renderer (ticket #43 fix round --
+   * the real renderer, 3 PDFs plus an ffmpeg-driven MP3, is the single most
+   * expensive thing this handler does, and previously ran for real even in
+   * tests whose point was "no regeneration on retries").
+   */
+  generateQuiz: typeof generateQuizImpl;
   /** Base URL the download route is served from, e.g. `http://localhost:3000`. No trailing slash. */
   appBaseUrl: string;
 }
@@ -161,7 +173,7 @@ async function generateAndRecord(
     }
   };
 
-  const result = await generateQuiz(generateOptions, deps.contentRepository, writeDeliverables);
+  const result = await deps.generateQuiz(generateOptions, deps.contentRepository, writeDeliverables);
 
   if (!result.ok) {
     const { slotIndex, shortfall } = result.failure;
