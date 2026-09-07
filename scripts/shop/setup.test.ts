@@ -50,4 +50,26 @@ describe("parseSetupResult", () => {
   test("rejects output that isn't JSON", () => {
     expect(() => parseSetupResult("not json")).toThrow();
   });
+
+  test("rejects a non-integer productId", () => {
+    const badProductId = JSON.stringify({
+      productId: "14",
+      webhookId: 3,
+      deliveryUrl: "http://host.docker.internal:3000/api/webhooks/woocommerce",
+      consumerKey: "ck_abc",
+      consumerSecret: "cs_def",
+    });
+    expect(() => parseSetupResult(badProductId)).toThrow(/productId/);
+  });
+
+  test("rejects an empty consumerKey", () => {
+    const emptyConsumerKey = JSON.stringify({
+      productId: 14,
+      webhookId: 3,
+      deliveryUrl: "http://host.docker.internal:3000/api/webhooks/woocommerce",
+      consumerKey: "",
+      consumerSecret: "cs_def",
+    });
+    expect(() => parseSetupResult(emptyConsumerKey)).toThrow(/consumerKey/);
+  });
 });

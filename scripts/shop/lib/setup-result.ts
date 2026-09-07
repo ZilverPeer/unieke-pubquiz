@@ -12,20 +12,26 @@ export interface SetupResult {
   consumerSecret: string;
 }
 
-const REQUIRED_KEYS: ReadonlyArray<keyof SetupResult> = [
-  "productId",
-  "webhookId",
-  "deliveryUrl",
-  "consumerKey",
-  "consumerSecret",
-];
+const INTEGER_KEYS: ReadonlyArray<keyof SetupResult> = ["productId", "webhookId"];
+const STRING_KEYS: ReadonlyArray<keyof SetupResult> = ["deliveryUrl", "consumerKey", "consumerSecret"];
+
+/** True for a positive integer (`Number.isInteger` and `> 0`) -- ids setup-shop.php returns are always WordPress/WooCommerce post/webhook ids, never 0 or negative. */
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
 
 /**
  * Parses setup-shop.php's stdout: exactly one non-empty line of JSON with
- * every key in {@link SetupResult}. Throws with a specific message on
- * anything else -- extra diagnostic lines, missing keys, or invalid JSON --
- * since that means setup-shop.php broke its "one JSON line, nothing else on
- * stdout" contract.
+ * every key in {@link SetupResult}, each of the right shape (`productId`/
+ * `webhookId` positive integers, the rest non-empty strings). Throws with
+ * the offending key named in the message on anything else -- extra
+ * diagnostic lines, a missing/malformed key, or invalid JSON -- since that
+ * means setup-shop.php broke its "one JSON line, nothing else on stdout"
+ * contract.
  */
 export function parseSetupResult(stdout: string): SetupResult {
   const lines = stdout.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
@@ -35,16 +41,25 @@ export function parseSetupResult(stdout: string): SetupResult {
     );
   }
 
-  let parsed: Partial<SetupResult>;
+  let parsed: Partial<Record<keyof SetupResult, unknown>>;
   try {
-    parsed = JSON.parse(lines[0]) as Partial<SetupResult>;
+    parsed = JSON.parse(lines[0]) as Partial<Record<keyof SetupResult, unknown>>;
   } catch (cause) {
     throw new Error(`setup-shop.php's output was not valid JSON: ${lines[0]}`, { cause });
   }
 
-  for (const key of REQUIRED_KEYS) {
-    if (parsed[key] === undefined) {
-      throw new Error(`setup-shop.php's JSON output is missing "${key}": ${lines[0]}`);
+  for (const key of INTEGER_KEYS) {
+    if (!isPositiveInteger(parsed[key])) {
+      throw new Error(
+        `setup-shop.php's JSON output has an invalid "${key}" (expected a positive integer): ${lines[0]}`,
+      );
+    }
+  }
+  for (const key of STRING_KEYS) {
+    if (!isNonEmptyString(parsed[key])) {
+      throw new Error(
+        `setup-shop.php's JSON output has an invalid "${key}" (expected a non-empty string): ${lines[0]}`,
+      );
     }
   }
 
