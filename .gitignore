@@ -54,6 +54,9 @@ content/
 .env*
 .scratch/
 
+# local loop state (ticket #59): next-dev.log/next-dev.pid
+.local/
+
 # static app audio (announcements) and non-copyrighted seed assets are code, not content
 !public/audio/**
 !supabase/seed-assets/**

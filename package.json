@@ -18,7 +18,9 @@
     "shop:up": "wp-env start && tsx scripts/shop/setup.ts",
     "shop:down": "wp-env stop && (docker stop pubquiz-mailpit || exit 0) && (docker stop pubquiz-cron-ticker || exit 0)",
     "shop:order": "tsx scripts/shop/place-order.ts",
-    "shop:capture": "tsx scripts/shop/capture-webhook.ts"
+    "shop:capture": "tsx scripts/shop/capture-webhook.ts",
+    "loop:up": "tsx scripts/loop/up.ts",
+    "loop:down": "tsx scripts/loop/down.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

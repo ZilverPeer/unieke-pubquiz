@@ -19,23 +19,17 @@ Every command below was actually run against this branch (ticket #43) to produce
 
 ## Daily start commands
 
-With the Supabase stack and the shop already up (steps 3-4 above are idempotent, safe to skip if they're already running):
+See `docs/walkthrough-customer-journey.md` (ticket #59): one command,
 
-```sh
-PUBQUIZ_WORKER=1 npx next dev
+```powershell
+npm run loop:up
 ```
 
-(PowerShell: `$env:PUBQUIZ_WORKER=1; npx next dev`.) This starts the app on `http://localhost:3000`, which serves the webhook route, the download route, and the pg-boss worker (started from `src/instrumentation.ts`) in one process -- see `src/worker/README.md`. Look for `[worker] started (queue "quiz-generation"); swept N pending Quiz job(s)` in the log to confirm the worker came up.
+starts the whole loop (the Supabase stack, the shop with Mailpit and the cron ticker, and the app with the worker), reusing anything already up and never resetting the database, then prints the shop, Mailpit and app URLs. The walkthrough takes it from there -- the product page, checkout, the mails, the downloads, My Account, and a failing order on purpose. `npm run loop:down` stops everything again.
 
-Leave this running. In another shell:
+### Troubleshooting
 
-```sh
-npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --mode mixed --pick 0=1
-```
-
-placing a **paid, `processing`** order directly (see `shop/README.md`). WooCommerce delivers its `order.updated` webhook asynchronously via Action Scheduler, which needs real HTTP traffic to tick in this local setup; since ticket #58, `npm run shop:up`'s cron ticker container requests `wp-cron.php` every 5 seconds for as long as the shop is up, so this happens on its own -- do nothing else. The worker picks the job up on its own next poll (well under a second locally); watch the `next dev` log for `POST /api/webhooks/woocommerce 200` within about 30 seconds, followed, once generation finishes, by the deliver module's calls completing the order.
-
-**Troubleshooting:** if an order sits in `processing` for more than a minute, check `docker ps` for `pubquiz-cron-ticker` -- if it's missing or stuck, kick the scheduler by hand as a fallback:
+If an order sits in `processing` for more than a minute, check `docker ps` for `pubquiz-cron-ticker` -- if it's missing or stuck, kick the scheduler by hand as a fallback:
 
 ```sh
 npx wp-env run cli -- wp action-scheduler run --user=admin
