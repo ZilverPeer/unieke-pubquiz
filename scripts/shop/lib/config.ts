@@ -1,10 +1,9 @@
 /**
  * Shared configuration for the local shop scripts (ticket #37).
  *
- * Category ids are hardcoded from `supabase/seed.sql` (the seed is the
- * single source of truth) in
- * shop/mu-plugins/wp-cli-scripts/setup-field-group.php, which is PHP and so
- * cannot import this module. See shop/README.md.
+ * Since ticket #57, Category ids and Dutch names come from the running
+ * Supabase stack's `nl` Category translations (scripts/shop/lib/categories.ts),
+ * not a hardcoded list -- see shop/README.md.
  */
 
 export const WP_ENV_PORT = 45330;

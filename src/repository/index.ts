@@ -37,6 +37,11 @@ import { deleteFromDeliverablesBucket, downloadFromBucket, uploadToDeliverablesB
 import type { PoolEntry } from "./types";
 
 export type { RepositoryConfig } from "./client";
+// Exported so scripts/shop/lib/categories.ts (a one-off setup script, not a
+// pipeline module) can build its own client with resolveLocalStackConfig(),
+// the same way createRepository()/createOrderRepository() do internally --
+// see that module's docblock.
+export { createSupabaseClient } from "./client";
 export type { ItemTranslation, PoolEntry } from "./types";
 export {
   IllegalQuizTransitionError,

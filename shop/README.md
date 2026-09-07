@@ -3,8 +3,12 @@
 A local WooCommerce shop, run entirely in Docker via `@wordpress/env`, that
 lets you place a paid Pubquiz order end-to-end and inspect what the webhook
 receiver (#39) and the deliver module (#41) see. Nothing here talks to
-Vercel or Supabase; it reads `src/domain/checkout.ts` and
-`src/domain/types.ts` for the pinned meta-key/slot constants.
+Vercel; it reads `src/domain/checkout.ts` and `src/domain/types.ts` for the
+pinned meta-key/slot constants. Since ticket #57, `npm run shop:up` also
+reads the running local Supabase stack's `nl` Category names -- see
+"Category names: the Supabase stack, not a hardcoded list" below; **the
+Supabase stack must be running and seeded before `shop:up`**
+(`npx supabase start && npm run db:reset`, see `docs/runbook-local-loop.md`).
 
 Since ticket #56 the shop is Dutch: the Storefront theme, `nl_NL` site
 language, EUR/NL WooCommerce settings, a Dutch product, and a guest checkout
@@ -14,7 +18,7 @@ that only asks for a name and an email. See "Dutch storefront" below.
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Starts wp-env, starts the Mailpit mail catcher, then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
+| `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env and the Mailpit container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
@@ -84,7 +88,8 @@ product/webhook/etc. step), which added up to roughly six minutes.
 
 `npm run shop:up` now makes exactly one WP-CLI call for all of that:
 `wp eval-file wp-content/mu-plugins/wp-cli-scripts/setup-shop.php
-<webhookDeliveryUrl> <webhookSecret>`. That one PHP script does everything
+<webhookDeliveryUrl> <webhookSecret> <base64CategoriesJson>` (the third
+argument since ticket #57 -- see "Category names" below). That one PHP script does everything
 theme activation through the REST API key used to (see "Dutch storefront"
 and "REST credentials" below for what each step does) directly against
 WordPress/WooCommerce's own PHP APIs -- `switch_theme()`,
@@ -252,11 +257,12 @@ clicking through wp-admin -- this keeps `shop:up` scriptable and idempotent.
 
 Fields, one per `CHECKOUT_META_KEYS` entry: `locale`, `difficulty`, `mode`
 (all required selects) and `category_1`..`category_8` (optional selects,
-one per Item slot). Field **labels** are the literal `CHECKOUT_META_KEYS`
-strings (e.g. `pubquiz_locale`) because this plugin's free tier writes each
-order line item's `meta_data` as `{label} => {value}`, not `{id} => {value}` --
-so the label *is* the wire format. This is documented again, in more detail,
-in the setup script's own docblock.
+one per Item slot). Field **ids** stay these fixed strings; field and choice
+**labels** are readable Dutch text (Taal/Moeilijkheid/Soort quiz/Categorie N;
+Nederlands/Engels; Makkelijk/Gemiddeld/Moeilijk/Gemengd; Gemengd/Eén
+categorie; each Category's `nl` name) -- see "Readable Dutch options and the
+label-to-key bridge" below for why that no longer breaks the webhook wire
+format the way it used to.
 
 ## Key verification (ticket item 3): does the real checkout path write the same keys?
 
@@ -275,7 +281,7 @@ curl -s -c cookies.txt -b cookies.txt \
   "http://localhost:45330/product/pubquiz/"
 
 # 2. GET the checkout page, scrape the nonce
-curl -s -c cookies.txt -b cookies.txt "http://localhost:45330/checkout/" -o checkout.html
+curl -s -c cookies.txt -b cookies.txt "http://localhost:45330/afrekenen/" -o checkout.html
 grep -o 'woocommerce-process-checkout-nonce" value="[^"]*"' checkout.html
 
 # 3. Submit checkout with our local test gateway (jumps straight to `processing`)
@@ -284,40 +290,91 @@ curl -s -c cookies.txt -b cookies.txt \
   -d "billing_email=via-checkout@example.com" -d "billing_country=NL" \
   -d "billing_address_1=Teststraat 1" -d "billing_city=Amsterdam" -d "billing_postcode=1000AA" \
   -d "payment_method=pubquiz_test_gateway" \
-  -d "woocommerce-process-checkout-nonce=<nonce>" -d "_wp_http_referer=/checkout/" \
+  -d "woocommerce-process-checkout-nonce=<nonce>" -d "_wp_http_referer=/afrekenen/" \
   "http://localhost:45330/?wc-ajax=checkout"
 ```
+
+(the Cart/Checkout pages are `/winkelwagen/`/`/afrekenen/`, not the English
+`/cart/`/`/checkout/` slugs, since ticket #56's Dutch page renames -- see
+"Dutch storefront" above.)
 
 Result: order reached `processing` immediately (via the local test gateway,
 see below), and `wp wc shop_order get <id> --format=json` showed the line
 item's `meta_data` as:
 
 ```
+Taal = Engels
+Moeilijkheid = Moeilijk
+Soort quiz = Eén categorie
+Categorie 1 = Literatuur
+_wapf_meta = { ... the plugin's own internal bookkeeping, including each field's "raw" slug ... }
 pubquiz_locale = en
 pubquiz_difficulty = hard
 pubquiz_mode = single_category
 pubquiz_category_1 = 7
-_wapf_meta = { ... the plugin's own internal bookkeeping ... }
 ```
 
-The first four keys match `CHECKOUT_META_KEYS` exactly, byte for byte, with
-correct values -- the same shape `shop:order` produces. The extra
-`_wapf_meta` key is the plugin's own internal record (underscore-prefixed,
-i.e. WooCommerce/WordPress's convention for "protected" meta that a UI or
-API consumer is expected to ignore); it needs no special handling by the
-future webhook parser (#39).
+The Dutch-labelled entries (`Taal`, `Moeilijkheid`, ...) are the plugin's own
+`{label} => {value}` writes, customer-readable but no longer the wire
+format (see "Readable Dutch options and the label-to-key bridge" below); the
+four `pubquiz_*` keys match `CHECKOUT_META_KEYS` exactly, byte for byte, with
+correct slug values -- the same shape `shop:order` produces, and what the
+webhook parser (#39) actually reads.
 
-## Category picks: a known free-tier UX limitation
+## Readable Dutch options and the label-to-key bridge (ticket #57)
 
-The plugin's free tier writes a select field's order-item-meta **value**
-from the matched choice's *label*, not its slug. To guarantee a Category
-pick lands as the exact numeric Category id (never a translated/localised
-name, since locale is data per `CONTEXT.md`), each choice's label is set to
-the id itself (see `setup-field-group.php`). This means the checkout UI
-shows customers a bare number (e.g. "3") instead of a Category name for
-these 8 dropdowns. Acceptable for this ticket (only WP-CLI/curl-driven
-verification is required); a real storefront would need a paid tier or a
-different plugin to show friendly names while still submitting ids.
+Before this ticket, the field group's labels *were* the literal
+`CHECKOUT_META_KEYS` strings (e.g. `pubquiz_locale`) and each Category
+choice's label was set to the bare numeric id, because the free tier of
+Advanced Product Fields writes each order line item's `meta_data` as
+`{label} => {value}` -- the label doubled as the wire format, at the cost of
+a checkout UI showing customers raw keys and numbers instead of words.
+
+This ticket makes the labels Dutch and readable (Taal/Moeilijkheid/Soort
+quiz/Categorie N; Nederlands/Engels; Makkelijk/Gemiddeld/Moeilijk/Gemengd;
+Gemengd/Eén categorie; each Category's `nl` name) without losing the
+`pubquiz_*` wire format, using a second thing the same plugin writes on
+every line item alongside the `{label} => {value}` pairs: a `_wapf_meta`
+line item meta entry, one array element per field, each carrying
+`id`/`label`/`value`/`raw` -- `raw` is the matched choice's *slug*
+(untouched by any label), verified directly against the plugin's own
+`create_order_line_item()` (`includes/controllers/class-product-controller.php`).
+A new must-use plugin, `shop/mu-plugins/pubquiz-checkout-meta.php`, hooks
+`woocommerce_checkout_create_order_line_item` at priority 30 (after the
+product-fields plugin's own priority-20 hook, so `_wapf_meta` already
+exists) and, for each `_wapf_meta` entry whose field id is `locale`,
+`difficulty`, `mode` or `category_N`, adds a `pubquiz_*` line item meta key
+with that entry's `raw` value -- an empty `raw` (an unfilled Category slot,
+"(geen)") is skipped, same as before. It hides those `pubquiz_*` keys from
+the customer-facing item table, the completed-order mail and My Account, and
+from the wp-admin order screen, with the same two filters
+`pubquiz-downloads.php` already uses for its own `pubquiz_download_*` keys
+-- the Dutch-labelled entries remain visible as the customer's order
+summary. The webhook's REST payload is not filtered by either hook, so the
+parser still sees the `pubquiz_*` keys unchanged; `src/domain/checkout.ts`
+and the webhook parser needed no changes.
+
+`shop-fixture.test.ts` pins `pubquiz-checkout-meta.php`'s field-id-to-key
+mapping against `CHECKOUT_META_KEYS`'s literal values, and pins that
+`setup-field-group.php` no longer hardcodes a Category id list (see below).
+
+## Category names: the Supabase stack, not a hardcoded list (ticket #57)
+
+The 8 Category dropdowns' choices used to be a hardcoded `[1..8]` id list in
+`setup-field-group.php` (their labels were the bare ids too, see above) --
+that's gone. `npm run shop:up` now reads the running Supabase stack's `nl`
+Category translations (`categories` joined to `category_translations`,
+`scripts/shop/lib/categories.ts`'s `loadDutchCategories()`) *before* any
+WP-CLI call, base64-encodes the `{id, name}` list (avoiding shell-quoting a
+JSON array as a `wp eval-file` argument on Windows), and passes it as
+`setup-shop.php`'s third positional argument, which decodes it into
+`$pubquiz_categories` and hands it to `setup-field-group.php` -- so the
+dropdowns follow the seed (and later the admin UI) instead of a number
+pinned by hand. This means **`npm run shop:up` now requires the local
+Supabase stack to be running and seeded** (`npx supabase start && npm run
+db:reset`, see `docs/runbook-local-loop.md`) -- a stopped or unreachable
+stack, or a seed with zero Categories, fails `shop:up` fast with a message
+naming the stack as the cause, before any WP-CLI call runs.
 
 ## Local test payment gateway, and why the order still reaches `processing`
 
@@ -474,11 +531,32 @@ A few things the brief didn't call out, discovered while wiring this up:
    `pubquiz-downloads.php` hides its raw `pubquiz_download_*` meta from the
    customer-facing table via `woocommerce_order_item_get_formatted_meta_data`
    instead (and keeps the admin-only filter too, since that's a real,
-   separate view).
+   separate view). `pubquiz-checkout-meta.php` (ticket #57) uses the same
+   pair of filters for its own `pubquiz_*` keys.
+6. **A `wp eval-file` script's positional arguments are a *local* `$args`
+   variable, not the `$args` superglobal** -- `global $args;` (this file's
+   approach before ticket #57) pulls in `$GLOBALS['args']`, which WP-CLI's
+   `EvalFile_Command` never sets (it passes the arguments as its own
+   `execute_eval()` method's local `$args` parameter, which the evaluated
+   code inherits directly, no `global` needed). Verified empirically against
+   this wp-env's WP-CLI: a `global $args;` script sees
+   `isset($GLOBALS['args'])` false and a bare `count($args)` throw a
+   `TypeError` (null given), while the same script without `global` sees
+   exactly the command-line arguments. Every `shop:up` run before this
+   ticket had therefore silently ignored a non-default
+   `WOOCOMMERCE_WEBHOOK_URL`/`WOOCOMMERCE_WEBHOOK_SECRET`, always falling
+   through to the literal defaults in `setup-shop.php` -- undetected because
+   nobody had set either env var locally, and a wrong/missing argument
+   `isset()`s to `false` rather than erroring. This ticket's new required
+   third argument (the base64 Categories list) made the bug surface as a
+   hard failure instead of a silent no-op; fixed by dropping the `global`
+   declaration for all three arguments, not just the new one.
 
-`src/domain/checkout.ts` needed **no changes** -- the plugin's label-as-key
-behaviour matches `CHECKOUT_META_KEYS` exactly once field labels are set to
-those literal strings (see setup-field-group.php).
+`src/domain/checkout.ts` needed **no changes** -- ticket #57 moved the
+label-as-key behaviour to `pubquiz-checkout-meta.php`'s `_wapf_meta` bridge
+(see "Readable Dutch options and the label-to-key bridge" above) instead of
+requiring the field group's labels to literally be the `CHECKOUT_META_KEYS`
+strings.
 
 ## Reset
 
