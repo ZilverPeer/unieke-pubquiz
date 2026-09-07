@@ -5,10 +5,13 @@
  * upload-then-deliver shape (src/worker/quiz-job.ts) but skips sampling and
  * persisting entirely -- the Composition already exists.
  *
- * `createDeliverer()` (src/deliver, ticket #41) still throws until that
- * ticket lands; deps take a `createDeliverer` factory (called lazily, after
- * upload has already succeeded) so the real CLI wires the real one and
- * tests inject a fake `Deliverer` directly.
+ * `createDeliverer` (src/deliver, implemented in ticket #41) is real now;
+ * deps still take a zero-arg `createDeliverer` factory (called lazily, after
+ * upload has already succeeded) so the real CLI can close over its
+ * `DelivererConfig`/`OrderLookup` (see generate.ts) and tests can inject a
+ * fake `Deliverer` directly. The `isDeliverNotImplementedError` catch below
+ * is now dead in practice (the real deliverer never throws that message) --
+ * left in place as a harmless safety net rather than removed mid-round.
  */
 import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath } from "@/domain";
 import type { Deliverer } from "@/deliver";

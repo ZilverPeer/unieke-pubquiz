@@ -1,19 +1,27 @@
 # Local shop (ticket #37)
 
 A local WooCommerce shop, run entirely in Docker via `@wordpress/env`, that
-lets you place a paid Pubquiz order end-to-end and inspect what the future
-webhook receiver (#39) will see. Nothing here talks to Vercel, Supabase, or
-any other part of this repo except reading `src/domain/checkout.ts` and
+lets you place a paid Pubquiz order end-to-end and inspect what the webhook
+receiver (#39) and the deliver module (#41) see. Nothing here talks to
+Vercel or Supabase; it reads `src/domain/checkout.ts` and
 `src/domain/types.ts` for the pinned meta-key/slot constants.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Starts wp-env, then idempotently: starts the Mailpit mail catcher, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), and creates/updates the `order.updated` webhook. Safe to re-run any time. |
+| `npm run shop:up` | Starts wp-env, then idempotently: starts the Mailpit mail catcher, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env and the Mailpit container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
+
+**Windows/PowerShell note:** `npm run shop:order -- --email a@b.com ...` (and
+`shop:capture` with flags) breaks under npm 11 on PowerShell -- npm eats the
+flags after `--` instead of passing them through to the script, so they never
+reach the script's own `argv` parsing. Run the underlying script directly
+instead: `npx tsx scripts/shop/place-order.ts --email a@b.com ...` (and
+`npx tsx scripts/shop/capture-webhook.ts --out <path>` / `--port <n>` for
+`shop:capture`).
 
 ## Ports
 
@@ -164,12 +172,14 @@ Pubquiz-configured line item (matched on the presence of the
 `pubquiz_locale` line item meta) at `processing`. The test gateway therefore
 exercises the exact path a production gateway would.
 
-Both `pubquiz-mailpit-smtp.php` and `pubquiz-test-gateway.php` return early
-unless `wp_get_environment_type()` is `local` or `development` (set via
+`pubquiz-mailpit-smtp.php`, `pubquiz-test-gateway.php`, and
+`pubquiz-force-ssl-for-rest-api.php` return early unless
+`wp_get_environment_type()` is `local` or `development` (set via
 `WP_ENVIRONMENT_TYPE` in `.wp-env.json`); `pubquiz-hold-processing.php` and
 `pubquiz-allow-host-webhooks.php` have no such guard since they are meant to
-run in production too (`pubquiz-operator-mail.php` is also production code,
-gated only by the presence of a prefixed private note).
+run in production too (`pubquiz-operator-mail.php` and `pubquiz-downloads.php`
+are also production code, the former gated only by the presence of a
+prefixed private note).
 
 ## Operator mail proof
 
@@ -213,6 +223,27 @@ the full captured HTTP request: headers (including
 `X-WC-Webhook-Signature`) and the JSON body with the order's `line_items[].meta_data`
 containing all four keys per Item plus every filled Category slot.
 
+## REST credentials
+
+`npm run shop:up` also creates (or, on rerun, rotates) a WooCommerce REST API
+key so the deliver module (#41) can reach this shop over `WOOCOMMERCE_URL` /
+`WOOCOMMERCE_CONSUMER_KEY` / `WOOCOMMERCE_CONSUMER_SECRET`. There is no
+supported WP-CLI command to create or read back a REST API key, and
+WooCommerce stores only a one-way hash of the consumer key (`wc_api_hash()`)
+-- the plaintext secret is shown once, at creation, and can never be
+recovered. So rather than try to reuse an existing key, `shop:up` deletes any
+row with description `pubquiz-pipeline` from the
+`wp_woocommerce_api_keys` table and creates a fresh one every run
+(`shop/mu-plugins/wp-cli-scripts/create-rest-api-key.php`, invoked via
+`wp eval-file` by `scripts/shop/lib/rest-api-key.ts`). This is safe: nothing
+in this repo persists the old key across a `shop:up`, and the worker reads
+the current one from `.env.shop.local` each time it starts.
+
+The three values are written to a gitignored `.env.shop.local` at the repo
+root (never printed to the console, never committed). Copy them into your
+own environment (e.g. `.env.local`) to run the worker against this shop
+outside `npm run shop:*` -- see `src/deliver/README.md`.
+
 ## Interface gaps
 
 A few things the brief didn't call out, discovered while wiring this up:
@@ -242,6 +273,31 @@ A few things the brief didn't call out, discovered while wiring this up:
    own native WP-CLI command only exposes `--name`/`--status`/`--topic`/`--secret`
    for updates). `shop:up` deletes and recreates the webhook instead if the
    configured delivery URL ever changes.
+
+4. **WooCommerce's REST API only performs Basic Auth (consumer key/secret)
+   over HTTPS.** `WC_REST_Authentication::authenticate()` calls
+   `perform_basic_authentication()` only `if ( is_ssl() )`; over plain HTTP it
+   falls through to OAuth 1.0a signing instead, which the deliver module
+   (#41) doesn't implement, so every request looked authenticated-but-anonymous
+   and every order call failed with `woocommerce_rest_cannot_view` (401) --
+   not an "invalid credentials" error, which is what made this one non-obvious.
+   Fixed locally with `shop/mu-plugins/pubquiz-force-ssl-for-rest-api.php`,
+   which sets `$_SERVER['HTTPS'] = 'on'` for requests under `/wp-json/wc/`
+   only, before WooCommerce's REST auth check runs. Gated to `local`/`development`
+   like `pubquiz-mailpit-smtp.php` above -- spoofing `is_ssl()` is only safe
+   because this shop's plain-HTTP setup is itself local-only; a real
+   deployment behind the VPS's HTTPS reverse proxy already has `is_ssl()`
+   true and must never load this shim.
+
+5. **`woocommerce_hidden_order_itemmeta` only hides item meta on the
+   wp-admin order screen**, not in the customer-facing template
+   (`order-details-item.php`) that the order view, the completed-order
+   email, and My Account all render through -- that path only skips
+   underscore-prefixed keys (`WC_Order_Item::get_formatted_meta_data()`).
+   `pubquiz-downloads.php` hides its raw `pubquiz_download_*` meta from the
+   customer-facing table via `woocommerce_order_item_get_formatted_meta_data`
+   instead (and keeps the admin-only filter too, since that's a real,
+   separate view).
 
 `src/domain/checkout.ts` needed **no changes** -- the plugin's label-as-key
 behaviour matches `CHECKOUT_META_KEYS` exactly once field labels are set to

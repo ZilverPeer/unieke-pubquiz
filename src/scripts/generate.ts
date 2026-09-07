@@ -16,7 +16,7 @@
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createDeliverer } from "@/deliver";
+import { createDeliverer, createOrderLookup, resolveDelivererConfigFromEnv } from "@/deliver";
 import {
   createDeliverableUploader,
   createOrderRepository,
@@ -55,11 +55,12 @@ async function main(): Promise<number> {
 
   if (command.kind === "composition") {
     const config = resolveLocalStackConfig();
+    const orderRepository = createOrderRepository(config);
     const result = await recomposeQuiz(command.options.compositionId, {
       contentRepository: createRepository(config),
-      orderRepository: createOrderRepository(config),
+      orderRepository,
       uploadDeliverable: createDeliverableUploader(config),
-      createDeliverer,
+      createDeliverer: () => createDeliverer(resolveDelivererConfigFromEnv(), createOrderLookup(orderRepository)),
       appBaseUrl: resolveAppBaseUrl(),
     });
     console.log(result.message);
