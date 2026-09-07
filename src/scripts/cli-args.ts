@@ -142,3 +142,46 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions {
     out: out ?? defaultOutDir(locale, new Date()),
   };
 }
+
+/** `--retry-quiz <id>`: moves a `failed` Quiz back to `pending` and re-enqueues it. */
+export interface RetryQuizOptions {
+  quizId: string;
+}
+
+/** `--composition <id>`: re-renders an existing Composition's Deliverables without re-sampling. */
+export interface ComposeOptions {
+  compositionId: string;
+}
+
+export type ScriptCommand =
+  | { kind: "generate"; options: GenerateOptions }
+  | { kind: "retry-quiz"; options: RetryQuizOptions }
+  | { kind: "composition"; options: ComposeOptions };
+
+/**
+ * Dispatches `npm run generate --` argv to one of three commands (ticket
+ * #42's dev-script flags, plus the original `generate` flow, unchanged and
+ * still reachable via `parseGenerateArgs` directly for existing callers).
+ * `--retry-quiz` and `--composition` are single-argument commands with no
+ * other flags -- reprocessing an existing Quiz/Composition, not building a
+ * new request.
+ */
+export function parseScriptArgs(argv: readonly string[]): ScriptCommand {
+  if (argv[0] === "--retry-quiz") {
+    const quizId = requireValue(argv, 1, "--retry-quiz");
+    if (argv.length > 2) {
+      throw new Error("--retry-quiz takes no other arguments");
+    }
+    return { kind: "retry-quiz", options: { quizId } };
+  }
+
+  if (argv[0] === "--composition") {
+    const compositionId = requireValue(argv, 1, "--composition");
+    if (argv.length > 2) {
+      throw new Error("--composition takes no other arguments");
+    }
+    return { kind: "composition", options: { compositionId } };
+  }
+
+  return { kind: "generate", options: parseGenerateArgs(argv) };
+}

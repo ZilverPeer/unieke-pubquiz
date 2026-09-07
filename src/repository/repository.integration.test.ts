@@ -19,7 +19,14 @@ const db: SupabaseClient<Database> = createClient(config.url, config.serviceRole
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 beforeEach(async () => {
-  // compositions cascade-deletes composition_items; seed Items are never touched.
+  // Quizzes (spec #36) can reference a Composition (composition_id), which
+  // blocks deleting it -- delete quizzes first so a leftover Quiz row from
+  // another integration test file (execution order across files sharing
+  // one Postgres isn't guaranteed, see vitest.integration.config.mts) never
+  // blocks this cleanup. compositions cascade-deletes composition_items;
+  // seed Items are never touched.
+  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
+  if (quizzesError) throw quizzesError;
   const { error } = await db.from("compositions").delete().not("id", "is", null);
   if (error) throw error;
 });

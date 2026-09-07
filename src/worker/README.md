@@ -5,8 +5,10 @@ The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its four 
 - `boss.ts` -- pg-boss instance lifecycle: `startBoss`/`stopBoss`, the `quiz-generation` queue (`createQuizQueue`), and `resolveDatabaseUrl()` (`DATABASE_URL`, falling back to the local Supabase stack's Postgres port).
 - `quiz-job.ts` -- `handleQuizJob`, the job handler. Pure with respect to pg-boss: takes a `QuizJobLike` (the small subset of a pg-boss job it needs) and a `QuizJobDeps` bag, so it can be driven directly in tests without a running queue.
 - `sweep.ts` -- `sweepPendingQuizzes`, the startup sweep.
+- `prune.ts` -- `pruneDeliverables`, the daily pruning job (ticket #42). See "Pruning" below.
 - `index.ts` -- the composition root: `startWorker()` wires the repository, the deliverer and pg-boss together, registers the handler, and runs the sweep once.
 - `quiz-job.integration.test.ts` -- see "Testing" below.
+- `prune.integration.test.ts` -- integration tests for `pruneDeliverables`, same conventions as `quiz-job.integration.test.ts`.
 
 ## The queue
 
@@ -33,6 +35,12 @@ The whole of step 1 and 2 -- the lookup, the transition, the order lookup, and g
 
 - **A crash mid-generation.** If the worker process is killed (not a thrown/caught exception) while a Quiz is `generating`, the Quiz is left `generating` with no live job. A later job for the same Quiz id (a fresh sweep, say) will try to transition `generating` -> `generating`, which is not a listed edge in `QUIZ_STATUS_TRANSITIONS` and throws `IllegalQuizTransitionError` -- handled like any other error (see above): retried until the last attempt, which marks the Quiz `failed`. There is no reaper that notices a stale `generating` Quiz *before* its next attempt (e.g. by age against the job's `expireInSeconds`) and no automatic retry is scheduled for it beyond a job actually being sent again; that's left for a follow-up.
 - **A mid-upload failure on the last attempt.** If uploading one of the four Deliverables fails partway through and this is the last attempt, the Quiz moves to `failed` (per the state machine above) but any Deliverable(s) already uploaded for this attempt are left in the bucket. No explicit cleanup is done here: a `failed` Quiz's objects are pruned along with the rest of its data by the pruning job (#42), so this is not a leak, just a delay.
+
+## Pruning
+
+`pruneDeliverables` (`prune.ts`) handles each Quiz's cleanup (either branch: an expired-token Quiz or a leftover `failed` one) independently, wrapped in its own try/catch. One Quiz's error (a Storage failure, a transient DB error, ...) is logged (`[worker] prune failed for Quiz <id>`) and that Quiz id is added to `PruneResult.failedQuizIds`; the run continues with the rest of the batch rather than aborting. A Quiz that failed this way is simply retried on the next scheduled run -- no separate retry bookkeeping.
+
+Pruning an expired Quiz deletes its four Storage objects and calls `markPruned` -- it deliberately does **not** clear the download token. Keeping the token means the download route (`src/app/download`) still recognises the link and answers 410 (Gone) rather than 404 (Not Found): a customer whose Deliverables aged out gets a "this has expired" signal, not "never existed". `--composition <id>` (`src/scripts/recompose-quiz.ts`) re-uploads a pruned Quiz's Deliverables and calls `clearPruned`, so the exact same link works again without minting a new token.
 
 ## Startup sweep
 

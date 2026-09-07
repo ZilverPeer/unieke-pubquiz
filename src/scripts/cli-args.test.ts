@@ -2,7 +2,7 @@
  * Unit tests for parseGenerateArgs (no DB, no I/O).
  */
 import { describe, expect, it } from "vitest";
-import { parseGenerateArgs } from "./cli-args";
+import { parseGenerateArgs, parseScriptArgs } from "./cli-args";
 
 describe("parseGenerateArgs", () => {
   it("parses the required flags into a QuizRequest shape", () => {
@@ -140,5 +140,54 @@ describe("parseGenerateArgs", () => {
         "1=2",
       ]),
     ).toThrow(/single_category/);
+  });
+});
+
+describe("parseScriptArgs", () => {
+  it("defaults to the generate command for existing flags", () => {
+    const command = parseScriptArgs([
+      "--locale",
+      "nl",
+      "--mode",
+      "mixed",
+      "--difficulty",
+      "hard",
+      "--email",
+      "erik@example.com",
+    ]);
+
+    expect(command.kind).toBe("generate");
+  });
+
+  it("parses --retry-quiz <id>", () => {
+    const command = parseScriptArgs(["--retry-quiz", "quiz-123"]);
+
+    expect(command).toEqual({ kind: "retry-quiz", options: { quizId: "quiz-123" } });
+  });
+
+  it("--retry-quiz requires a value", () => {
+    expect(() => parseScriptArgs(["--retry-quiz"])).toThrow('--retry-quiz requires a value');
+  });
+
+  it("--retry-quiz takes no other arguments", () => {
+    expect(() => parseScriptArgs(["--retry-quiz", "quiz-123", "--out", "x"])).toThrow(
+      "--retry-quiz takes no other arguments",
+    );
+  });
+
+  it("parses --composition <id>", () => {
+    const command = parseScriptArgs(["--composition", "comp-123"]);
+
+    expect(command).toEqual({ kind: "composition", options: { compositionId: "comp-123" } });
+  });
+
+  it("--composition requires a value", () => {
+    expect(() => parseScriptArgs(["--composition"])).toThrow('--composition requires a value');
+  });
+
+  it("--composition takes no other arguments", () => {
+    expect(() => parseScriptArgs(["--composition", "comp-123", "extra"])).toThrow(
+      "--composition takes no other arguments",
+    );
   });
 });
