@@ -66,6 +66,20 @@ describe("shop/mu-plugins/pubquiz-downloads.php", () => {
   });
 });
 
+describe("shop/mu-plugins/pubquiz-hold-processing.php", () => {
+  test("matches on CHECKOUT_META_KEYS.locale's literal value", () => {
+    const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-hold-processing.php"), "utf8");
+    expect(php).toContain(`'${CHECKOUT_META_KEYS.locale}'`);
+  });
+});
+
+describe("shop/mu-plugins/pubquiz-customer-notice.php", () => {
+  test("matches on CHECKOUT_META_KEYS.locale's literal value", () => {
+    const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-customer-notice.php"), "utf8");
+    expect(php).toContain(`'${CHECKOUT_META_KEYS.locale}'`);
+  });
+});
+
 describe("shop/mu-plugins/wp-cli-scripts/setup-field-group.php", () => {
   test("declares all three fixed CHECKOUT_META_KEYS and the category key stem", () => {
     const php = readFileSync(

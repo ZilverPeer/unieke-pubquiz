@@ -23,7 +23,7 @@ export const PUBQUIZ_PRODUCT_SHORT_DESCRIPTION =
 /** Placeholder price (ticket #56); the real pricing model is out of scope for spec #55. */
 export const PUBQUIZ_PRODUCT_PRICE = "14.95";
 
-/** wp-env's plugin-URL directory-naming bug (see shop/README.md "Interface gaps") applies to themes too, so this uses the plain download URL, not `storefront.latest-stable.zip`. */
+/** wp-env's plugin-URL directory-naming bug applies to themes too, so this uses the plain download URL, not `storefront.latest-stable.zip` (see shop/README.md "Dutch storefront" > "Theme"). */
 export const STOREFRONT_THEME_SLUG = "storefront";
 
 export const TEST_GATEWAY_ID = "pubquiz_test_gateway";

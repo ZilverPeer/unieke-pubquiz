@@ -5,8 +5,10 @@
  * covers everything wp-env itself cannot express declaratively:
  *   - the Mailpit mail-catcher container (see lib/mailpit.ts)
  *   - the Storefront theme (active), the Dutch site/plugin/theme language,
- *     and the Dutch WooCommerce store settings (see
- *     lib/wordpress-settings.ts, ticket #56)
+ *     the Dutch WooCommerce store settings, and WooCommerce's own
+ *     Shop/Cart/Checkout/My account pages renamed to their Dutch titles and
+ *     slugs (the "Sample Page" WooCommerce leaves behind is deleted too --
+ *     see lib/wordpress-settings.ts, ticket #56)
  *   - the Pubquiz product, Dutch name/short description/placeholder price
  *     (created once, Dutch fields re-applied every run -- see lib/product.ts)
  *   - the Advanced Product Fields field group on that product (re-applied
@@ -27,7 +29,12 @@ import { getOrCreateProductId } from "./lib/product";
 import { ensureWebhook } from "./lib/webhook";
 import { ensureMailpit } from "./lib/mailpit";
 import { ensureRestApiKey } from "./lib/rest-api-key";
-import { ensureDutchLanguage, ensureStorefrontTheme, ensureWooCommerceDutchSettings } from "./lib/wordpress-settings";
+import {
+  ensureDutchLanguage,
+  ensureDutchPages,
+  ensureStorefrontTheme,
+  ensureWooCommerceDutchSettings,
+} from "./lib/wordpress-settings";
 import { WP_ENV_PORT } from "./lib/config";
 
 /** Finds the WooCommerce page by slug (e.g. "cart", "checkout") and replaces its content with the given classic shortcode, if it isn't already. */
@@ -53,6 +60,7 @@ function main() {
   ensureStorefrontTheme();
   ensureDutchLanguage();
   ensureWooCommerceDutchSettings();
+  ensureDutchPages();
 
   const productId = getOrCreateProductId();
 
@@ -62,9 +70,10 @@ function main() {
   // (and only accepts them at checkout) through WooCommerce's classic
   // Cart/Checkout shortcodes -- it does not integrate with the Store API, so
   // the default block-based Cart/Checkout pages silently show none of our
-  // fields. See shop/README.md ("Interface gaps").
-  applyClassicShortcode("cart", "[woocommerce_cart]");
-  applyClassicShortcode("checkout", "[woocommerce_checkout]");
+  // fields. See shop/README.md ("Interface gaps"). Uses the Dutch slugs
+  // ensureDutchPages() just applied -- it always runs first.
+  applyClassicShortcode("winkelwagen", "[woocommerce_cart]");
+  applyClassicShortcode("afrekenen", "[woocommerce_checkout]");
 
   const { deliveryUrl } = ensureWebhook();
 

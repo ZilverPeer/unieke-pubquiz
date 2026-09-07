@@ -111,13 +111,32 @@ idempotently, with WP-CLI (see `scripts/shop/lib/wordpress-settings.ts` and
   (placeholder, 14.95 EUR) price are Dutch, set by
   `scripts/shop/lib/product.ts` both at creation and, so a re-run converges
   an already-existing product too, on every subsequent `shop:up`.
+- **Pages.** WooCommerce's own install creates its Shop/Cart/Checkout/My
+  account pages with English titles and slugs *before* the language switch
+  runs -- switching the site language doesn't retitle already-existing
+  content, so left alone, every page's `<title>` and Storefront's primary
+  navigation (which falls back to listing published pages when no menu is
+  assigned, true here) would stay English forever, reruns included.
+  `ensureDutchPages()` (`scripts/shop/lib/wordpress-settings.ts`) renames
+  them in place, by `woocommerce_<page>_page_id` option (never by slug, so
+  WooCommerce's own page-id wiring keeps pointing at the same post): Shop ->
+  Winkel/`winkel`, Cart -> Winkelwagen/`winkelwagen`, Checkout ->
+  Afrekenen/`afrekenen`, My account -> Mijn account/`mijn-account` -- and
+  deletes the "Sample Page" WooCommerce leaves behind (otherwise the one
+  remaining English entry in the fallback navigation). `setup.ts` re-applies
+  the classic Cart/Checkout shortcodes under the new (`winkelwagen`/
+  `afrekenen`) slugs right after.
 - **Guest checkout, minimal fields.** `shop/mu-plugins/pubquiz-checkout-fields.php`
   filters `woocommerce_billing_fields` down to first name, last name and
-  email whenever the cart doesn't need shipping (true for any cart made up
-  only of virtual products, the Pubquiz product included) -- WooCommerce
-  already drops the shipping fields for such a cart by itself, this does
-  the same for billing. Ticks WooCommerce's own "create an account" box at
-  checkout to opt into an account; guest checkout otherwise needs nothing
+  email at checkout (`is_checkout()`, true for both the checkout page and
+  the wc-ajax checkout submission WooCommerce validates the fields against
+  -- see the plugin's own comment) whenever the cart doesn't need shipping
+  (true for any cart made up only of virtual products, the Pubquiz product
+  included) -- WooCommerce already drops the shipping fields for such a
+  cart by itself, this does the same for billing. Scoped to checkout only,
+  so My Account -> Addresses still shows every billing field for a
+  customer's saved address. Ticks WooCommerce's own "create an account" box
+  at checkout to opt into an account; guest checkout otherwise needs nothing
   beyond the three kept fields.
 - **The customer notice.** `shop/mu-plugins/pubquiz-customer-notice.php`
   adds a Dutch notice -- "Je quiz wordt gemaakt. Je ontvangt binnen enkele
@@ -139,16 +158,24 @@ option get woocommerce_enable_guest_checkout`, `wp option get
 woocommerce_enable_signup_and_login_from_checkout`):
 
 1. **Dutch chrome, no English leftovers.** `curl` of `/product/pubquiz/`,
-   `/cart/` (after an add-to-cart) and `/checkout/` all show
-   `wp-theme-storefront`/`storefront-primary-navigation` in the body/markup
-   and Dutch WooCommerce strings ("Toevoegen aan winkelwagen", "Afrekenen",
+   `/winkelwagen/` (after an add-to-cart) and `/afrekenen/` all show a Dutch
+   `<title>` ("Pubquiz – digitale download", "Winkelwagen", "Afrekenen"),
+   `wp-theme-storefront`/`storefront-primary-navigation` in the body/markup,
+   Dutch WooCommerce strings ("Toevoegen aan winkelwagen", "Afrekenen",
    "Voornaam", "Achternaam", "E-mailadres", "Plaats bestelling" on the
-   submit button) with no English WooCommerce chrome.
+   submit button), and a primary navigation of exactly Winkel/Winkelwagen/
+   Afrekenen/Mijn account (`wp post list --post_type=page
+   --fields=ID,post_title,post_name` shows those four titles/slugs, and no
+   "Sample Page") -- no English WooCommerce chrome or leftover default page
+   anywhere.
 2. **Minimal-fields guest checkout.** The checkout page's rendered billing
    fields are exactly `billing_first_name`, `billing_last_name`,
    `billing_email` (verified by grepping the checkout HTML for
    `id="billing_*"`) -- every other billing field (address, city, postcode,
-   country, phone) is gone, per `pubquiz-checkout-fields.php`.
+   country, phone) is gone, per `pubquiz-checkout-fields.php`. Scoped to
+   checkout only: `/mijn-account/edit-address/billing/` for a logged-in
+   customer still renders every billing field (address, city, postcode,
+   country, phone included).
 3. **The documented checkout path, name and email only.** Using the same
    add-to-cart -> scrape-nonce -> submit-checkout curl sequence as "Key
    verification (ticket item 3)" below, but with only
