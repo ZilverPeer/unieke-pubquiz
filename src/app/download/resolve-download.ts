@@ -7,9 +7,11 @@
  */
 import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, type DeliverableFile } from "@/domain";
 
-/** The subset of QuizRecord this function needs -- just enough to build the storage path. */
+/** The subset of QuizRecord this function needs -- just enough to build the storage path and check pruning. */
 export interface DownloadQuizLookup {
   id: string;
+  /** Set once the pruning job has deleted this Quiz's objects -- see markPruned (src/repository/orders.ts). */
+  prunedAt: string | null;
 }
 
 export interface ResolveDownloadDeps {
@@ -30,8 +32,11 @@ function isDeliverableFile(file: string): file is DeliverableFile {
 /**
  * Resolves one download request to a plain result the route can turn into a
  * Response: 404 for a file name outside DELIVERABLE_FILES or an unknown
- * token, 410 once the token is known but the object has been pruned from
- * the bucket, 200 with the object's bytes otherwise.
+ * token, 410 once the token is known but its Quiz has been pruned
+ * (`prunedAt` set -- the pruning job keeps the token precisely so this
+ * branch stays reachable, see CONTEXT.md "Orders and Quizzes") or the
+ * object is otherwise missing from the bucket, 200 with the object's bytes
+ * otherwise.
  */
 export async function resolveDownload(
   token: string,
@@ -45,6 +50,10 @@ export async function resolveDownload(
   const quiz = await deps.getQuizByDownloadToken(token);
   if (!quiz) {
     return { status: 404 };
+  }
+
+  if (quiz.prunedAt) {
+    return { status: 410 };
   }
 
   let body: Uint8Array;

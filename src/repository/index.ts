@@ -13,7 +13,7 @@ import {
   persistComposition as persistCompositionImpl,
 } from "./compositions";
 import {
-  clearDownloadToken as clearDownloadTokenImpl,
+  clearPruned as clearPrunedImpl,
   getOrderById as getOrderByIdImpl,
   getQuizByCompositionId as getQuizByCompositionIdImpl,
   getQuizByDownloadToken as getQuizByDownloadTokenImpl,
@@ -22,6 +22,7 @@ import {
   listPendingQuizzes as listPendingQuizzesImpl,
   listQuizzesByBillingEmail as listQuizzesByBillingEmailImpl,
   listQuizzesDeliveredBefore as listQuizzesDeliveredBeforeImpl,
+  markPruned as markPrunedImpl,
   recordDelivery as recordDeliveryImpl,
   transitionQuizStatus as transitionQuizStatusImpl,
   upsertOrder as upsertOrderImpl,
@@ -85,7 +86,10 @@ export interface OrderRepository {
     options?: TransitionQuizStatusOptions,
   ): Promise<QuizRecord>;
   recordDelivery(quizId: string, input: RecordDeliveryInput): Promise<QuizRecord>;
-  clearDownloadToken(quizId: string): Promise<void>;
+  /** Added for the pruning job (ticket #42): keeps the download token, only records when the objects were deleted. */
+  markPruned(quizId: string, at: Date): Promise<void>;
+  /** Added for `--composition` re-rendering (ticket #42): re-enables a pruned Quiz's existing download link. */
+  clearPruned(quizId: string): Promise<void>;
   listQuizzesByBillingEmail(billingEmail: string): Promise<QuizRecord[]>;
   listQuizzesDeliveredBefore(cutoff: Date): Promise<QuizRecord[]>;
   getQuizById(quizId: string): Promise<QuizRecord | null>;
@@ -106,7 +110,8 @@ export function createOrderRepository(config: RepositoryConfig): OrderRepository
     upsertOrder: (input) => upsertOrderImpl(client, input),
     transitionQuizStatus: (quizId, to, options) => transitionQuizStatusImpl(client, quizId, to, options),
     recordDelivery: (quizId, input) => recordDeliveryImpl(client, quizId, input),
-    clearDownloadToken: (quizId) => clearDownloadTokenImpl(client, quizId),
+    markPruned: (quizId, at) => markPrunedImpl(client, quizId, at),
+    clearPruned: (quizId) => clearPrunedImpl(client, quizId),
     listQuizzesByBillingEmail: (billingEmail) => listQuizzesByBillingEmailImpl(client, billingEmail),
     listQuizzesDeliveredBefore: (cutoff) => listQuizzesDeliveredBeforeImpl(client, cutoff),
     getQuizById: (quizId) => getQuizByIdImpl(client, quizId),

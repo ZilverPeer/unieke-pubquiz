@@ -249,11 +249,19 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
   let boss: PgBoss;
 
   beforeAll(async () => {
+    // Fast retries so this suite stays quick: 1s fixed delay, no backoff.
+    // Polling interval is set separately, per-worker, on boss.work() below
+    // (see registerHandler) -- pollingIntervalSeconds is a work()-time
+    // option (pg-boss's JobPollingOptions, validated by checkWorkArgs), not
+    // a createQueue one; passing it here was silently ignored, which
+    // previously left this suite's worker polling at pg-boss's real default
+    // of 2s instead of 0.5s and made the "throws twice then succeeds"
+    // case's 20s waitFor occasionally too tight on a loaded machine (one
+    // real generation attempt plus up to three ~2-3s poll-bound retry
+    // hops).
     boss = new PgBoss(resolveDatabaseUrl());
     await boss.start();
-    // Fast retries so this suite stays quick: 1s fixed delay, no backoff,
-    // half-second polling (pg-boss's minimum).
-    await createQuizQueue(boss, { retryLimit: 3, retryDelay: 1, retryBackoff: false, pollingIntervalSeconds: 0.5 });
+    await createQuizQueue(boss, { retryLimit: 3, retryDelay: 1, retryBackoff: false });
   }, 30_000);
 
   afterAll(async () => {
@@ -283,9 +291,12 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
   }
 
   async function registerHandler(deliverer: Deliverer): Promise<void> {
-    await boss.work<{ quizId: string }, void, { includeMetadata: true }>(
+    // pollingIntervalSeconds here (not on createQuizQueue or the PgBoss
+    // constructor -- see beforeAll's comment) is what actually makes this
+    // worker's fetch loop fast.
+    await boss.work<{ quizId: string }, void, { includeMetadata: true; pollingIntervalSeconds: number }>(
       QUIZ_QUEUE,
-      { includeMetadata: true },
+      { includeMetadata: true, pollingIntervalSeconds: 0.5 },
       async (jobs) => {
         const [job] = jobs;
         await handleQuizJob(job, buildDeps(deliverer));

@@ -49,6 +49,14 @@ export interface QuizRecord {
   compositionId: string | null;
   downloadToken: string | null;
   deliveredAt: string | null;
+  /**
+   * Set by the daily pruning job (ticket #42, src/worker/prune.ts) when this
+   * Quiz's Deliverable objects were deleted from Storage; the token itself
+   * is kept (see "Orders and Quizzes" in CONTEXT.md) so the download route
+   * still recognises it and answers 410 rather than 404. Cleared by
+   * `--composition` re-rendering (src/scripts/recompose-quiz.ts).
+   */
+  prunedAt: string | null;
 }
 
 /** The four Deliverables of a Quiz, by fixed file name. */

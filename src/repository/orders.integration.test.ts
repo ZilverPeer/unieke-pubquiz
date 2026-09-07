@@ -271,8 +271,8 @@ describe("recordDelivery", () => {
   });
 });
 
-describe("clearDownloadToken", () => {
-  it("clears the download token without changing status", async () => {
+describe("markPruned / clearPruned", () => {
+  it("markPruned sets prunedAt, keeps the download token, and doesn't change status", async () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
@@ -286,11 +286,37 @@ describe("clearDownloadToken", () => {
     const compositionId = await createComposition();
     await repository.recordDelivery(quizId, { compositionId, downloadToken: "tok-prune-1" });
 
-    await repository.clearDownloadToken(quizId);
+    const at = new Date();
+    await repository.markPruned(quizId, at);
 
-    const cleared = await repository.getQuizById(quizId);
-    expect(cleared?.downloadToken).toBeNull();
-    expect(cleared?.status).toBe("delivered");
+    const pruned = await repository.getQuizById(quizId);
+    // PostgREST returns timestamptz as "...+00:00", not toISOString()'s "...Z" --
+    // compare the instant, not the raw string.
+    expect(new Date(pruned?.prunedAt ?? "").getTime()).toBe(at.getTime());
+    expect(pruned?.downloadToken).toBe("tok-prune-1");
+    expect(pruned?.status).toBe("delivered");
+  });
+
+  it("clearPruned nulls prunedAt, re-enabling the same download token", async () => {
+    const wooOrderId = freshWooOrderId();
+    const { quizzes } = await repository.upsertOrder({
+      wooOrderId,
+      billingEmail: "unprune@example.com",
+      wooStatus: "processing",
+      rawPayload: {},
+      lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
+    });
+    const quizId = quizzes[0].id;
+    await repository.transitionQuizStatus(quizId, "generating");
+    const compositionId = await createComposition();
+    await repository.recordDelivery(quizId, { compositionId, downloadToken: "tok-unprune-1" });
+    await repository.markPruned(quizId, new Date());
+
+    await repository.clearPruned(quizId);
+
+    const unpruned = await repository.getQuizById(quizId);
+    expect(unpruned?.prunedAt).toBeNull();
+    expect(unpruned?.downloadToken).toBe("tok-unprune-1");
   });
 });
 
@@ -362,7 +388,7 @@ describe("listQuizzesDeliveredBefore", () => {
     expect(notYetDue.some((q) => q.id === quizId)).toBe(false);
   });
 
-  it("excludes delivered Quizzes whose token was already cleared", async () => {
+  it("excludes delivered Quizzes already marked pruned", async () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
@@ -375,7 +401,7 @@ describe("listQuizzesDeliveredBefore", () => {
     await repository.transitionQuizStatus(quizId, "generating");
     const compositionId = await createComposition();
     await repository.recordDelivery(quizId, { compositionId, downloadToken: "tok-sweep-cleared-1" });
-    await repository.clearDownloadToken(quizId);
+    await repository.markPruned(quizId, new Date());
 
     const future = new Date(Date.now() + 60_000);
     const result = await repository.listQuizzesDeliveredBefore(future);

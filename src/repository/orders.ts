@@ -84,6 +84,7 @@ function toQuizRecord(row: QuizRow): QuizRecord {
     compositionId: row.composition_id,
     downloadToken: row.download_token,
     deliveredAt: row.delivered_at,
+    prunedAt: row.pruned_at,
   };
 }
 
@@ -233,8 +234,19 @@ export async function recordDelivery(
   return toQuizRecord(data);
 }
 
-export async function clearDownloadToken(client: SupabaseClient<Database>, quizId: string): Promise<void> {
-  const { error } = await client.from("quizzes").update({ download_token: null }).eq("id", quizId);
+/**
+ * Marks a Quiz as pruned (its Storage objects deleted) without touching its
+ * download token: the token is kept so the download route still recognises
+ * it and answers 410 rather than 404 (see CONTEXT.md "Orders and Quizzes").
+ */
+export async function markPruned(client: SupabaseClient<Database>, quizId: string, at: Date): Promise<void> {
+  const { error } = await client.from("quizzes").update({ pruned_at: at.toISOString() }).eq("id", quizId);
+  if (error) throw error;
+}
+
+/** Un-prunes a Quiz once its Deliverables have been re-rendered and re-uploaded (`--composition`, ticket #42). */
+export async function clearPruned(client: SupabaseClient<Database>, quizId: string): Promise<void> {
+  const { error } = await client.from("quizzes").update({ pruned_at: null }).eq("id", quizId);
   if (error) throw error;
 }
 
@@ -260,7 +272,7 @@ export async function listQuizzesDeliveredBefore(
     .from("quizzes")
     .select()
     .eq("status", "delivered")
-    .not("download_token", "is", null)
+    .is("pruned_at", null)
     .lt("delivered_at", cutoff.toISOString());
   if (error) throw error;
 

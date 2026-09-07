@@ -6,7 +6,7 @@
  * generate.integration.test.ts against the real stack.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { CompositionRecord, QuizConfig, QuizRecord } from "@/domain";
+import type { CompositionRecord, QuizRecord } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository } from "@/repository";
 import { recomposeQuiz } from "./recompose-quiz";
@@ -19,28 +19,6 @@ function buildCompositionRecord(overrides: Partial<CompositionRecord> = {}): Com
     requestedDifficulty: "mixed",
     seed: 1,
     composition: { slots: new Array(8).fill([]) },
-    ...overrides,
-  };
-}
-
-function buildQuiz(overrides: Partial<QuizRecord> = {}): QuizRecord {
-  const config: QuizConfig = {
-    locale: "nl",
-    quizMode: "mixed",
-    categoryPicks: new Array(8).fill(undefined),
-    requestedDifficulty: "mixed",
-  };
-  return {
-    id: "quiz-1",
-    orderId: "order-1",
-    wooLineItemId: 1,
-    sequence: 0,
-    config,
-    status: "delivered",
-    failureReason: null,
-    compositionId: "composition-1",
-    downloadToken: "token-1",
-    deliveredAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -79,8 +57,11 @@ function buildFakeOrderRepository(quiz: QuizRecord | null): OrderRepository {
     recordDelivery: () => {
       throw new Error("recordDelivery should not be reachable in this test");
     },
-    clearDownloadToken: () => {
-      throw new Error("clearDownloadToken should not be reachable in this test");
+    markPruned: () => {
+      throw new Error("markPruned should not be reachable in this test");
+    },
+    clearPruned: () => {
+      throw new Error("clearPruned should not be reachable in this test");
     },
     listQuizzesByBillingEmail: () => {
       throw new Error("listQuizzesByBillingEmail should not be reachable in this test");
@@ -135,15 +116,6 @@ describe("recomposeQuiz refusal paths", () => {
 
   it("refuses a Composition with no owning Quiz", async () => {
     const deps = buildDeps(buildCompositionRecord(), null);
-
-    const result = await recomposeQuiz("composition-1", deps);
-
-    expect(result.exitCode).toBe(1);
-    expect(deps.uploadDeliverable).not.toHaveBeenCalled();
-  });
-
-  it("refuses a Quiz whose download token has been pruned", async () => {
-    const deps = buildDeps(buildCompositionRecord(), buildQuiz({ downloadToken: null }));
 
     const result = await recomposeQuiz("composition-1", deps);
 

@@ -109,7 +109,7 @@ beforeEach(async () => {
 });
 
 describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", () => {
-  it(`deletes objects and clears the token for a Quiz delivered more than ${DOWNLOAD_VALIDITY_DAYS} days ago`, async () => {
+  it(`deletes objects and marks the Quiz pruned (keeping its token) for a Quiz delivered more than ${DOWNLOAD_VALIDITY_DAYS} days ago`, async () => {
     const quizId = await deliverFreshQuiz("prune-31d");
     await backdateDeliveredAt(quizId, DOWNLOAD_VALIDITY_DAYS + 1);
 
@@ -121,14 +121,18 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
     expect(objectNames).toEqual([]);
 
     const quiz = await orderRepository.getQuizById(quizId);
-    expect(quiz?.downloadToken).toBeNull();
-    // Only the token is cleared -- status/compositionId stay, so the
-    // Composition can still be re-rendered on request (CONTEXT.md).
+    // The token is kept -- see markPruned's doc comment and CONTEXT.md
+    // "Orders and Quizzes": a pruned Quiz's link must stay *recognised* so
+    // the download route can answer 410 rather than 404.
+    expect(quiz?.downloadToken).toBeTruthy();
+    expect(quiz?.prunedAt).toBeTruthy();
+    // status/compositionId stay too, so the Composition can still be
+    // re-rendered on request (CONTEXT.md).
     expect(quiz?.status).toBe("delivered");
     expect(quiz?.compositionId).toBeTruthy();
   });
 
-  it(`keeps objects and the token for a Quiz delivered less than ${DOWNLOAD_VALIDITY_DAYS} days ago`, async () => {
+  it(`keeps objects and leaves the Quiz unpruned for a Quiz delivered less than ${DOWNLOAD_VALIDITY_DAYS} days ago`, async () => {
     const quizId = await deliverFreshQuiz("prune-29d");
     await backdateDeliveredAt(quizId, DOWNLOAD_VALIDITY_DAYS - 1);
 
@@ -143,6 +147,7 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
 
     const quiz = await orderRepository.getQuizById(quizId);
     expect(quiz?.downloadToken).toBeTruthy();
+    expect(quiz?.prunedAt).toBeNull();
   });
 
   it("deletes leftover objects of a failed Quiz", async () => {
@@ -169,6 +174,33 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
     expect(objectsAfter).toEqual([]);
   });
 
+  it("keeps pruning the rest of the batch when one Quiz's removal throws, and reports it as a failure", async () => {
+    const failingQuizId = await deliverFreshQuiz("prune-throws");
+    await backdateDeliveredAt(failingQuizId, DOWNLOAD_VALIDITY_DAYS + 1);
+    const okQuizId = await deliverFreshQuiz("prune-ok");
+    await backdateDeliveredAt(okQuizId, DOWNLOAD_VALIDITY_DAYS + 1);
+
+    const throwingRemover = async (storagePaths: readonly string[]): Promise<void> => {
+      if (storagePaths[0]?.startsWith(`${failingQuizId}/`)) {
+        throw new Error("simulated Storage failure");
+      }
+      await removeDeliverables(storagePaths);
+    };
+
+    const result = await pruneDeliverables({ orderRepository, removeDeliverables: throwingRemover }, new Date());
+
+    expect(result.failedQuizIds).toEqual([failingQuizId]);
+    expect(result.prunedQuizIds).toEqual([okQuizId]);
+
+    const failingQuiz = await orderRepository.getQuizById(failingQuizId);
+    expect(failingQuiz?.downloadToken).toBeTruthy();
+    expect(failingQuiz?.prunedAt).toBeNull();
+
+    const okQuiz = await orderRepository.getQuizById(okQuizId);
+    expect(okQuiz?.downloadToken).toBeTruthy();
+    expect(okQuiz?.prunedAt).toBeTruthy();
+  });
+
   it("running twice is safe (no error pruning an already-pruned Quiz)", async () => {
     const quizId = await deliverFreshQuiz("prune-idempotent");
     await backdateDeliveredAt(quizId, DOWNLOAD_VALIDITY_DAYS + 1);
@@ -176,9 +208,8 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
     await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
     const second = await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
 
-    // Already pruned: clearDownloadToken already ran, so
-    // listQuizzesDeliveredBefore (which requires a non-null token) no
-    // longer returns it.
+    // Already pruned: markPruned already ran, so listQuizzesDeliveredBefore
+    // (which requires prunedAt still null) no longer returns it.
     expect(second.prunedQuizIds).not.toContain(quizId);
   });
 });

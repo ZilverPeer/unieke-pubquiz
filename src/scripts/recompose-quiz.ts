@@ -36,10 +36,12 @@ function isDeliverNotImplementedError(error: unknown): boolean {
 }
 
 /**
- * Refuses (exit code 1) a Composition that doesn't exist, has no owning
- * Quiz, or whose Quiz's download token has already been cleared by the
- * pruning job -- there would be no valid download URL to hand the deliverer
- * in that last case (interface gap: not spelled out in the ticket brief).
+ * Refuses (exit code 1) a Composition that doesn't exist or has no owning
+ * Quiz. A pruned Quiz's download token is *not* a refusal case: pruning
+ * (src/worker/prune.ts) keeps the token, so this always has a valid
+ * download URL to hand the deliverer -- re-rendering re-uploads the
+ * Deliverables and clears the Quiz's pruned state, re-enabling the same
+ * link (CONTEXT.md "Orders and Quizzes").
  */
 export async function recomposeQuiz(compositionId: string, deps: RecomposeQuizDeps): Promise<RecomposeQuizResult> {
   const compositionRecord = await deps.contentRepository.getCompositionById(compositionId);
@@ -50,13 +52,6 @@ export async function recomposeQuiz(compositionId: string, deps: RecomposeQuizDe
   const quiz = await deps.orderRepository.getQuizByCompositionId(compositionId);
   if (!quiz) {
     return { exitCode: 1, message: `Composition ${compositionId} has no Quiz -- refusing to re-render` };
-  }
-
-  if (!quiz.downloadToken) {
-    return {
-      exitCode: 1,
-      message: `Quiz ${quiz.id} has no download token (its Deliverables were pruned) -- cannot rebuild download URLs`,
-    };
   }
 
   const pool = await deps.contentRepository.loadPool(compositionRecord.locale);
@@ -76,6 +71,11 @@ export async function recomposeQuiz(compositionId: string, deps: RecomposeQuizDe
   for (const file of DELIVERABLE_FILES) {
     await deps.uploadDeliverable(`${quiz.id}/${file}`, files[file], DELIVERABLE_CONTENT_TYPES[file]);
   }
+
+  // Re-attach: now that the objects exist again, un-prune the Quiz so its
+  // existing download link (the token itself was never cleared -- see
+  // prune.ts) works again, whether or not this Quiz was pruned at all.
+  await deps.orderRepository.clearPruned(quiz.id);
 
   const deliveredFiles = DELIVERABLE_FILES.map((file) => ({
     file,

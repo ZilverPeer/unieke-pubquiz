@@ -12,7 +12,7 @@ const TOKEN = "tok-abc";
 
 function buildDeps(overrides: Partial<ResolveDownloadDeps> = {}): ResolveDownloadDeps {
   return {
-    getQuizByDownloadToken: async (token) => (token === TOKEN ? { id: QUIZ_ID } : null),
+    getQuizByDownloadToken: async (token) => (token === TOKEN ? { id: QUIZ_ID, prunedAt: null } : null),
     downloadDeliverable: async () => new Uint8Array([1, 2, 3]),
     ...overrides,
   };
@@ -24,7 +24,7 @@ describe("resolveDownload", () => {
     const deps = buildDeps({
       getQuizByDownloadToken: async () => {
         lookedUp = true;
-        return { id: QUIZ_ID };
+        return { id: QUIZ_ID, prunedAt: null };
       },
     });
 
@@ -42,7 +42,23 @@ describe("resolveDownload", () => {
     expect(result).toEqual({ status: 404 });
   });
 
-  it("410s when the token is known but the object is gone from the bucket (pruned)", async () => {
+  it("410s a pruned Quiz (prunedAt set) without ever touching the bucket", async () => {
+    let bucketTouched = false;
+    const deps = buildDeps({
+      getQuizByDownloadToken: async () => ({ id: QUIZ_ID, prunedAt: "2026-01-01T03:00:00.000Z" }),
+      downloadDeliverable: async () => {
+        bucketTouched = true;
+        return new Uint8Array([1, 2, 3]);
+      },
+    });
+
+    const result = await resolveDownload(TOKEN, "quizmaster.pdf", deps);
+
+    expect(result).toEqual({ status: 410 });
+    expect(bucketTouched).toBe(false);
+  });
+
+  it("410s when the token is known and not pruned but the object is nonetheless gone from the bucket", async () => {
     const deps = buildDeps({
       downloadDeliverable: async () => {
         throw new Error("Object not found");

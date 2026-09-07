@@ -68,7 +68,7 @@ export async function startWorker(): Promise<Worker> {
   await boss.work(PRUNE_QUEUE, async () => {
     const result = await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
     console.log(
-      `[worker] pruned ${result.prunedQuizIds.length} expired Quiz(zes), cleaned up ${result.cleanedFailedQuizIds.length} failed Quiz(zes)`,
+      `[worker] pruned ${result.prunedQuizIds.length} expired Quiz(zes), cleaned up ${result.cleanedFailedQuizIds.length} failed Quiz(zes), ${result.failedQuizIds.length} failure(s)`,
     );
   });
 

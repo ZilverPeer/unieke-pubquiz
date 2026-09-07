@@ -25,6 +25,7 @@ function buildQuiz(overrides: Partial<QuizRecord> = {}): QuizRecord {
     compositionId: null,
     downloadToken: null,
     deliveredAt: null,
+    prunedAt: null,
     ...overrides,
   };
 }
@@ -43,8 +44,11 @@ function buildFakeOrderRepository(quiz: QuizRecord | null): OrderRepository & {
     recordDelivery: () => {
       throw new Error("recordDelivery should not be reachable in this test");
     },
-    clearDownloadToken: () => {
-      throw new Error("clearDownloadToken should not be reachable in this test");
+    markPruned: () => {
+      throw new Error("markPruned should not be reachable in this test");
+    },
+    clearPruned: () => {
+      throw new Error("clearPruned should not be reachable in this test");
     },
     listQuizzesByBillingEmail: () => {
       throw new Error("listQuizzesByBillingEmail should not be reachable in this test");

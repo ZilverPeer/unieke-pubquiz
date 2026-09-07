@@ -10,9 +10,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { CategoryPick, QuizConfig } from "@/domain";
-import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, DOWNLOAD_VALIDITY_DAYS } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import {
+  createDeliverableRemover,
   createDeliverableUploader,
   createOrderRepository,
   createRepository,
@@ -20,6 +21,7 @@ import {
 } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
+import { pruneDeliverables } from "@/worker/prune";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "@/worker/quiz-job";
 import { GET } from "./route";
 
@@ -27,6 +29,7 @@ const config = resolveLocalStackConfig();
 const orderRepository = createOrderRepository(config);
 const contentRepository = createRepository(config);
 const uploadDeliverable = createDeliverableUploader(config);
+const removeDeliverables = createDeliverableRemover(config);
 
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
@@ -90,6 +93,12 @@ function paramsFor(token: string, file: string): { params: Promise<{ token: stri
   return { params: Promise.resolve({ token, file }) };
 }
 
+async function backdateDeliveredAt(quizId: string, daysAgo: number): Promise<void> {
+  const deliveredAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  const { error } = await db.from("quizzes").update({ delivered_at: deliveredAt.toISOString() }).eq("id", quizId);
+  if (error) throw error;
+}
+
 beforeEach(async () => {
   const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
   if (quizzesError) throw quizzesError;
@@ -130,16 +139,17 @@ describe.skipIf(resolveFfmpeg() === null)("GET /download/[token]/[file] (needs f
     expect(body.length).toBeGreaterThan(0);
   });
 
-  it("410s once the token is known but the object has been pruned from the bucket", async () => {
+  it("410s once the token is known but the Quiz has been pruned by the real pruning job", async () => {
     const { quizId, token } = await deliverFreshQuiz("route-410");
+    await backdateDeliveredAt(quizId, DOWNLOAD_VALIDITY_DAYS + 1);
 
-    // Simulates the pruning job's object deletion (ticket #42's prune.ts),
-    // done directly here so this test only exercises the route's own
-    // "object gone" branch, independent of prune.ts's own behaviour (see
-    // src/worker/prune.integration.test.ts for that).
-    const paths = DELIVERABLE_FILES.map((f) => `${quizId}/${f}`);
-    const { error } = await db.storage.from("deliverables").remove(paths);
-    if (error) throw error;
+    // Goes through the real pruneDeliverables (src/worker/prune.ts) rather
+    // than deleting objects directly: this is the HARD-finding regression
+    // the coordinator flagged -- pruning must keep the token so this route
+    // still recognises it and answers 410, not 404 (CONTEXT.md "Orders and
+    // Quizzes").
+    const pruneResult = await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
+    expect(pruneResult.prunedQuizIds).toContain(quizId);
 
     const response = await GET(new Request("http://localhost/download/x"), paramsFor(token, "quizmaster.pdf"));
 
