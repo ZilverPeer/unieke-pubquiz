@@ -59,7 +59,7 @@ function main() {
   const { deliveryUrl } = ensureWebhook();
 
   // Rotated on every run (see lib/rest-api-key.ts's docblock for why reuse
-  // isn't possible) and written to .env.shop.local -- never printed in full
+  // isn't possible) and upserted into .env.local -- never printed in full
   // here, since this log is not a secret store.
   ensureRestApiKey();
 

@@ -40,6 +40,8 @@ Run once, right before pushing, not after every edit:
 - `npm run typecheck`, `npm test`, `npx eslint src scripts`: always.
 - `npm run test:integration`: only when the ticket changes `src/repository`, `src/scripts`, or `supabase/`. Run it once; the suites clean up after themselves, so `npm run db:reset` is needed at most once per push, and only if a test failed for state reasons.
 - `npm run build`: never, unless the ticket changes the Next.js app itself.
+
+**Warning (as of ticket #43's fix round):** `generate.integration.test.ts` scopes its cleanup to the Compositions it created itself (by billing email), so it is safe to run against a stack that also has real orders on it. Every other integration suite that touches Orders/Quizzes/Compositions -- `orders`, `repository`, `recompose-quiz`, `reprocess-cli`, `prune`, `quiz-job` -- still wipes `orders`, `quizzes` and `compositions` wholesale in its own `beforeEach`/`afterEach`. Running `npm run test:integration` on a stack that has real orders placed through the local shop (e.g. while following `docs/runbook-local-loop.md`) destroys those orders. Narrowing the remaining suites the same way `generate.integration.test.ts` was narrowed is a tracked follow-up, not yet done.
 - While iterating, run only the affected test file (`npx vitest run <file>`).
 
 ### Report template

@@ -24,6 +24,7 @@ import {
 } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
+import { generateQuiz } from "@/scripts/generate-quiz";
 
 const config = resolveLocalStackConfig();
 const orderRepository = createOrderRepository(config);
@@ -154,6 +155,7 @@ describe.skipIf(resolveFfmpeg() === null)("--composition CLI (needs ffmpeg)", ()
         contentRepository,
         uploadDeliverable,
         deliverer: { deliverQuiz: async () => {}, noteFailure: async () => {} },
+        generateQuiz,
         appBaseUrl: "http://localhost:3000",
       },
     );

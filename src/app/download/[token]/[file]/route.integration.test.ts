@@ -21,6 +21,7 @@ import {
 } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
+import { generateQuiz } from "@/scripts/generate-quiz";
 import { pruneDeliverables } from "@/worker/prune";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "@/worker/quiz-job";
 import { GET } from "./route";
@@ -76,6 +77,7 @@ function buildDeps(): QuizJobDeps {
     contentRepository,
     uploadDeliverable,
     deliverer: noopDeliverer,
+    generateQuiz,
     appBaseUrl: "http://localhost:3000",
   };
 }

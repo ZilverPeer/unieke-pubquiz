@@ -29,12 +29,26 @@ const repository = createRepository(config);
 // src/repository/repository.integration.test.ts's own cleanup.
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
+// Every billing email this suite has handed out via freshEmail(), so
+// afterEach can delete exactly the Compositions this suite created --
+// see freshEmail below and afterEach's own comment (PR #50 review round).
+const createdEmails: string[] = [];
+
 afterEach(async () => {
   // compositions cascade-deletes composition_items; seed Items are never
   // touched. This suite persists real Compositions (both via generateQuiz
-  // directly and via the spawned CLI) and must not leave them behind for
-  // later test runs or other integration test files.
-  const { error } = await db.from("compositions").delete().not("id", "is", null);
+  // directly and via the spawned CLI); scoped to this run's own billing
+  // emails (createdEmails) rather than an unconditional wipe, so it neither
+  // fails on nor deletes Compositions belonging to real orders placed
+  // through the local shop on the same stack (ticket #43 fix round --
+  // deleting every row here used to violate quizzes_composition_id_fkey
+  // whenever such orders existed). The other integration suites (orders,
+  // repository, recompose, reprocess-cli, prune, quiz-job) still wipe
+  // `orders`/`quizzes`/`compositions` wholesale -- see
+  // docs/runbook-local-loop.md and docs/agents/orchestration.md for the
+  // warning; narrowing those is tracked as a follow-up, out of scope here.
+  if (createdEmails.length === 0) return;
+  const { error } = await db.from("compositions").delete().in("billing_email", createdEmails.splice(0));
   if (error) throw error;
 });
 
@@ -56,7 +70,9 @@ const HARD_TEXT_CATEGORY_ID = "1";
 const HARD_TEXT_CATEGORY_NAME: Record<Locale, string> = { nl: "Sport", en: "Sports" };
 
 function freshEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`;
+  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`;
+  createdEmails.push(email);
+  return email;
 }
 
 function fullyRandomCategoryPicks(): GenerateOptions["categoryPicks"] {

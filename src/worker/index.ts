@@ -12,6 +12,7 @@ import {
   createRepository,
   resolveLocalStackConfig,
 } from "@/repository";
+import { generateQuiz } from "@/scripts/generate-quiz";
 import { QUIZ_QUEUE, startBoss, stopBoss } from "./boss";
 import { PRUNE_QUEUE, pruneDeliverables, schedulePruneJob } from "./prune";
 import { handleQuizJob, type QuizJobData, type QuizJobDeps } from "./quiz-job";
@@ -58,6 +59,7 @@ export async function startWorker(): Promise<Worker> {
       contentRepository,
       uploadDeliverable,
       deliverer: createDeliverer(resolveDelivererConfigFromEnv(), createOrderLookup(orderRepository)),
+      generateQuiz,
       appBaseUrl,
     };
     await handleQuizJob(job, deps);

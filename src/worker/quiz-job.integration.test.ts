@@ -14,7 +14,7 @@ import { PgBoss } from "pg-boss";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CategoryPick, Locale, QuizConfig } from "@/domain";
 import { downloadPath } from "@/domain";
-import { generateQuiz } from "@/scripts/generate-quiz";
+import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import {
   createDeliverableUploader,
   createOrderRepository,
@@ -90,14 +90,79 @@ function createRecordingDeliverer(): Deliverer & {
   };
 }
 
-function buildDeps(deliverer: Deliverer): QuizJobDeps {
+function buildDeps(deliverer: Deliverer, generateQuizFn: typeof generateQuiz = generateQuiz): QuizJobDeps {
   return {
     orderRepository,
     contentRepository,
     uploadDeliverable,
     deliverer,
+    generateQuiz: generateQuizFn,
     appBaseUrl: APP_BASE_URL,
   };
+}
+
+const FAKE_DELIVERABLE_FILES: GeneratedQuizFiles = {
+  "quizmaster.pdf": Buffer.from("fake quizmaster pdf"),
+  "picture-handout.pdf": Buffer.from("fake picture handout pdf"),
+  "answer-sheet.pdf": Buffer.from("fake answer sheet pdf"),
+  "music-round.mp3": Buffer.from("fake music round mp3"),
+};
+
+/** Inserts a bare Composition row directly (no sampling), just enough to
+ * satisfy `quizzes.composition_id`'s foreign key -- see
+ * createStubGenerateQuiz below. */
+async function insertFakeComposition(billingEmail: string, config: QuizConfig): Promise<string> {
+  const { data, error } = await db
+    .from("compositions")
+    .insert({
+      billing_email: billingEmail,
+      locale: config.locale,
+      quiz_mode: config.quizMode,
+      requested_difficulty: config.requestedDifficulty,
+      seed: 1,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+/**
+ * Stands in for the real engine (src/scripts/generate-quiz.ts) in the
+ * retry-policy tests below (ticket #43 fix round): those tests are about
+ * `deliverQuiz`'s retry behaviour, not rendering, and the real renderer (3
+ * PDFs plus an ffmpeg-driven MP3) was previously the single most expensive
+ * thing this suite did -- expensive enough, under contention, to blow past
+ * even a generous `waitFor` budget before `deliverQuiz` had been called
+ * even once (see the flake this ticket fixed). Still calls the real
+ * `writeDeliverables`/`uploadDeliverable` path with deterministic fake
+ * buffers, so "uploads four Deliverables" assertions keep meaning
+ * something, and returns a real (pre-inserted) Composition id so
+ * `recordDelivery`'s foreign key is satisfied.
+ */
+function createStubGenerateQuiz(compositionId: string): {
+  generateQuiz: typeof generateQuiz;
+  getCallCount: () => number;
+} {
+  let calls = 0;
+  const stub: typeof generateQuiz = async (options, _repository, writeDeliverables) => {
+    calls++;
+    await writeDeliverables(FAKE_DELIVERABLE_FILES);
+    return {
+      ok: true,
+      files: FAKE_DELIVERABLE_FILES,
+      compositionRecord: {
+        billingEmail: options.billingEmail,
+        locale: options.locale,
+        quizMode: options.quizMode,
+        requestedDifficulty: options.requestedDifficulty,
+        seed: options.seed,
+        composition: { slots: [] },
+      },
+      compositionId,
+    };
+  };
+  return { generateQuiz: stub, getCallCount: () => calls };
 }
 
 function firstAttempt(quizId: string, retryLimit = 3): QuizJobLike {
@@ -281,28 +346,25 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
    * would resolve immediately and never observe the retries this test is
    * about.
    *
-   * Root cause of the previously-observed flake (ticket #43): this budget
-   * is dominated by the one real `generateQuiz` render (PDFs + an
-   * ffmpeg-driven MP3) that happens on the first attempt only -- the
-   * retries after it are cheap (`deliverQuiz` alone, ~`retryDelay`-spaced).
-   * A run of this suite alone takes ~9-10s; measured directly, running it
-   * *while `npm run shop:up` was provisioning Docker containers in the
-   * background* stretched that single render past 20s on this machine,
-   * so `getCallCount()` was still 0 (not partial) when the old 20s budget
-   * expired -- not a queue-polling or retry-timing bug. 35s gives that
-   * render enough headroom under realistic contention while staying well
-   * under this test's own 45s timeout.
+   * The previously-observed flake (ticket #43) traced to the one real
+   * `generateQuiz` render (PDFs + an ffmpeg-driven MP3) this suite used to
+   * pay for on every test's first attempt -- expensive enough, under
+   * contention, that `getCallCount()` was still 0 when even a 35s budget
+   * expired. Both retry tests below inject a stub `generateQuiz` (see
+   * createStubGenerateQuiz) instead, so there is no render left in this
+   * suite's time budget at all: retries are then bound only by pg-boss's
+   * own polling/retryDelay, back to the original tight timeout.
    */
   async function waitForCalls(getCallCount: () => number, expectedCalls: number): Promise<void> {
     await vi.waitFor(
       () => {
         expect(getCallCount()).toBe(expectedCalls);
       },
-      { timeout: 35_000, interval: 250 },
+      { timeout: 20_000, interval: 250 },
     );
   }
 
-  async function registerHandler(deliverer: Deliverer): Promise<void> {
+  async function registerHandler(deliverer: Deliverer, generateQuizFn: typeof generateQuiz): Promise<void> {
     // pollingIntervalSeconds here (not on createQuizQueue or the PgBoss
     // constructor -- see beforeAll's comment) is what actually makes this
     // worker's fetch loop fast.
@@ -311,7 +373,7 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
       { includeMetadata: true, pollingIntervalSeconds: 0.5 },
       async (jobs) => {
         const [job] = jobs;
-        await handleQuizJob(job, buildDeps(deliverer));
+        await handleQuizJob(job, buildDeps(deliverer, generateQuizFn));
       },
     );
   }
@@ -320,7 +382,10 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
     "a deliverer that throws twice then succeeds ends delivered, without regenerating on the retries",
     async () => {
       const email = freshEmail("worker-retry-success");
+      const compositionId = await insertFakeComposition(email, buildConfig());
       const quizId = await insertPendingQuiz(email, buildConfig());
+      const { generateQuiz: stubGenerateQuiz, getCallCount: getGenerateCallCount } =
+        createStubGenerateQuiz(compositionId);
 
       let calls = 0;
       const deliverer: Deliverer = {
@@ -331,25 +396,31 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
         noteFailure: async () => {},
       };
 
-      await registerHandler(deliverer);
+      await registerHandler(deliverer, stubGenerateQuiz);
       await boss.send(QUIZ_QUEUE, { quizId }, { singletonKey: quizId });
       await waitForCalls(() => calls, 3);
 
       const quiz = await orderRepository.getQuizById(quizId);
       expect(quiz?.status).toBe("delivered");
 
-      // Only generated once: the same Composition id survives every retry.
+      // Only generated once: asserted directly against the stub's own call
+      // count, not inferred from timing or the Composition id surviving.
+      expect(getGenerateCallCount()).toBe(1);
+
       const objectNames = await listDeliverableObjectNames(quizId);
       expect(objectNames).toHaveLength(4);
     },
-    45_000,
+    20_000,
   );
 
   it(
     "a deliverer that always throws ends failed after three retries",
     async () => {
       const email = freshEmail("worker-retry-exhausted");
+      const compositionId = await insertFakeComposition(email, buildConfig());
       const quizId = await insertPendingQuiz(email, buildConfig());
+      const { generateQuiz: stubGenerateQuiz, getCallCount: getGenerateCallCount } =
+        createStubGenerateQuiz(compositionId);
 
       let calls = 0;
       const deliverer: Deliverer = {
@@ -360,7 +431,7 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
         noteFailure: async () => {},
       };
 
-      await registerHandler(deliverer);
+      await registerHandler(deliverer, stubGenerateQuiz);
       await boss.send(QUIZ_QUEUE, { quizId }, { singletonKey: quizId });
       await waitForCalls(() => calls, 4); // initial attempt + 3 retries
 
@@ -368,8 +439,12 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
       // delivered even once retries are exhausted (see quiz-job.ts).
       const quiz = await orderRepository.getQuizById(quizId);
       expect(quiz?.status).toBe("delivered");
+
+      // Generation itself only ever ran once (the first attempt): a
+      // "delivered" Quiz's retries never re-enter generateAndRecord.
+      expect(getGenerateCallCount()).toBe(1);
     },
-    45_000,
+    20_000,
   );
 
   it("enqueues a pending Quiz inserted while the worker was down (startup sweep)", async () => {

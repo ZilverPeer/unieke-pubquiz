@@ -96,6 +96,8 @@ docker exec supabase_db_unieke-pubquiz psql -U postgres -d postgres -c \
   "select id, order_id, sequence, status, failure_reason, composition_id, download_token from quizzes order by created_at desc limit 5;"
 ```
 
+`orders.status` is set once, at webhook receipt (the WooCommerce order status the webhook payload carried), and is never updated afterwards -- completion (`processing` -> `completed`) happens only in WooCommerce itself, once the order has downloadable files attached (see `src/app/api/webhooks/woocommerce/README.md`). Do not read a local `orders.status` still showing `processing` as the order being stuck; check the order in WordPress admin (or `quizzes.status`, which the worker does update through `delivered`/`failed`) instead.
+
 ## Downloading a Deliverable directly
 
 Every download link is `http://localhost:3000/download/<token>/<file>` (`downloadPath`, `src/domain/orders.ts`) -- reachable straight from a browser or `curl` once `next dev` is running, since it's the same host/port the link's own base URL (`APP_BASE_URL`, defaults to `http://localhost:3000`) points at:
@@ -115,6 +117,10 @@ npx wp-env run cli -- wp eval '$w = new WC_Webhook(1); $o = wc_get_order(<order 
 (webhook id `1` is `pubquiz-order-updated`, created by `shop:up`; confirm with `npx wp-env run cli -- wp wc webhook list --user=admin --format=json`.) Redelivering a `completed` order's webhook is a fast no-op (`status !== "processing"` gate, `handle-webhook.ts`) -- verified empirically: same order id, same two Quiz ids/composition ids/download tokens, same four Storage objects per Quiz, before and after.
 
 Note: WooCommerce also sends its own unsigned connectivity **ping** (`webhook_id=<n>`, form-urlencoded, no `X-WC-Webhook-Signature`) whenever `wp wc webhook update --status=active` runs (i.e. every `npm run shop:up`), queued and delivered the same way as real deliveries. Our route correctly answers it `401` (no valid signature) -- this is expected WooCommerce core behaviour (`class-wc-webhook.php`), not a defect; it does not increment the webhook's `failure_count` and has no effect on order processing.
+
+## Warning: `npm run test:integration` destroys real orders on this stack
+
+`generate.integration.test.ts` scopes its own cleanup to the Compositions it created (by billing email), so it is safe to run against a stack that also has real orders placed through the local shop (as above). Every other integration suite that touches Orders/Quizzes/Compositions -- `orders`, `repository`, `recompose-quiz`, `reprocess-cli`, `prune`, `quiz-job` -- still wipes `orders`, `quizzes` and `compositions` wholesale in its own `beforeEach`/`afterEach`. Running `npm run test:integration` on the same stack you have been following this runbook on will delete every order you placed. Use a separate/throwaway stack for `npm run test:integration`, or place fresh orders again afterwards. Narrowing the remaining suites is a tracked follow-up.
 
 ## Stopping everything
 
