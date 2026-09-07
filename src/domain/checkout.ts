@@ -7,6 +7,7 @@
  * RequestedDifficulty "easy" | "medium" | "hard" | "mixed",
  * QuizMode "mixed" | "single_category", Category picks are Category ids.
  */
+import type { DeliverableFile } from "./orders";
 import { SLOT_COUNT } from "./types";
 
 export const CHECKOUT_META_KEYS = {
@@ -24,3 +25,23 @@ export const CHECKOUT_META_KEYS = {
 
 /** Prefix of private order notes that the shop's mail plugin forwards to the operator. */
 export const OPERATOR_NOTE_PREFIX = "[pubquiz]";
+
+/**
+ * The line item meta_data key the deliver module (#41) writes a Deliverable's
+ * download URL under. A line item's quantity can be above one -- several
+ * Quizzes then share one wooLineItemId (src/repository/orders.ts,
+ * CONTEXT.md "Order"/"Quiz") -- so the key carries the Quiz's `sequence`
+ * (0-based internally, 1-based here for customers, same convention as
+ * `CHECKOUT_META_KEYS.categoryPick`) to keep each Quiz's four files distinct
+ * instead of the last-delivered Quiz's links clobbering the others'.
+ * `shop/mu-plugins/pubquiz-downloads.php` reads this same key stem to find,
+ * group, and render the download links; a fixture test
+ * (shop-fixture.test.ts) checks the PHP literal stays in sync by hand (PHP
+ * cannot import this constant).
+ */
+export function downloadMetaKey(sequence: number, file: DeliverableFile): string {
+  if (!Number.isInteger(sequence) || sequence < 0) {
+    throw new RangeError(`sequence must be a non-negative integer, got ${sequence}`);
+  }
+  return `pubquiz_download_${sequence + 1}_${file}`;
+}
