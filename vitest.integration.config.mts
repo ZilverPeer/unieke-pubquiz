@@ -8,6 +8,11 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.integration.test.{ts,tsx}"],
+    // Loads .env.local (WOOCOMMERCE_*, SUPABASE_*, ...) the same way the tsx
+    // dev scripts do (scripts/load-env.ts) -- vitest is not a Next.js
+    // process, so it doesn't get this for free. reprocess-cli.integration.test.ts
+    // needs WOOCOMMERCE_* to reach the local shop's deliver module.
+    setupFiles: ["./scripts/load-env.ts"],
     // Integration tests share one Postgres instance and reset state in
     // beforeEach; running them concurrently would race on that state.
     fileParallelism: false,

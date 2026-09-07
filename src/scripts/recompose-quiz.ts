@@ -9,9 +9,13 @@
  * deps still take a zero-arg `createDeliverer` factory (called lazily, after
  * upload has already succeeded) so the real CLI can close over its
  * `DelivererConfig`/`OrderLookup` (see generate.ts) and tests can inject a
- * fake `Deliverer` directly. The `isDeliverNotImplementedError` catch below
- * is now dead in practice (the real deliverer never throws that message) --
- * left in place as a harmless safety net rather than removed mid-round.
+ * fake `Deliverer` directly. `isDeliverUnavailableError` below catches two
+ * cases as one "upload succeeded, delivery didn't run" outcome rather than
+ * crashing the CLI: `resolveDelivererConfigFromEnv()` throwing because
+ * `WOOCOMMERCE_*` isn't configured on this machine (the common case --
+ * `--composition` is useful for re-rendering even without a shop to deliver
+ * to), and the pre-#41 "deliver module not implemented yet" message, kept
+ * as a harmless safety net.
  */
 import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath } from "@/domain";
 import type { Deliverer } from "@/deliver";
@@ -34,8 +38,12 @@ export interface RecomposeQuizResult {
   message: string;
 }
 
-function isDeliverNotImplementedError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("deliver module not implemented yet");
+function isDeliverUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("deliver module not implemented yet") ||
+    error.message.includes("deliver: missing environment variable(s)")
+  );
 }
 
 /**
@@ -89,10 +97,10 @@ export async function recomposeQuiz(compositionId: string, deps: RecomposeQuizDe
     const deliverer = deps.createDeliverer();
     await deliverer.deliverQuiz({ quizId: quiz.id, files: deliveredFiles });
   } catch (error) {
-    if (isDeliverNotImplementedError(error)) {
+    if (isDeliverUnavailableError(error)) {
       return {
         exitCode: 0,
-        message: `Deliverables re-rendered and uploaded for Quiz ${quiz.id}; delivery is not implemented yet (ticket #41)`,
+        message: `Deliverables re-rendered and uploaded for Quiz ${quiz.id}; delivery skipped (deliver module not configured: ${(error as Error).message})`,
       };
     }
     throw error;

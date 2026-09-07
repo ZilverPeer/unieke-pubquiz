@@ -280,13 +280,25 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
    * its retries -- has even run once (see quiz-job.ts), so waiting on status
    * would resolve immediately and never observe the retries this test is
    * about.
+   *
+   * Root cause of the previously-observed flake (ticket #43): this budget
+   * is dominated by the one real `generateQuiz` render (PDFs + an
+   * ffmpeg-driven MP3) that happens on the first attempt only -- the
+   * retries after it are cheap (`deliverQuiz` alone, ~`retryDelay`-spaced).
+   * A run of this suite alone takes ~9-10s; measured directly, running it
+   * *while `npm run shop:up` was provisioning Docker containers in the
+   * background* stretched that single render past 20s on this machine,
+   * so `getCallCount()` was still 0 (not partial) when the old 20s budget
+   * expired -- not a queue-polling or retry-timing bug. 35s gives that
+   * render enough headroom under realistic contention while staying well
+   * under this test's own 45s timeout.
    */
   async function waitForCalls(getCallCount: () => number, expectedCalls: number): Promise<void> {
     await vi.waitFor(
       () => {
         expect(getCallCount()).toBe(expectedCalls);
       },
-      { timeout: 20_000, interval: 250 },
+      { timeout: 35_000, interval: 250 },
     );
   }
 
@@ -330,7 +342,7 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
       const objectNames = await listDeliverableObjectNames(quizId);
       expect(objectNames).toHaveLength(4);
     },
-    30_000,
+    45_000,
   );
 
   it(
@@ -357,7 +369,7 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
       const quiz = await orderRepository.getQuizById(quizId);
       expect(quiz?.status).toBe("delivered");
     },
-    30_000,
+    45_000,
   );
 
   it("enqueues a pending Quiz inserted while the worker was down (startup sweep)", async () => {

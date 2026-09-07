@@ -65,19 +65,20 @@ async function insertPendingQuiz(billingEmail: string): Promise<string> {
 
 const REPO_ROOT = join(__dirname, "..", "..");
 
-function runCli(args: string[]): { status: number | null; stdout: string; stderr: string } {
+function runCli(
+  args: string[],
+  envOverrides: Record<string, string> = {},
+): { status: number | null; stdout: string; stderr: string } {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    SUPABASE_URL: config.url,
+    SUPABASE_SERVICE_ROLE_KEY: config.serviceRoleKey,
+    ...envOverrides,
+  };
   const result = spawnSync(
     process.execPath,
     ["--import", "tsx", join(REPO_ROOT, "src", "scripts", "generate.ts"), ...args],
-    {
-      cwd: REPO_ROOT,
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        SUPABASE_URL: config.url,
-        SUPABASE_SERVICE_ROLE_KEY: config.serviceRoleKey,
-      },
-    },
+    { cwd: REPO_ROOT, encoding: "utf-8", env },
   );
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
@@ -134,7 +135,7 @@ describe("--retry-quiz CLI", () => {
 });
 
 describe.skipIf(resolveFfmpeg() === null)("--composition CLI (needs ffmpeg)", () => {
-  it("uploads Deliverables and reports delivery is not implemented yet (ticket #41)", async () => {
+  it("uploads Deliverables and reports delivery skipped when WOOCOMMERCE_* isn't configured", async () => {
     // generateQuiz + a real render pass, driven through the CLI's own
     // `generate` command first, to get a real Composition + Quiz pair with
     // a download token -- mirrors generate.integration.test.ts's own use of
@@ -159,9 +160,24 @@ describe.skipIf(resolveFfmpeg() === null)("--composition CLI (needs ffmpeg)", ()
     const quiz = await orderRepository.getQuizById(quizId);
     if (!quiz?.compositionId) throw new Error("test setup failed: Quiz was not delivered");
 
-    const { status, stdout, stderr } = runCli(["--composition", quiz.compositionId]);
+    // This machine's .env.local may well have real WOOCOMMERCE_* values
+    // (npm run shop:up writes them there -- see scripts/load-env.ts) that
+    // would point at a local shop with no order matching this test's fake
+    // wooOrderId. Blank them (empty string, not deleted) so this test
+    // deterministically exercises the "deliver module not configured" path
+    // regardless of what's running: the spawned CLI's own top-level
+    // `scripts/load-env` import re-reads .env.local itself and would
+    // otherwise silently reintroduce a deleted key (dotenv only skips keys
+    // already present in process.env -- an empty string counts as present,
+    // an absent key doesn't), and resolveDelivererConfigFromEnv treats an
+    // empty string the same as missing (`!env[name]`, src/deliver/config.ts).
+    const { status, stdout, stderr } = runCli(["--composition", quiz.compositionId], {
+      WOOCOMMERCE_URL: "",
+      WOOCOMMERCE_CONSUMER_KEY: "",
+      WOOCOMMERCE_CONSUMER_SECRET: "",
+    });
 
     expect(status, stderr).toBe(0);
-    expect(stdout).toContain("delivery is not implemented yet");
+    expect(stdout).toContain("delivery skipped (deliver module not configured");
   });
 });
