@@ -15,21 +15,20 @@ export const MAILPIT_UI_PORT = 45332;
 export const MAILPIT_SMTP_PORT = 45333;
 export const MAILPIT_IMAGE = "axllent/mailpit:latest";
 
+/**
+ * The product slug, name, short description and placeholder price
+ * (ticket #56), the Storefront theme slug, and the webhook name/topic used
+ * to live here too -- since ticket #61 (single-bootstrap `shop:up`) those
+ * are set only in shop/mu-plugins/wp-cli-scripts/setup-shop.php, the single
+ * place that creates/converges them, and pinned there by
+ * src/domain/shop-fixture.test.ts. `PUBQUIZ_PRODUCT_SLUG` stays here because
+ * scripts/shop/lib/product.ts (used by `shop:order`) still needs it to look
+ * the product up by slug.
+ */
 export const PUBQUIZ_PRODUCT_SLUG = "pubquiz";
-/** Dutch product name and short description (ticket #56); the placeholder price is set on the product itself. */
-export const PUBQUIZ_PRODUCT_NAME = "Pubquiz – digitale download";
-export const PUBQUIZ_PRODUCT_SHORT_DESCRIPTION =
-  "Een kant-en-klare pubquiz om zelf te presenteren: quizmasterscript, beeldronde, antwoordenblad en muziekronde, direct na aankoop per download.";
-/** Placeholder price (ticket #56); the real pricing model is out of scope for spec #55. */
-export const PUBQUIZ_PRODUCT_PRICE = "14.95";
-
-/** wp-env's plugin-URL directory-naming bug applies to themes too, so this uses the plain download URL, not `storefront.latest-stable.zip` (see shop/README.md "Dutch storefront" > "Theme"). */
-export const STOREFRONT_THEME_SLUG = "storefront";
 
 export const TEST_GATEWAY_ID = "pubquiz_test_gateway";
 
-export const WEBHOOK_NAME = "pubquiz-order-updated";
-export const WEBHOOK_TOPIC = "order.updated";
 /** Default target when WOOCOMMERCE_WEBHOOK_URL is not set in the environment. */
 export const DEFAULT_WEBHOOK_URL = "http://host.docker.internal:3000/api/webhooks/woocommerce";
 

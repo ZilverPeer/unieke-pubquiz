@@ -33,7 +33,7 @@ Every path is sent under `/wp-json` (`woocommerce-client.ts`'s `API_PREFIX`) -- 
 
 ## Environment variables
 
-See `.env.example`. `WOOCOMMERCE_URL`, `WOOCOMMERCE_CONSUMER_KEY`, `WOOCOMMERCE_CONSUMER_SECRET` -- all three required, no defaults. `npm run shop:up` creates a REST API key (description `pubquiz-pipeline`) and upserts all three into the repo root's gitignored `.env.local` (`scripts/shop/lib/rest-api-key.ts`) -- the same file `next dev` loads automatically and the tsx dev scripts/vitest integration suite load explicitly via `scripts/load-env.ts` (see root `README.md` "Environment variables"). No copying between files needed.
+See `.env.example`. `WOOCOMMERCE_URL`, `WOOCOMMERCE_CONSUMER_KEY`, `WOOCOMMERCE_CONSUMER_SECRET` -- all three required, no defaults. `npm run shop:up` creates a REST API key (description `pubquiz-pipeline`, `shop/mu-plugins/wp-cli-scripts/setup-shop.php`) and upserts all three into the repo root's gitignored `.env.local` (`scripts/shop/lib/env-file.ts`) -- the same file `next dev` loads automatically and the tsx dev scripts/vitest integration suite load explicitly via `scripts/load-env.ts` (see root `README.md` "Environment variables"). No copying between files needed.
 
 ## Interface pinned on master
 

@@ -22,7 +22,7 @@
 import { CHECKOUT_META_KEYS } from "../../src/domain/checkout";
 import { SLOT_COUNT } from "../../src/domain/types";
 import { wpCliJson } from "./lib/wp-cli";
-import { getOrCreateProductId } from "./lib/product";
+import { getProductId } from "./lib/product";
 
 interface QuizArg {
   locale: string;
@@ -96,7 +96,7 @@ function toMetaData(quiz: QuizArg): Array<{ key: string; value: string }> {
 
 function main() {
   const { email, quizzes } = parseArgs(process.argv.slice(2));
-  const productId = getOrCreateProductId();
+  const productId = getProductId();
 
   const lineItems = quizzes.map((quiz) => ({
     product_id: productId,

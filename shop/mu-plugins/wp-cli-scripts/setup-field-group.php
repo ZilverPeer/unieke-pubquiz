@@ -119,4 +119,7 @@ $fg = \SW_WAPF\Includes\Classes\Field_Groups::raw_json_to_field_group( $raw );
 
 update_post_meta( $product->ID, '_wapf_fieldgroup', serialize( $fg->to_array() ) );
 
-WP_CLI::success( "Attached the Pubquiz field group to product #{$product->ID}." );
+// STDERR, not WP_CLI::success() (which writes to STDOUT): this file is now
+// required by setup-shop.php (ticket #61), whose STDOUT contract allows
+// exactly one closing line of JSON and nothing else.
+fwrite( STDERR, "Attached the Pubquiz field group to product #{$product->ID}.\n" );

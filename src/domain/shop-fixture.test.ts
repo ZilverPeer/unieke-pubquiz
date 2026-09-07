@@ -92,3 +92,32 @@ describe("shop/mu-plugins/wp-cli-scripts/setup-field-group.php", () => {
     expect(php).toContain("pubquiz_category_");
   });
 });
+
+describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
+  /**
+   * Ticket #61 (single-bootstrap shop:up) moved the Pubquiz product's slug,
+   * Dutch name/short description and placeholder price out of
+   * scripts/shop/lib/config.ts (a TypeScript module) into this PHP file
+   * (the only remaining consumer of those strings); PHP cannot import a TS
+   * constants module, so this pins the literal values here instead, the
+   * same way the other describe blocks in this file pin CHECKOUT_META_KEYS.
+   */
+  const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "wp-cli-scripts", "setup-shop.php"), "utf8");
+
+  test("declares the pinned Pubquiz product slug, name, short description and price", () => {
+    expect(php).toContain("PUBQUIZ_PRODUCT_SLUG', 'pubquiz'");
+    expect(php).toContain("PUBQUIZ_PRODUCT_NAME', 'Pubquiz – digitale download'");
+    expect(php).toContain(
+      "PUBQUIZ_PRODUCT_SHORT_DESCRIPTION', 'Een kant-en-klare pubquiz om zelf te presenteren: quizmasterscript, beeldronde, antwoordenblad en muziekronde, direct na aankoop per download.'",
+    );
+    expect(php).toContain("PUBQUIZ_PRODUCT_PRICE', '14.95'");
+  });
+
+  test("prints exactly the closing JSON keys parseSetupResult expects", () => {
+    expect(php).toContain("'productId'");
+    expect(php).toContain("'webhookId'");
+    expect(php).toContain("'deliveryUrl'");
+    expect(php).toContain("'consumerKey'");
+    expect(php).toContain("'consumerSecret'");
+  });
+});
