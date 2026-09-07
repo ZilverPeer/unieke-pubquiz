@@ -86,6 +86,10 @@ Empirical, in PowerShell (the user's shell), in the persistent review clone `%LO
 - The fix round follows the same verification budget and report template. Fix rounds are where red-first is easiest to skip; the message asks for the red output explicitly.
 - One fix round is the steady state. A second means the brief or the review was unclear; note that in the logbook.
 
+### Stopping processes an agent started
+
+Any agent that starts `next dev` (or any other server) stops it with `taskkill /PID <pid> /T /F` on Windows and then proves the port is closed (`netstat -ano | findstr :3000` empty). A `kill` on the Git Bash wrapper pid leaves the node tree alive; the #63 Spec reviewer did that and its orphaned worker consumed another test's pg-boss jobs on the shared stack, which looked like a broken master test until the orchestrator found the stray process.
+
 ## Merge
 
 Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master (after `npm ci` if the PR added a dependency), run `npm run shop:down` from the worktree (the shop stays up for the whole ticket, through review and fix rounds; the orchestrator is the one who stops it, once, here; its containers bind-mount the worktree's `shop/` directory), remove the worktree, append to the wave logbook. At the end of the wave: `npm run test:integration` once on master, stop the stacks, complete the logbook, then a retro with Erik before the next wave starts.
