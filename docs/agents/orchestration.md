@@ -17,7 +17,7 @@ How the main session runs a ticket from dispatch to merge. Written after the spe
 2. Run the smallest real command each integrating ticket will need (a `tsx` import, a render, a stack query). Fix environment blockers on master first.
 3. Decide which tickets touch the local Supabase stack. At most one of those is in flight at a time.
 4. Start the stack once (`npx supabase start && npm run db:reset`) if any ticket in the wave needs it. The orchestrator stops it at the end of the wave. Agents never start, stop or reset it unless the brief says so.
-5. Create the worktree and branch, claim the issue, then dispatch. Parallel dispatches go out in one message.
+5. Create the worktree and branch, claim the issue, then dispatch. Parallel dispatches go out in one message. Tickets that touch the shop (wp-env) run one at a time and share one worktree path, `../Pubquiz-wt-shop`: wp-env keys its containers to the directory it starts from, so a fresh worktree costs a full WordPress, plugin and theme download (about six minutes for #56) while a reused one restarts in about twenty seconds. The orchestrator removes and recreates the worktree between shop tickets; the wp-env instance survives that because it lives under `~/.wp-env`.
 
 ## Implementer brief (template)
 
@@ -78,7 +78,7 @@ Reports findings tagged HARD or JUDGEMENT with `file:line`, then a one-paragraph
 
 ### Spec reviewer
 
-Empirical, in PowerShell (the user's shell), in the persistent review clone `%LOCALAPPDATA%\Temp\pubquiz-review` (`git fetch && git checkout <branch> && git reset --hard && git clean -fdx -e node_modules && npm install`). A fresh clone is only worth its install time when the ticket touches `package.json` or build config. Reproduces every acceptance criterion with the real tools (real render, real ffprobe, real database counts), records the exact evidence, and proves any new failing-test claim by checking out master's version of the file under test. Uses the running stack; never starts, stops or resets it. Regenerates every sample from the branch tip; never inspects files an implementer left in its worktree (wave 4: a stale sample produced a false clipping finding). Cleans up its own output folders.
+Empirical, in PowerShell (the user's shell), in the persistent review clone `%LOCALAPPDATA%\Temp\pubquiz-review` (`git fetch && git checkout <branch> && git reset --hard && git clean -fdx -e node_modules && npm install`). A fresh clone is only worth its install time when the ticket touches `package.json` or build config. Reproduces every acceptance criterion with the real tools (real render, real ffprobe, real database counts), records the exact evidence, and proves any new failing-test claim by checking out master's version of the file under test. Uses the running stack; never starts, stops or resets it. For shop tickets it starts the shop from the review clone with `npm run shop:up` and finishes with `npm run shop:down` (never `wp-env destroy`), so the clone's wp-env instance stays cached for the next review. Regenerates every sample from the branch tip; never inspects files an implementer left in its worktree (wave 4: a stale sample produced a false clipping finding). Cleans up its own output folders.
 
 ### Fix round
 
