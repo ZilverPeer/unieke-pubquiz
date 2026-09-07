@@ -118,10 +118,6 @@ npx wp-env run cli -- wp eval '$w = new WC_Webhook(1); $o = wc_get_order(<order 
 
 Note: WooCommerce also sends its own unsigned connectivity **ping** (`webhook_id=<n>`, form-urlencoded, no `X-WC-Webhook-Signature`) whenever `wp wc webhook update --status=active` runs (i.e. every `npm run shop:up`), queued and delivered the same way as real deliveries. Our route correctly answers it `401` (no valid signature) -- this is expected WooCommerce core behaviour (`class-wc-webhook.php`), not a defect; it does not increment the webhook's `failure_count` and has no effect on order processing.
 
-## Warning: `npm run test:integration` destroys real orders on this stack
-
-`generate.integration.test.ts` scopes its own cleanup to the Compositions it created (by billing email), so it is safe to run against a stack that also has real orders placed through the local shop (as above). Every other integration suite that touches Orders/Quizzes/Compositions -- `orders`, `repository`, `recompose-quiz`, `reprocess-cli`, `prune`, `quiz-job` -- still wipes `orders`, `quizzes` and `compositions` wholesale in its own `beforeEach`/`afterEach`. Running `npm run test:integration` on the same stack you have been following this runbook on will delete every order you placed. Use a separate/throwaway stack for `npm run test:integration`, or place fresh orders again afterwards. Narrowing the remaining suites is a tracked follow-up.
-
 ## Stopping everything
 
 ```sh

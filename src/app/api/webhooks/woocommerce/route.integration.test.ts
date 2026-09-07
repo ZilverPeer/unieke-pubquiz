@@ -12,22 +12,58 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { resolveLocalStackConfig } from "@/repository";
 import type { Database } from "@/repository/database.types";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import { resolveDatabaseUrl } from "@/worker/boss";
 import { closeBossForTests } from "./boss-client";
 import { POST } from "./route";
 
 const SECRET = "test-secret";
 const FIXTURE_PATH = join(process.cwd(), "shop/fixtures/order-updated-processing.json");
+// The fixture's billing.email -- see shop/fixtures/order-updated-processing.json.
+// Every test in this file posts a copy of the same fixture (only the Woo
+// order id and line items vary), so they all resolve to this one billing
+// email; tracking it once here is enough for cleanup to scope to it.
+const FIXTURE_BILLING_EMAIL = "fixture-buyer@example.com";
 
 const config = resolveLocalStackConfig();
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
+// Scopes cleanup to exactly the fixture's billing email, so a real order
+// or another suite's fixture on the same stack survives this run (ticket
+// #51 -- see src/test-support/scoped-cleanup.ts). Every test in this file
+// posts a copy of the same fixture, so re-tracking the one billing email
+// before each cleanup() call (which clears tracking once it runs) is
+// enough.
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  cleanup.trackEmail(FIXTURE_BILLING_EMAIL);
+  await cleanup.cleanup();
+});
+
 function loadFixtureBody(): Record<string, unknown> {
   const captured = JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as { body: unknown };
   return captured.body as Record<string, unknown>;
+}
+
+async function quizzesForWooOrderId(wooOrderId: number): Promise<Database["public"]["Tables"]["quizzes"]["Row"][]> {
+  const { data: order, error: orderError } = await db
+    .from("orders")
+    .select("id")
+    .eq("woo_order_id", wooOrderId)
+    .maybeSingle();
+  if (orderError) throw orderError;
+  if (!order) return [];
+  const { data: quizzes, error: quizzesError } = await db
+    .from("quizzes")
+    .select()
+    .eq("order_id", order.id)
+    .order("woo_line_item_id", { ascending: true });
+  if (quizzesError) throw quizzesError;
+  return quizzes;
 }
 
 function sign(body: string, secret: string = SECRET): string {
@@ -60,13 +96,6 @@ async function countJobsForQueue(quizIds: string[]): Promise<number> {
     await client.end();
   }
 }
-
-beforeEach(async () => {
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error: ordersError } = await db.from("orders").delete().not("id", "is", null);
-  if (ordersError) throw ordersError;
-});
 
 afterAll(async () => {
   await closeBossForTests();
@@ -104,9 +133,9 @@ describe("POST /api/webhooks/woocommerce", () => {
       const first = await post(rawBody, sign(rawBody));
       expect(first.status).toBe(200);
 
-      const { data: quizzesAfterFirst } = await db.from("quizzes").select();
+      const quizzesAfterFirst = await quizzesForWooOrderId(body.id as number);
       expect(quizzesAfterFirst).toHaveLength(1);
-      const quizId = quizzesAfterFirst![0].id;
+      const quizId = quizzesAfterFirst[0].id;
 
       const second = await post(rawBody, sign(rawBody));
       expect(second.status).toBe(200);
@@ -114,9 +143,9 @@ describe("POST /api/webhooks/woocommerce", () => {
       const { data: orders } = await db.from("orders").select().eq("woo_order_id", body.id as number);
       expect(orders).toHaveLength(1);
 
-      const { data: quizzesAfterSecond } = await db.from("quizzes").select();
+      const quizzesAfterSecond = await quizzesForWooOrderId(body.id as number);
       expect(quizzesAfterSecond).toHaveLength(1);
-      expect(quizzesAfterSecond![0].id).toBe(quizId);
+      expect(quizzesAfterSecond[0].id).toBe(quizId);
 
       const jobCount = await countJobsForQueue([quizId]);
       expect(jobCount).toBe(1);
@@ -143,11 +172,11 @@ describe("POST /api/webhooks/woocommerce", () => {
       const response = await post(rawBody, sign(rawBody));
       expect(response.status).toBe(200);
 
-      const { data: quizzes } = await db.from("quizzes").select().order("woo_line_item_id", { ascending: true });
+      const quizzes = await quizzesForWooOrderId(body.id as number);
       expect(quizzes).toHaveLength(2);
 
-      const good = quizzes!.find((q) => q.status === "pending");
-      const bad = quizzes!.find((q) => q.status === "failed");
+      const good = quizzes.find((q) => q.status === "pending");
+      const bad = quizzes.find((q) => q.status === "failed");
 
       expect(bad).toBeDefined();
       expect(bad!.failure_reason).toMatch(/unknown category id "999"/i);
@@ -171,10 +200,10 @@ describe("POST /api/webhooks/woocommerce", () => {
     const response = await post(rawBody, sign(rawBody));
     expect(response.status).toBe(200);
 
-    const { data: quizzes } = await db.from("quizzes").select();
+    const quizzes = await quizzesForWooOrderId(body.id as number);
     expect(quizzes).toHaveLength(3);
 
-    const jobCount = await countJobsForQueue(quizzes!.map((q) => q.id));
+    const jobCount = await countJobsForQueue(quizzes.map((q) => q.id));
     expect(jobCount).toBe(3);
   }, 30_000);
 });

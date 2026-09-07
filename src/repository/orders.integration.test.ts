@@ -4,8 +4,9 @@
  * sequence. Never mocks Supabase.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { CategoryPick, QuizConfig } from "@/domain";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import type { Database } from "./database.types";
 import { createOrderRepository, IllegalQuizTransitionError, resolveLocalStackConfig } from "./index";
 
@@ -15,13 +16,14 @@ const repository = createOrderRepository(config);
 // is only exercised through its public interface.
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
-beforeEach(async () => {
-  // quizzes references orders; delete quizzes first since orders has no
-  // cascade (delete-restricted while Quizzes exist, by design).
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error: ordersError } = await db.from("orders").delete().not("id", "is", null);
-  if (ordersError) throw ordersError;
+// Scopes cleanup to exactly the billing emails this suite's tests track,
+// so a real order placed through the local shop, or another suite's
+// fixture, on the same stack survives this run (ticket #51 -- see
+// src/test-support/scoped-cleanup.ts).
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  await cleanup.cleanup();
 });
 
 let nextWooOrderId = 900_000;
@@ -56,7 +58,7 @@ describe("upsertOrder", () => {
 
     const { order, quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "customer@example.com",
+      billingEmail: cleanup.trackEmail("customer@example.com"),
       wooStatus: "processing",
       rawPayload: { id: wooOrderId },
       lineItems: [{ wooLineItemId: 1, quantity: 2, config: buildConfig() }],
@@ -80,6 +82,10 @@ describe("upsertOrder", () => {
 
   it("normalises billing email trimmed and lower-cased", async () => {
     const wooOrderId = freshWooOrderId();
+    // The repository normalises this to "customer@example.com" -- track
+    // that normalised form directly, since cleanup filters on the
+    // billing_email column's stored (already-normalised) value.
+    cleanup.trackEmail("customer@example.com");
 
     const { order } = await repository.upsertOrder({
       wooOrderId,
@@ -96,7 +102,7 @@ describe("upsertOrder", () => {
     const wooOrderId = freshWooOrderId();
     const input = {
       wooOrderId,
-      billingEmail: "repeat@example.com",
+      billingEmail: cleanup.trackEmail("repeat@example.com"),
       wooStatus: "processing",
       rawPayload: { id: wooOrderId },
       lineItems: [{ wooLineItemId: 1, quantity: 2, config: buildConfig() }],
@@ -121,7 +127,7 @@ describe("upsertOrder", () => {
     const wooOrderId = freshWooOrderId();
     const input = {
       wooOrderId,
-      billingEmail: "progressed@example.com",
+      billingEmail: cleanup.trackEmail("progressed@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -142,7 +148,7 @@ describe("upsertOrder", () => {
     const wooOrderId = freshWooOrderId();
     await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "status-update@example.com",
+      billingEmail: cleanup.trackEmail("status-update@example.com"),
       wooStatus: "processing",
       rawPayload: { id: wooOrderId, note: "first" },
       lineItems: [],
@@ -150,7 +156,7 @@ describe("upsertOrder", () => {
 
     const { order } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "status-update@example.com",
+      billingEmail: cleanup.trackEmail("status-update@example.com"),
       wooStatus: "completed",
       rawPayload: { id: wooOrderId, note: "second" },
       lineItems: [],
@@ -169,7 +175,7 @@ describe("transitionQuizStatus", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "transition@example.com",
+      billingEmail: cleanup.trackEmail("transition@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -217,7 +223,7 @@ async function createComposition(): Promise<string> {
   const { data, error } = await db
     .from("compositions")
     .insert({
-      billing_email: "composition@example.com",
+      billing_email: cleanup.trackEmail("composition@example.com"),
       locale: "nl",
       quiz_mode: "mixed",
       requested_difficulty: "mixed",
@@ -234,7 +240,7 @@ describe("recordDelivery", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "delivery@example.com",
+      billingEmail: cleanup.trackEmail("delivery@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -258,7 +264,7 @@ describe("recordDelivery", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "delivery-illegal@example.com",
+      billingEmail: cleanup.trackEmail("delivery-illegal@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -276,7 +282,7 @@ describe("markPruned / clearPruned", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "prune@example.com",
+      billingEmail: cleanup.trackEmail("prune@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -301,7 +307,7 @@ describe("markPruned / clearPruned", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "unprune@example.com",
+      billingEmail: cleanup.trackEmail("unprune@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -322,7 +328,7 @@ describe("markPruned / clearPruned", () => {
 
 describe("listQuizzesByBillingEmail", () => {
   it("lists newest first and normalises the lookup email", async () => {
-    const email = "history@example.com";
+    const email = cleanup.trackEmail("history@example.com");
     const firstOrder = freshWooOrderId();
     await repository.upsertOrder({
       wooOrderId: firstOrder,
@@ -351,7 +357,7 @@ describe("listQuizzesByBillingEmail", () => {
     const wooOrderId = freshWooOrderId();
     await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "owner-a@example.com",
+      billingEmail: cleanup.trackEmail("owner-a@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -368,7 +374,7 @@ describe("listQuizzesDeliveredBefore", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "prune-sweep@example.com",
+      billingEmail: cleanup.trackEmail("prune-sweep@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -392,7 +398,7 @@ describe("listQuizzesDeliveredBefore", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "prune-sweep-cleared@example.com",
+      billingEmail: cleanup.trackEmail("prune-sweep-cleared@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -415,7 +421,7 @@ describe("getQuizById / getQuizByDownloadToken", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "get-by-id@example.com",
+      billingEmail: cleanup.trackEmail("get-by-id@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -432,7 +438,7 @@ describe("getQuizById / getQuizByDownloadToken", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "get-by-token@example.com",
+      billingEmail: cleanup.trackEmail("get-by-token@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -455,7 +461,7 @@ describe("listPendingQuizzes", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "sweep@example.com",
+      billingEmail: cleanup.trackEmail("sweep@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 2, config: buildConfig() }],
@@ -474,7 +480,7 @@ describe("order deletion is blocked while Quizzes reference it", () => {
     const wooOrderId = freshWooOrderId();
     const { order } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "delete-blocked@example.com",
+      billingEmail: cleanup.trackEmail("delete-blocked@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -491,7 +497,7 @@ describe("Composition deletion is blocked while a Quiz references it", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "composition-delete-blocked@example.com",
+      billingEmail: cleanup.trackEmail("composition-delete-blocked@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],
@@ -512,7 +518,7 @@ describe("deleting a Quiz never affects its Composition", () => {
     const wooOrderId = freshWooOrderId();
     const { quizzes } = await repository.upsertOrder({
       wooOrderId,
-      billingEmail: "composition-unaffected@example.com",
+      billingEmail: cleanup.trackEmail("composition-unaffected@example.com"),
       wooStatus: "processing",
       rawPayload: {},
       lineItems: [{ wooLineItemId: 1, quantity: 1, config: buildConfig() }],

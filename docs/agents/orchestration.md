@@ -39,11 +39,9 @@ Every brief contains, in this order:
 Run once, right before pushing, not after every edit:
 
 - `npm run typecheck`, `npm test`, `npx eslint src scripts`: always.
-- `npm run test:integration`: implementers never run it (trial from spec 2 wave 2, agreed 2026-09-07 after wave 1: implementers repeating the suite, with resets, was the waste). The Spec reviewer runs it once on the branch; the orchestrator runs it once on master at the end of the wave. An implementer that adds an integration test runs only that file.
+- `npm run test:integration`: implementers never run it (trial from spec 2 wave 2, agreed 2026-09-07 after wave 1: implementers repeating the suite, with resets, was the waste). The Spec reviewer runs it once on the branch; the orchestrator runs it once on master at the end of the wave. An implementer that adds an integration test runs only that file. Every suite scopes its own cleanup to the rows it created (by billing email, or by id for the Order-less case -- `src/test-support/scoped-cleanup.ts`, ticket #51), so the suites clean up after themselves and running the full suite is safe even against a stack that also has real orders on it.
 - `npm run db:reset`: agents never run it. If a test fails for state reasons, report the failing assertion; the orchestrator decides.
 - `npm run build`: never, unless the ticket changes the Next.js app itself.
-
-**Warning (as of ticket #43's fix round):** `generate.integration.test.ts` scopes its cleanup to the Compositions it created itself (by billing email), so it is safe to run against a stack that also has real orders on it. Every other integration suite that touches Orders/Quizzes/Compositions -- `orders`, `repository`, `recompose-quiz`, `reprocess-cli`, `prune`, `quiz-job` -- still wipes `orders`, `quizzes` and `compositions` wholesale in its own `beforeEach`/`afterEach`. Running `npm run test:integration` on a stack that has real orders placed through the local shop (e.g. while following `docs/runbook-local-loop.md`) destroys those orders. Narrowing the remaining suites the same way `generate.integration.test.ts` was narrowed is a tracked follow-up, not yet done.
 - While iterating, run only the affected test file (`npx vitest run <file>`).
 
 ### Report template
