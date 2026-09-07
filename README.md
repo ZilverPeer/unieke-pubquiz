@@ -29,6 +29,8 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 | `DATABASE_URL` | pg-boss's own store (`src/worker/boss.ts`) | `postgresql://postgres:postgres@127.0.0.1:45322/postgres` |
 | `PUBQUIZ_WORKER` | set to `1` to run the pg-boss worker inside `next dev`/the container (`src/instrumentation.ts`) | unset (worker off) |
 
+`WOOCOMMERCE_WEBHOOK_SECRET` is read independently by two separate processes -- `npm run shop:up` rewrites the shop's webhook secret from it on every run, and the app reads it (`route.ts`) to verify each delivery -- so the shell running `shop:up` and the shell running the app must agree on the same value (or both leave it unset, so both fall back to the same `test-secret` default) or every delivery will 401.
+
 See `.env.example`, `src/app/api/webhooks/woocommerce/README.md`, `src/worker/README.md` and `shop/README.md` for the full detail behind each one.
 
 ## Public routes
