@@ -20,6 +20,23 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment variables
+
+| Variable | Used by | Default |
+|---|---|---|
+| `WOOCOMMERCE_WEBHOOK_SECRET` | webhook signature verification (`src/app/api/webhooks/woocommerce`) and `npm run shop:up` | `test-secret` (local only) |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | repository connection to the local Supabase stack (`src/repository/local-stack-config.ts`) | resolved via `supabase status -o env` |
+| `DATABASE_URL` | pg-boss's own store (`src/worker/boss.ts`) | `postgresql://postgres:postgres@127.0.0.1:45322/postgres` |
+| `PUBQUIZ_WORKER` | set to `1` to run the pg-boss worker inside `next dev`/the container (`src/instrumentation.ts`) | unset (worker off) |
+
+`WOOCOMMERCE_WEBHOOK_SECRET` is read independently by two separate processes -- `npm run shop:up` rewrites the shop's webhook secret from it on every run, and the app reads it (`route.ts`) to verify each delivery -- so the shell running `shop:up` and the shell running the app must agree on the same value (or both leave it unset, so both fall back to the same `test-secret` default) or every delivery will 401.
+
+See `.env.example`, `src/app/api/webhooks/woocommerce/README.md`, `src/worker/README.md` and `shop/README.md` for the full detail behind each one.
+
+## Public routes
+
+`/api/webhooks/woocommerce` has no session or API key to check -- it verifies its own HMAC signature instead (see `src/app/api/webhooks/woocommerce/README.md`). No auth middleware exists yet (no `src/middleware.ts` or `src/proxy.ts`); when one is added, this route must stay excluded from it.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
