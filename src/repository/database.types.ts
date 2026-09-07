@@ -304,6 +304,7 @@ export type Database = {
           id: string
           locale: Database["public"]["Enums"]["locale"]
           order_id: string
+          pruned_at: string | null
           quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           sequence: number
@@ -321,6 +322,7 @@ export type Database = {
           id?: string
           locale: Database["public"]["Enums"]["locale"]
           order_id: string
+          pruned_at?: string | null
           quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           sequence: number
@@ -338,6 +340,7 @@ export type Database = {
           id?: string
           locale?: Database["public"]["Enums"]["locale"]
           order_id?: string
+          pruned_at?: string | null
           quiz_mode?: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty?: Database["public"]["Enums"]["requested_difficulty"]
           sequence?: number

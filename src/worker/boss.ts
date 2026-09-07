@@ -24,12 +24,21 @@ export function resolveDatabaseUrl(): string {
   return process.env.DATABASE_URL ?? DEFAULT_LOCAL_DATABASE_URL;
 }
 
-/** Overrides applied on top of the queue's defaults -- test-only escape hatch for fast retries. */
+/**
+ * Overrides applied on top of the queue's defaults -- test-only escape
+ * hatch for fast retries. `pollingIntervalSeconds` is deliberately not
+ * here: it is a `boss.work()`-time option (pg-boss's `JobPollingOptions`,
+ * default 2s idle poll), not a `createQueue` one -- `createQueue` has no
+ * such option and silently ignores an unknown key, so passing it here
+ * would look like it worked without ever taking effect. A caller that
+ * wants faster polling passes `pollingIntervalSeconds` in its own
+ * `boss.work(name, { pollingIntervalSeconds, ... }, handler)` call instead
+ * (see quiz-job.integration.test.ts's retry-policy suite).
+ */
 export interface QuizQueueOverrides {
   retryLimit?: number;
   retryDelay?: number;
   retryBackoff?: boolean;
-  pollingIntervalSeconds?: number;
 }
 
 /**

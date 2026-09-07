@@ -4,6 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CompositionRecord } from "@/domain";
+import { SLOT_COUNT } from "@/domain";
 import type { Database } from "./database.types";
 
 // Billing email is the no-repeat rule's key, but WooCommerce doesn't
@@ -60,4 +61,45 @@ export async function persistComposition(
   if (itemsError) throw itemsError;
 
   return { compositionId: composition.id };
+}
+
+/**
+ * Reads a persisted Composition back out, for the `--composition` dev
+ * script flag (ticket #42): re-rendering an existing Composition never
+ * re-samples, so it needs the exact slots (in slot/position order) rather
+ * than a fresh sample.
+ */
+export async function getCompositionById(
+  client: SupabaseClient<Database>,
+  compositionId: string,
+): Promise<CompositionRecord | null> {
+  const { data: compositionRow, error: compositionError } = await client
+    .from("compositions")
+    .select()
+    .eq("id", compositionId)
+    .maybeSingle();
+  if (compositionError) throw compositionError;
+  if (!compositionRow) return null;
+
+  const { data: itemRows, error: itemsError } = await client
+    .from("composition_items")
+    .select("slot_index, position, item_id")
+    .eq("composition_id", compositionId)
+    .order("slot_index", { ascending: true })
+    .order("position", { ascending: true });
+  if (itemsError) throw itemsError;
+
+  const slots: string[][] = Array.from({ length: SLOT_COUNT }, () => []);
+  for (const row of itemRows) {
+    slots[row.slot_index].push(row.item_id);
+  }
+
+  return {
+    billingEmail: compositionRow.billing_email,
+    locale: compositionRow.locale,
+    quizMode: compositionRow.quiz_mode,
+    requestedDifficulty: compositionRow.requested_difficulty,
+    seed: compositionRow.seed,
+    composition: { slots },
+  };
 }
