@@ -7,6 +7,7 @@
  */
 import type { CompositionRecord, Locale, OrderRecord, QuizRecord, QuizStatus } from "@/domain";
 import { createSupabaseClient, type RepositoryConfig } from "./client";
+import { loadCategoryIds as loadCategoryIdsImpl } from "./categories";
 import {
   getCompositionById as getCompositionByIdImpl,
   loadExcludedItemIds as loadExcludedItemIdsImpl,
@@ -161,4 +162,19 @@ export type RemoveDeliverables = (storagePaths: readonly string[]) => Promise<vo
 export function createDeliverableRemover(config: RepositoryConfig): RemoveDeliverables {
   const client = createSupabaseClient(config);
   return (storagePaths) => deleteFromDeliverablesBucket(client, storagePaths);
+}
+
+/**
+ * Every existing Category id, as strings -- a sibling factory, not a method
+ * on ContentRepository or OrderRepository (spec #36, ticket #39): it's
+ * needed only by the webhook parser (validating a checkout Category pick
+ * refers to a real Category before accepting it), and neither existing
+ * repository had this query already (an interface gap flagged by the
+ * ticket #39 brief; this is the smallest addition that closes it).
+ */
+export type LoadCategoryIds = () => Promise<Set<string>>;
+
+export function createCategoryIdLookup(config: RepositoryConfig): LoadCategoryIds {
+  const client = createSupabaseClient(config);
+  return () => loadCategoryIdsImpl(client);
 }
