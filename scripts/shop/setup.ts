@@ -4,7 +4,11 @@
  * start` has already run (the npm script chains it first); this script
  * covers everything wp-env itself cannot express declaratively:
  *   - the Mailpit mail-catcher container (see lib/mailpit.ts)
- *   - the Pubquiz product (created once, reused after)
+ *   - the Storefront theme (active), the Dutch site/plugin/theme language,
+ *     and the Dutch WooCommerce store settings (see
+ *     lib/wordpress-settings.ts, ticket #56)
+ *   - the Pubquiz product, Dutch name/short description/placeholder price
+ *     (created once, Dutch fields re-applied every run -- see lib/product.ts)
  *   - the Advanced Product Fields field group on that product (re-applied
  *     every run -- cheap and keeps it in sync with this script)
  *   - the `order.updated` webhook (created once, delivery_url/secret kept
@@ -12,9 +16,10 @@
  *   - the "pubquiz-pipeline" WooCommerce REST API key the deliver module
  *     (#41) uses, upserted into .env.local (see lib/rest-api-key.ts)
  *
- * WooCommerce, the Advanced Product Fields plugin, and the pubquiz-* mu
- * plugins are installed/activated by wp-env itself per .wp-env.json and
- * need no action here.
+ * WooCommerce, the Advanced Product Fields plugin, the Storefront theme, and
+ * the pubquiz-* mu plugins are installed by wp-env itself per .wp-env.json;
+ * this script only activates/configures what wp-env has no declarative
+ * field for.
  */
 import "../load-env";
 import { wpCli, wpCliJson } from "./lib/wp-cli";
@@ -22,6 +27,7 @@ import { getOrCreateProductId } from "./lib/product";
 import { ensureWebhook } from "./lib/webhook";
 import { ensureMailpit } from "./lib/mailpit";
 import { ensureRestApiKey } from "./lib/rest-api-key";
+import { ensureDutchLanguage, ensureStorefrontTheme, ensureWooCommerceDutchSettings } from "./lib/wordpress-settings";
 import { WP_ENV_PORT } from "./lib/config";
 
 /** Finds the WooCommerce page by slug (e.g. "cart", "checkout") and replaces its content with the given classic shortcode, if it isn't already. */
@@ -43,6 +49,10 @@ function applyClassicShortcode(slug: string, shortcode: string): void {
 
 function main() {
   const { uiUrl: mailpitUrl } = ensureMailpit();
+
+  ensureStorefrontTheme();
+  ensureDutchLanguage();
+  ensureWooCommerceDutchSettings();
 
   const productId = getOrCreateProductId();
 
