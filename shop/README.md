@@ -462,10 +462,15 @@ one:
    a `pubquiz_every_5s` schedule via Action Scheduler's own
    `action_scheduler_run_schedule` filter (`ActionScheduler_QueueRunner.php`
    line 91), the first time it finds the event on any other schedule; once
-   rescheduled, every later request pays for one `wp_get_schedule()` query
-   and nothing else. Not gated to `local`/`development` -- that one query
-   per page load is cheap even in production when the queue is already
-   empty, and ticket #58 did not ask for an environment guard here.
+   rescheduled, every later request pays for one `wp_get_schedule()` read
+   against the `cron` option -- autoloaded, so an in-memory lookup, not a
+   query -- and nothing else. **Gated to `local`/`development`**, same as
+   `pubquiz-mailpit-smtp.php`: the 5-second schedule only compensates for
+   this local setup's two broken delivery paths (no real HTTP request for
+   a WP-CLI order change, and the ticker container's requests can't carry
+   Action Scheduler's own async loopback request back out anywhere useful)
+   -- a real deployment's async runner already delivers within the same
+   request cycle, so this plugin is a no-op in production.
 
 **Troubleshooting:** if an order sits in `processing` for more than a
 minute, check `docker ps` for `pubquiz-cron-ticker`; if it's missing or

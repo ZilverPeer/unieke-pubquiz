@@ -33,15 +33,38 @@
  * hook (default priority 10) always runs after it within the same
  * request.
  *
- * Not gated to `local`/`development` like `pubquiz-mailpit-smtp.php` --
- * once the event is confirmed on `pubquiz_every_5s`, every later page load
- * pays for exactly one `wp_get_schedule()` query and nothing else, so this
- * is safe to ship to production too; ticket #58 did not ask for an
- * environment guard here.
+ * The first reschedule is an unlocked WP-Cron read-modify-write against
+ * the `cron` option (`wp_unschedule_event()`/`wp_schedule_event()` both
+ * read the option, edit it in PHP, then write it back) -- the same window
+ * Action Scheduler's own `init()` already has around its `cron` option
+ * write, so two concurrent first requests could in principle both read
+ * the pre-reschedule state and briefly leave two `action_scheduler_run_queue`
+ * events scheduled. Harmless: the queue runner itself is idempotent
+ * (running it twice for the same due actions processes each action once,
+ * since claiming an action is what actually gates work), and the next
+ * request settles back to one event via the `wp_get_schedule()` check
+ * above. Once on `pubquiz_every_5s`, every later request pays for exactly
+ * one `wp_get_schedule()` read against `cron` -- an autoloaded option, so
+ * an in-memory lookup, not a query -- and nothing else.
+ *
+ * Gated to `wp_get_environment_type()` `local`/`development`, same as
+ * `pubquiz-mailpit-smtp.php`: the 5-second schedule only compensates for
+ * this *local* setup's two broken delivery paths (a WP-CLI order change
+ * generates no real HTTP request for pseudo-cron to run on at all, and the
+ * ticker container's requests can't carry Action Scheduler's own async
+ * loopback request back out to a real webserver) -- a real deployment has
+ * a working async runner (`ActionScheduler_AsyncRequest_QueueRunner`) that
+ * already delivers within the same request cycle, so forcing every
+ * production page load onto a 5-second WP-Cron schedule would be pure
+ * overhead for no benefit there.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
+}
+
+if ( ! in_array( wp_get_environment_type(), array( 'local', 'development' ), true ) ) {
+    return;
 }
 
 add_filter(
@@ -72,8 +95,9 @@ add_action(
         $hook         = ActionScheduler_QueueRunner::WP_CRON_HOOK;
         $cron_context = array( 'WP Cron' ); // Same args ActionScheduler_QueueRunner::init() schedules with.
 
-        // Idempotent: once the event is confirmed on the fast schedule,
-        // every later request does nothing beyond this one query.
+        // Once the event is confirmed on the fast schedule, every later
+        // request does nothing beyond this one in-memory read of the
+        // autoloaded `cron` option.
         if ( 'pubquiz_every_5s' === wp_get_schedule( $hook, $cron_context ) ) {
             return;
         }
