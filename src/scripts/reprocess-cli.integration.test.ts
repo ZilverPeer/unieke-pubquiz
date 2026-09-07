@@ -12,7 +12,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { PgBoss } from "pg-boss";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { CategoryPick, QuizConfig } from "@/domain";
 import { QUIZ_QUEUE, createQuizQueue, resolveDatabaseUrl } from "@/worker/boss";
 import { handleQuizJob } from "@/worker/quiz-job";
@@ -25,6 +25,7 @@ import {
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
 import { generateQuiz } from "@/scripts/generate-quiz";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 
 const config = resolveLocalStackConfig();
 const orderRepository = createOrderRepository(config);
@@ -32,13 +33,23 @@ const contentRepository = createRepository(config);
 const uploadDeliverable = createDeliverableUploader(config);
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
+// Scopes cleanup to exactly the billing emails this suite hands out via
+// freshEmail(), so a real order or another suite's fixture on the same
+// stack survives this run (ticket #51 -- see
+// src/test-support/scoped-cleanup.ts).
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  await cleanup.cleanup();
+});
+
 let nextWooOrderId = 950_000;
 function freshWooOrderId(): number {
   return nextWooOrderId++;
 }
 
 function freshEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`;
+  return cleanup.trackEmail(`${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`);
 }
 
 const FULLY_RANDOM_PICKS: CategoryPick[] = new Array(8).fill(undefined);
@@ -83,15 +94,6 @@ function runCli(
   );
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
-
-beforeEach(async () => {
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error: ordersError } = await db.from("orders").delete().not("id", "is", null);
-  if (ordersError) throw ordersError;
-  const { error: compositionsError } = await db.from("compositions").delete().not("id", "is", null);
-  if (compositionsError) throw compositionsError;
-});
 
 describe("--retry-quiz CLI", () => {
   let boss: PgBoss;

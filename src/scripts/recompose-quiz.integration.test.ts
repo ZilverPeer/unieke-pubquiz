@@ -8,7 +8,7 @@
  * catch/print behaviour).
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CategoryPick, QuizConfig } from "@/domain";
 import { DELIVERABLE_FILES, DOWNLOAD_VALIDITY_DAYS } from "@/domain";
 import type { Deliverer } from "@/deliver";
@@ -22,6 +22,7 @@ import {
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
 import { generateQuiz } from "@/scripts/generate-quiz";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import { pruneDeliverables } from "@/worker/prune";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "@/worker/quiz-job";
 import { recomposeQuiz } from "./recompose-quiz";
@@ -34,13 +35,23 @@ const removeDeliverables = createDeliverableRemover(config);
 
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
+// Scopes cleanup to exactly the billing emails this suite hands out via
+// freshEmail(), so a real order or another suite's fixture on the same
+// stack survives this run (ticket #51 -- see
+// src/test-support/scoped-cleanup.ts).
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  await cleanup.cleanup();
+});
+
 let nextWooOrderId = 900_000;
 function freshWooOrderId(): number {
   return nextWooOrderId++;
 }
 
 function freshEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`;
+  return cleanup.trackEmail(`${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`);
 }
 
 const FULLY_RANDOM_PICKS: CategoryPick[] = new Array(8).fill(undefined);
@@ -82,13 +93,14 @@ function buildJobDeps(): QuizJobDeps {
   };
 }
 
-async function deliverFreshQuiz(prefix: string): Promise<{ quizId: string; compositionId: string }> {
-  const quizId = await insertPendingQuiz(freshEmail(prefix));
+async function deliverFreshQuiz(prefix: string): Promise<{ quizId: string; compositionId: string; email: string }> {
+  const email = freshEmail(prefix);
+  const quizId = await insertPendingQuiz(email);
   const job: QuizJobLike = { data: { quizId }, retryCount: 0, retryLimit: 3 };
   await handleQuizJob(job, buildJobDeps());
   const quiz = await orderRepository.getQuizById(quizId);
   if (!quiz?.compositionId) throw new Error("test setup failed: Quiz was not delivered");
-  return { quizId, compositionId: quiz.compositionId };
+  return { quizId, compositionId: quiz.compositionId, email };
 }
 
 async function backdateDeliveredAt(quizId: string, daysAgo: number): Promise<void> {
@@ -103,27 +115,21 @@ async function listDeliverableObjects(quizId: string): Promise<{ name: string; s
   return data.map((object) => ({ name: object.name, size: (object.metadata as { size: number })?.size }));
 }
 
-async function countCompositions(): Promise<number> {
-  const { count, error } = await db.from("compositions").select("*", { count: "exact", head: true });
+async function countCompositions(billingEmail: string): Promise<number> {
+  const { count, error } = await db
+    .from("compositions")
+    .select("*", { count: "exact", head: true })
+    .eq("billing_email", billingEmail);
   if (error) throw error;
   return count ?? 0;
 }
 
-beforeEach(async () => {
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error: ordersError } = await db.from("orders").delete().not("id", "is", null);
-  if (ordersError) throw ordersError;
-  const { error: compositionsError } = await db.from("compositions").delete().not("id", "is", null);
-  if (compositionsError) throw compositionsError;
-});
-
 describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => {
   it("re-renders and re-uploads the same Deliverables without a new Composition row, and calls the deliverer once with four files", async () => {
-    const { quizId, compositionId } = await deliverFreshQuiz("recompose-happy");
+    const { quizId, compositionId, email } = await deliverFreshQuiz("recompose-happy");
 
     const objectsBefore = await listDeliverableObjects(quizId);
-    const compositionsBefore = await countCompositions();
+    const compositionsBefore = await countCompositions(email);
 
     const fakeDeliverer: Deliverer = {
       deliverQuiz: vi.fn().mockResolvedValue(undefined),
@@ -146,7 +152,7 @@ describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => 
     expect(call.files).toHaveLength(DELIVERABLE_FILES.length);
     expect(call.files.map((f: { file: string }) => f.file).sort()).toEqual([...DELIVERABLE_FILES].sort());
 
-    const compositionsAfter = await countCompositions();
+    const compositionsAfter = await countCompositions(email);
     expect(compositionsAfter).toBe(compositionsBefore);
 
     const objectsAfter = await listDeliverableObjects(quizId);

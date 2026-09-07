@@ -4,9 +4,10 @@
  * see README.md for the run sequence. Never mocks Supabase.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { CompositionRecord } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT } from "@/domain";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import type { Database } from "./database.types";
 import { createRepository, resolveLocalStackConfig } from "./index";
 
@@ -18,17 +19,15 @@ const db: SupabaseClient<Database> = createClient(config.url, config.serviceRole
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-beforeEach(async () => {
-  // Quizzes (spec #36) can reference a Composition (composition_id), which
-  // blocks deleting it -- delete quizzes first so a leftover Quiz row from
-  // another integration test file (execution order across files sharing
-  // one Postgres isn't guaranteed, see vitest.integration.config.mts) never
-  // blocks this cleanup. compositions cascade-deletes composition_items;
-  // seed Items are never touched.
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error } = await db.from("compositions").delete().not("id", "is", null);
-  if (error) throw error;
+// Scopes cleanup to exactly the billing emails this suite's tests track,
+// so a Composition belonging to a real order on the same stack, or another
+// suite's fixture, survives this run (ticket #51 -- see
+// src/test-support/scoped-cleanup.ts). Only Compositions -- this file never
+// creates an Order or Quiz.
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  await cleanup.cleanup();
 });
 
 async function itemIdsMissingLocale(kind: "text" | "picture" | "music", missing: "nl" | "en") {
@@ -136,7 +135,7 @@ describe("loadExcludedItemIds", () => {
     const pool = await repository.loadPool("nl");
     const firstIds = pool.slice(0, 80).map((e) => e.item.id);
     const secondIds = pool.slice(80, 160).map((e) => e.item.id);
-    const email = "customer@example.com";
+    const email = cleanup.trackEmail("customer@example.com");
 
     await repository.persistComposition(buildRecord(email, firstIds));
     const afterFirst = await repository.loadExcludedItemIds(email);
@@ -152,7 +151,7 @@ describe("loadExcludedItemIds", () => {
     const pool = await repository.loadPool("nl");
     const ids = pool.slice(0, 80).map((e) => e.item.id);
 
-    await repository.persistComposition(buildRecord("review-probe@example.com", ids));
+    await repository.persistComposition(buildRecord(cleanup.trackEmail("review-probe@example.com"), ids));
     const result = await repository.loadExcludedItemIds("  REVIEW-PROBE@EXAMPLE.COM  ");
 
     expect(result).toEqual(new Set(ids));
@@ -162,7 +161,7 @@ describe("loadExcludedItemIds", () => {
     const pool = await repository.loadPool("nl");
     const idsForA = pool.slice(0, 80).map((e) => e.item.id);
 
-    await repository.persistComposition(buildRecord("email-a@example.com", idsForA));
+    await repository.persistComposition(buildRecord(cleanup.trackEmail("email-a@example.com"), idsForA));
     const excludedForB = await repository.loadExcludedItemIds("email-b@example.com");
 
     expect(excludedForB).toEqual(new Set());
@@ -173,7 +172,7 @@ describe("persistComposition", () => {
   it("stores slot_index and position reproducing the Composition's slots in order", async () => {
     const pool = await repository.loadPool("nl");
     const ids = pool.slice(0, 80).map((e) => e.item.id);
-    const record = buildRecord("slots@example.com", ids);
+    const record = buildRecord(cleanup.trackEmail("slots@example.com"), ids);
 
     const { compositionId } = await repository.persistComposition(record);
 

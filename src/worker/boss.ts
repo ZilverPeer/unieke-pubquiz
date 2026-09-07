@@ -49,14 +49,30 @@ export interface QuizQueueOverrides {
  * default for retryable failures (see quiz-job.ts); a terminal failure
  * (shortfall, invalid config) completes the job directly instead of
  * throwing, so it is never retried regardless of this policy.
+ *
+ * `createQueue`'s options only take effect the first time the queue is
+ * created -- pg-boss stores its own state in Postgres, so a later call
+ * against a stack where `quiz-generation` already exists (a prior process,
+ * or an earlier test file sharing this suite's Postgres -- see
+ * vitest.integration.config.mts's `fileParallelism: false`) would
+ * otherwise silently keep whichever options created it first (PR #53's fix
+ * round: this is what broke quiz-job.integration.test.ts's retry-policy
+ * suite under full-suite contention -- its fast-retry overrides never
+ * applied against a queue `startBoss()`'s no-overrides call had already
+ * created with the production defaults). `updateQueue` applies its options
+ * on every call regardless, so it's called every time too -- the process
+ * that starts last always wins, which is what the worker wants at startup
+ * (its own defaults should win over a stale queue from a previous run) and
+ * what the tests need. `policy` isn't part of `UpdateQueueOptions` (it's
+ * fixed at creation), so it stays on `createQueue` only.
  */
 export async function createQuizQueue(boss: PgBoss, overrides: QuizQueueOverrides = {}): Promise<void> {
-  await boss.createQueue(QUIZ_QUEUE, {
-    policy: "exclusive",
-    retryLimit: overrides.retryLimit ?? 3,
-    retryBackoff: overrides.retryBackoff ?? true,
-    retryDelay: overrides.retryDelay ?? 5,
-  });
+  const retryLimit = overrides.retryLimit ?? 3;
+  const retryBackoff = overrides.retryBackoff ?? true;
+  const retryDelay = overrides.retryDelay ?? 5;
+
+  await boss.createQueue(QUIZ_QUEUE, { policy: "exclusive", retryLimit, retryBackoff, retryDelay });
+  await boss.updateQueue(QUIZ_QUEUE, { retryLimit, retryBackoff, retryDelay });
 }
 
 /** Creates and starts a pg-boss instance against `resolveDatabaseUrl()`, with the quiz queue created. */

@@ -11,7 +11,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PgBoss } from "pg-boss";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { CategoryPick, Locale, QuizConfig } from "@/domain";
 import { downloadPath } from "@/domain";
 import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
@@ -24,6 +24,7 @@ import {
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
 import type { Deliverer, DeliveredFile } from "@/deliver";
+import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import { createQuizQueue, QUIZ_QUEUE, resolveDatabaseUrl } from "./boss";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "./quiz-job";
 import { sweepPendingQuizzes } from "./sweep";
@@ -38,13 +39,23 @@ const APP_BASE_URL = "http://localhost:3000";
 // src/repository/orders.integration.test.ts for the same convention.
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
 
+// Scopes cleanup to exactly the billing emails this suite hands out via
+// freshEmail(), so a real order or another suite's fixture on the same
+// stack survives this run (ticket #51 -- see
+// src/test-support/scoped-cleanup.ts).
+const cleanup = createScopedCleanup(db);
+
+afterEach(async () => {
+  await cleanup.cleanup();
+});
+
 let nextWooOrderId = 800_000;
 function freshWooOrderId(): number {
   return nextWooOrderId++;
 }
 
 function freshEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`;
+  return cleanup.trackEmail(`${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`);
 }
 
 const FULLY_RANDOM_PICKS: CategoryPick[] = new Array(8).fill(undefined);
@@ -174,17 +185,6 @@ async function listDeliverableObjectNames(quizId: string): Promise<string[]> {
   if (error) throw error;
   return data.map((object) => object.name).sort();
 }
-
-beforeEach(async () => {
-  // Mirrors orders.integration.test.ts's beforeEach: quizzes before orders
-  // (no cascade), compositions last (cascades to composition_items).
-  const { error: quizzesError } = await db.from("quizzes").delete().not("id", "is", null);
-  if (quizzesError) throw quizzesError;
-  const { error: ordersError } = await db.from("orders").delete().not("id", "is", null);
-  if (ordersError) throw ordersError;
-  const { error: compositionsError } = await db.from("compositions").delete().not("id", "is", null);
-  if (compositionsError) throw compositionsError;
-});
 
 describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs ffmpeg)", () => {
   it("generates, uploads the four Deliverables, records delivery, and calls deliverQuiz once", async () => {
