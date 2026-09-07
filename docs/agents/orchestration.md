@@ -32,7 +32,7 @@ Every brief contains, in this order:
 - Out-of-scope rule: if something outside the ticket looks wrong, report it in the PR body rather than fixing it in the ticket. The orchestrator decides whether it becomes an issue.
 - Finish: merge `origin/master`, push, open the PR with `Closes #<n>`, do not merge, report using the report template.
 - Commit trailers and PR footer as given by the session.
-- Never end the turn to wait on a background command; poll it and continue (three implementers in spec 2 wave 1 sat idle until nudged).
+- Long commands run in the foreground with a large timeout (up to 600000 ms). Never end the turn to wait on a background command (three implementers in spec 2 wave 1 sat idle until nudged), and never busy-poll one with no-op commands (the #56 implementer fired `echo` every few seconds for minutes); if a background command is unavoidable, wait for it with one blocking `until ...; do sleep 5; done` call.
 
 ### Verification budget
 

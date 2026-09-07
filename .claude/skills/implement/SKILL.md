@@ -1,7 +1,7 @@
 ---
 name: implement
 description: "Implement one ticket in its worktree the way docs/agents/orchestration.md expects: tdd at the named seams, one verification pass, a PR, the report template."
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Implement the ticket the orchestrator's brief names. The brief carries the ticket-specific facts (worktree, file layout, seams, acceptance checks, stack rule); this skill carries the fixed rules. Read `docs/agents/orchestration.md` ("Implementer brief", "Verification budget", "Report template") once.
@@ -12,7 +12,7 @@ Implement the ticket the orchestrator's brief names. The brief carries the ticke
 - Use `/tdd` at the seams the brief names: a red test with a captured failing assertion first, then the code. Keep the red output; the report needs it.
 - While iterating, run only the affected test file and `npm run typecheck`.
 - Once, right before pushing: `npm run typecheck`, `npx vitest run`, `npx eslint src scripts`. Never run `npm run test:integration` (the Spec reviewer runs it once on your branch); if you added an integration test, run only that file. Never run `npm run db:reset`, `npm run build`, or start, stop or reset the Supabase stack or the shop unless the brief says so. If a test fails for state reasons, report the failing assertion and stop; the orchestrator decides.
-- Never end your turn to wait on a background command; poll it and continue.
+- Long commands (`npm run shop:up`, `npm ci`, a test file against the stack) run in the FOREGROUND with a large `timeout` (up to 600000 ms). If something must run in the background, wait for it with one foreground command that blocks (`until <condition>; do sleep 5; done` in a single Bash call is allowed; a bare `sleep` is not). Never busy-poll with no-op commands such as `echo`, and never end your turn to wait on a background command.
 - Do not run `/code-review`; the orchestrator dispatches the reviewers.
 - Anything wrong outside the ticket goes in the PR body, not in the code.
 - Locale is data, English identifiers, UI strings through `next-intl`, content never enters git, no new recurring cost (CLAUDE.md).
