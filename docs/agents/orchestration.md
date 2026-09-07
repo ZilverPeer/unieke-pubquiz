@@ -32,13 +32,15 @@ Every brief contains, in this order:
 - Out-of-scope rule: if something outside the ticket looks wrong, report it in the PR body rather than fixing it in the ticket. The orchestrator decides whether it becomes an issue.
 - Finish: merge `origin/master`, push, open the PR with `Closes #<n>`, do not merge, report using the report template.
 - Commit trailers and PR footer as given by the session.
+- Never end the turn to wait on a background command; poll it and continue (three implementers in spec 2 wave 1 sat idle until nudged).
 
 ### Verification budget
 
 Run once, right before pushing, not after every edit:
 
 - `npm run typecheck`, `npm test`, `npx eslint src scripts`: always.
-- `npm run test:integration`: only when the ticket changes `src/repository`, `src/scripts`, or `supabase/`. Run it once; the suites clean up after themselves, so `npm run db:reset` is needed at most once per push, and only if a test failed for state reasons.
+- `npm run test:integration`: implementers never run it (trial from spec 2 wave 2, agreed 2026-09-07 after wave 1: implementers repeating the suite, with resets, was the waste). The Spec reviewer runs it once on the branch; the orchestrator runs it once on master at the end of the wave. An implementer that adds an integration test runs only that file.
+- `npm run db:reset`: agents never run it. If a test fails for state reasons, report the failing assertion; the orchestrator decides.
 - `npm run build`: never, unless the ticket changes the Next.js app itself.
 
 **Warning (as of ticket #43's fix round):** `generate.integration.test.ts` scopes its cleanup to the Compositions it created itself (by billing email), so it is safe to run against a stack that also has real orders on it. Every other integration suite that touches Orders/Quizzes/Compositions -- `orders`, `repository`, `recompose-quiz`, `reprocess-cli`, `prune`, `quiz-job` -- still wipes `orders`, `quizzes` and `compositions` wholesale in its own `beforeEach`/`afterEach`. Running `npm run test:integration` on a stack that has real orders placed through the local shop (e.g. while following `docs/runbook-local-loop.md`) destroys those orders. Narrowing the remaining suites the same way `generate.integration.test.ts` was narrowed is a tracked follow-up, not yet done.
@@ -84,7 +86,7 @@ Empirical, in PowerShell (the user's shell), in the persistent review clone `%LO
 
 ## Merge
 
-Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master, remove the worktree, append to the wave logbook.
+Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master (after `npm ci` if the PR added a dependency), stop any wp-env instance started from the worktree before removing the worktree (its containers bind-mount the worktree's `shop/` directory), remove the worktree, append to the wave logbook. At the end of the wave: `npm run test:integration` once on master, stop the stacks, complete the logbook, then a retro with Erik before the next wave starts.
 
 ## Logbook
 
