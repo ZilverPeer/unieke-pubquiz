@@ -1,97 +1,71 @@
 /**
  * `npm run shop:up` -- idempotently brings the local shop to a state where
  * `npm run shop:order` and `npm run shop:capture` work. Assumes `wp-env
- * start` has already run (the npm script chains it first); this script
- * covers everything wp-env itself cannot express declaratively:
- *   - the Mailpit mail-catcher container (see lib/mailpit.ts)
- *   - the Storefront theme (active), the Dutch site/plugin/theme language,
- *     the Dutch WooCommerce store settings, and WooCommerce's own
- *     Shop/Cart/Checkout/My account pages renamed to their Dutch titles and
- *     slugs (the "Sample Page" WooCommerce leaves behind is deleted too --
- *     see lib/wordpress-settings.ts, ticket #56)
- *   - the Pubquiz product, Dutch name/short description/placeholder price
- *     (created once, Dutch fields re-applied every run -- see lib/product.ts)
- *   - the Advanced Product Fields field group on that product (re-applied
- *     every run -- cheap and keeps it in sync with this script)
- *   - the `order.updated` webhook (created once, delivery_url/secret kept
- *     in sync with .env.local on every run)
- *   - the "pubquiz-pipeline" WooCommerce REST API key the deliver module
- *     (#41) uses, upserted into .env.local (see lib/rest-api-key.ts)
+ * start` has already run (the npm script chains it first).
  *
- * WooCommerce, the Advanced Product Fields plugin, the Storefront theme, and
- * the pubquiz-* mu plugins are installed by wp-env itself per .wp-env.json;
- * this script only activates/configures what wp-env has no declarative
- * field for.
+ * Since ticket #61 ("single-bootstrap shop:up"), the entire WordPress side
+ * of this -- theme, language, WooCommerce store settings, Dutch page
+ * renames, the Pubquiz product, the Advanced Product Fields field group,
+ * the classic Cart/Checkout shortcodes, the `order.updated` webhook, and a
+ * fresh REST API key -- runs as ONE `wp eval-file` call against
+ * shop/mu-plugins/wp-cli-scripts/setup-shop.php, instead of about 26
+ * separate WP-CLI invocations. Each WP-CLI call costs roughly 14 seconds
+ * against this container on Windows bind mounts, so this cut a ~6 minute
+ * `shop:up` to well under 90 seconds. See shop/README.md "Single bootstrap".
+ *
+ * This file now only does what has to run on the host: the Mailpit
+ * mail-catcher container (see lib/mailpit.ts), running that one eval-file
+ * call and parsing its single line of JSON output (parseSetupResult, in
+ * lib/setup-result.ts so it can be unit-tested without booting the whole
+ * shop), and upserting the returned REST API credentials into .env.local.
  */
 import "../load-env";
-import { wpCli, wpCliJson } from "./lib/wp-cli";
-import { getOrCreateProductId } from "./lib/product";
-import { ensureWebhook } from "./lib/webhook";
+import { wpCli } from "./lib/wp-cli";
 import { ensureMailpit } from "./lib/mailpit";
-import { ensureRestApiKey } from "./lib/rest-api-key";
-import {
-  ensureDutchLanguage,
-  ensureDutchPages,
-  ensureStorefrontTheme,
-  ensureWooCommerceDutchSettings,
-} from "./lib/wordpress-settings";
-import { WP_ENV_PORT } from "./lib/config";
+import { parseSetupResult, type SetupResult } from "./lib/setup-result";
+import { upsertRestApiCredentials } from "./lib/env-file";
+import { DEFAULT_WEBHOOK_URL, WP_ENV_PORT } from "./lib/config";
 
-/** Finds the WooCommerce page by slug (e.g. "cart", "checkout") and replaces its content with the given classic shortcode, if it isn't already. */
-function applyClassicShortcode(slug: string, shortcode: string): void {
-  const ids = wpCliJson<number[]>([
-    "post",
-    "list",
-    "--post_type=page",
-    `--name=${slug}`,
-    "--field=ID",
-    "--posts_per_page=1",
-    "--format=json",
-  ]);
-  if (ids.length === 0) {
-    throw new Error(`No WooCommerce "${slug}" page found -- has WooCommerce finished installing?`);
-  }
-  wpCli(["post", "update", String(ids[0]), `--post_content=${shortcode}`]);
+const SETUP_SCRIPT_PATH = "wp-content/mu-plugins/wp-cli-scripts/setup-shop.php";
+
+function runSetupShop(): SetupResult {
+  const deliveryUrl = process.env.WOOCOMMERCE_WEBHOOK_URL ?? DEFAULT_WEBHOOK_URL;
+  const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET ?? "test-secret";
+
+  const { stdout } = wpCli(["eval-file", SETUP_SCRIPT_PATH, deliveryUrl, secret]);
+  return parseSetupResult(stdout);
 }
 
 function main() {
+  const startedAt = Date.now();
+
   const { uiUrl: mailpitUrl } = ensureMailpit();
 
-  ensureStorefrontTheme();
-  ensureDutchLanguage();
-  ensureWooCommerceDutchSettings();
-  ensureDutchPages();
+  const result = runSetupShop();
 
-  const productId = getOrCreateProductId();
+  // Rotated on every run (see setup-shop.php's docblock for why reuse isn't
+  // possible) and upserted into .env.local -- never printed in full here,
+  // since this log is not a secret store.
+  upsertRestApiCredentials({
+    url: `http://localhost:${WP_ENV_PORT}`,
+    consumerKey: result.consumerKey,
+    consumerSecret: result.consumerSecret,
+  });
 
-  wpCli(["eval-file", "wp-content/mu-plugins/wp-cli-scripts/setup-field-group.php"]);
-
-  // The Advanced Product Fields plugin's free tier only renders its fields
-  // (and only accepts them at checkout) through WooCommerce's classic
-  // Cart/Checkout shortcodes -- it does not integrate with the Store API, so
-  // the default block-based Cart/Checkout pages silently show none of our
-  // fields. See shop/README.md ("Interface gaps"). Uses the Dutch slugs
-  // ensureDutchPages() just applied -- it always runs first.
-  applyClassicShortcode("winkelwagen", "[woocommerce_cart]");
-  applyClassicShortcode("afrekenen", "[woocommerce_checkout]");
-
-  const { deliveryUrl } = ensureWebhook();
-
-  // Rotated on every run (see lib/rest-api-key.ts's docblock for why reuse
-  // isn't possible) and upserted into .env.local -- never printed in full
-  // here, since this log is not a secret store.
-  ensureRestApiKey();
+  const elapsedSeconds = ((Date.now() - startedAt) / 1000).toFixed(1);
 
   console.log("Pubquiz shop is up.");
   console.log(`  Shop:          http://localhost:${WP_ENV_PORT}`);
   console.log(`  Admin:         http://localhost:${WP_ENV_PORT}/wp-admin (admin/password)`);
-  console.log(`  Product:       #${productId} (http://localhost:${WP_ENV_PORT}/?p=${productId})`);
+  console.log(`  Product:       #${result.productId} (http://localhost:${WP_ENV_PORT}/?p=${result.productId})`);
   console.log(`  Mail catcher:  ${mailpitUrl}`);
-  console.log(`  Webhook:       order.updated -> ${deliveryUrl}`);
+  console.log(`  Webhook:       order.updated -> ${result.deliveryUrl}`);
   console.log(`  REST API key:  upserted into .env.local (WOOCOMMERCE_URL/CONSUMER_KEY/CONSUMER_SECRET)`);
   console.log("");
   console.log("Next: npm run shop:order -- --email you@example.com --pick 0=1");
   console.log("      npm run shop:capture");
+  console.log("");
+  console.log(`shop:up finished in ${elapsedSeconds}s (setup.ts's own work, after "wp-env start").`);
 }
 
 main();

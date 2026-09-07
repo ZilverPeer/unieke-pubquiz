@@ -14,7 +14,7 @@ that only asks for a name and an email. See "Dutch storefront" below.
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Starts wp-env, then idempotently: starts the Mailpit mail catcher, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Safe to re-run any time. |
+| `npm run shop:up` | Starts wp-env, starts the Mailpit mail catcher, then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env and the Mailpit container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
@@ -73,11 +73,43 @@ published at 45333 (reachable from wp-env's containers via Docker Desktop's
 outgoing `wp_mail()` calls are routed there by
 `shop/mu-plugins/pubquiz-mailpit-smtp.php`.
 
+## Single bootstrap (ticket #61)
+
+Every WP-CLI call against the wp-env container costs about 14 seconds on
+Windows (0.4s PHP, 4s WordPress bootstrap, 14s once WooCommerce and the
+theme are loaded too), because Docker Desktop on Windows serves the
+WordPress files through a bind mount. Before this ticket, `scripts/shop/setup.ts`
+made about 26 separate `wp` calls (one per theme/language/option/page/
+product/webhook/etc. step), which added up to roughly six minutes.
+
+`npm run shop:up` now makes exactly one WP-CLI call for all of that:
+`wp eval-file wp-content/mu-plugins/wp-cli-scripts/setup-shop.php
+<webhookDeliveryUrl> <webhookSecret>`. That one PHP script does everything
+theme activation through the REST API key used to (see "Dutch storefront"
+and "REST credentials" below for what each step does) directly against
+WordPress/WooCommerce's own PHP APIs -- `switch_theme()`,
+`wp_download_language_pack()`/`Language_Pack_Upgrader`, `update_option()`,
+`wp_update_post()`, `WC_Product_Simple`, `WC_Webhook` -- rather than
+shelling out to `wp` subcommands from inside an already-running `wp
+eval-file` process. Every step still reads the current state first and
+only writes when something differs, exactly as before; only the number of
+WP-CLI round trips changed. The script's only line of STDOUT is one JSON
+object (`{"productId":..,"webhookId":..,"deliveryUrl":"..","consumerKey":"..","consumerSecret":".."}`,
+parsed by `scripts/shop/lib/setup-result.ts`'s `parseSetupResult()`) -- every
+diagnostic message goes to STDERR instead, so wp-env's own output framing
+never has to be told apart from actual step output.
+
+`scripts/shop/setup.ts` itself now only does what has to run on the host:
+start Mailpit (`lib/mailpit.ts`), make that one `wp eval-file` call
+(`lib/wp-cli.ts`), and upsert the returned REST API credentials into
+`.env.local` (`lib/env-file.ts`). It prints its own wall-clock time at the
+end.
+
 ## Dutch storefront (ticket #56)
 
 `npm run shop:up` brings the shop to a Dutch, guest-checkout-ready state,
-idempotently, with WP-CLI (see `scripts/shop/lib/wordpress-settings.ts` and
-`scripts/shop/lib/product.ts`):
+idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
+"Single bootstrap" below):
 
 - **Theme.** The Storefront theme (WooCommerce's own free theme, chosen per
   spec #55 "Theme" -- it works with the classic Cart/Checkout shortcodes
@@ -92,40 +124,45 @@ idempotently, with WP-CLI (see `scripts/shop/lib/wordpress-settings.ts` and
   `.latest-stable.zip` URL would extract to
   `wp-content/themes/storefront.latest-stable/` instead of
   `wp-content/themes/storefront/`, same bug already documented below for
-  plugins. `scripts/shop/setup.ts` then runs `wp theme activate storefront`
-  every run (a no-op once already active).
-- **Language.** `wp language core install nl_NL --activate` sets the site
-  language to Dutch; `wp language plugin install woocommerce nl_NL` and
-  `wp language theme install storefront nl_NL` install the Dutch
-  translations for WooCommerce's and Storefront's own strings;
-  `wp language core update` refreshes all installed translations. All four
-  are idempotent on their own (re-running an install/activate that's
-  already done is a no-op).
+  plugins. `setup-shop.php` activates it (`switch_theme()`) only if it isn't
+  the active theme already (`get_stylesheet()`).
+- **Language.** `setup-shop.php` installs the `nl_NL` core language pack and
+  sets it as the site language (`WPLANG`), plus the Dutch translations for
+  WooCommerce's and Storefront's own strings, calling WordPress's own
+  `wp_download_language_pack()`/`Language_Pack_Upgrader` directly (what `wp
+  language ... install` wraps) rather than shelling out to a `wp`
+  subcommand -- see "Single bootstrap" below for why. Idempotent by
+  checking first: a core pack already in `get_available_languages()`, or a
+  plugin/theme pack whose `.mo` file already exists under `WP_LANG_DIR`, is
+  never re-downloaded (see "Single bootstrap" for why this replaces `wp
+  language core update`'s unconditional refresh).
 - **WooCommerce store settings.** `woocommerce_currency=EUR`,
   `woocommerce_default_country=NL`,
   `woocommerce_enable_guest_checkout=yes`,
   `woocommerce_enable_signup_and_login_from_checkout=yes` -- option names
   verified against the installed WooCommerce itself
-  (`wp option list --search=woocommerce_*`), not assumed.
+  (`wp option list --search=woocommerce_*`), not assumed. `setup-shop.php`
+  reads each option first and only calls `update_option()` when the value
+  differs.
 - **Product.** The Pubquiz product's name, short description and
-  (placeholder, 14.95 EUR) price are Dutch, set by
-  `scripts/shop/lib/product.ts` both at creation and, so a re-run converges
-  an already-existing product too, on every subsequent `shop:up`.
+  (placeholder, 14.95 EUR) price are Dutch, set by `setup-shop.php`'s
+  `pubquiz_ensure_product()` both at creation and, so a re-run converges an
+  already-existing product too, on every subsequent `shop:up`.
 - **Pages.** WooCommerce's own install creates its Shop/Cart/Checkout/My
   account pages with English titles and slugs *before* the language switch
   runs -- switching the site language doesn't retitle already-existing
   content, so left alone, every page's `<title>` and Storefront's primary
   navigation (which falls back to listing published pages when no menu is
   assigned, true here) would stay English forever, reruns included.
-  `ensureDutchPages()` (`scripts/shop/lib/wordpress-settings.ts`) renames
-  them in place, by `woocommerce_<page>_page_id` option (never by slug, so
-  WooCommerce's own page-id wiring keeps pointing at the same post): Shop ->
-  Winkel/`winkel`, Cart -> Winkelwagen/`winkelwagen`, Checkout ->
+  `setup-shop.php` renames them in place, by `woocommerce_<page>_page_id`
+  option (never by slug, so WooCommerce's own page-id wiring keeps pointing
+  at the same post), only if the title or slug differs from the target:
+  Shop -> Winkel/`winkel`, Cart -> Winkelwagen/`winkelwagen`, Checkout ->
   Afrekenen/`afrekenen`, My account -> Mijn account/`mijn-account` -- and
   deletes the "Sample Page" WooCommerce leaves behind (otherwise the one
-  remaining English entry in the fallback navigation). `setup.ts` re-applies
-  the classic Cart/Checkout shortcodes under the new (`winkelwagen`/
-  `afrekenen`) slugs right after.
+  remaining English entry in the fallback navigation). `setup-shop.php`
+  applies the classic Cart/Checkout shortcodes under the new
+  (`winkelwagen`/`afrekenen`) slugs right after, in the same run.
 - **Guest checkout, minimal fields.** `shop/mu-plugins/pubquiz-checkout-fields.php`
   filters `woocommerce_billing_fields` down to first name, last name and
   email at checkout (`is_checkout()`, true for both the checkout page and
@@ -365,10 +402,13 @@ WooCommerce stores only a one-way hash of the consumer key (`wc_api_hash()`)
 recovered. So rather than try to reuse an existing key, `shop:up` deletes any
 row with description `pubquiz-pipeline` from the
 `wp_woocommerce_api_keys` table and creates a fresh one every run
-(`shop/mu-plugins/wp-cli-scripts/create-rest-api-key.php`, invoked via
-`wp eval-file` by `scripts/shop/lib/rest-api-key.ts`). This is safe: nothing
-in this repo persists the old key across a `shop:up`, and the worker reads
-the current one from `.env.local` each time it starts.
+(`pubquiz_rotate_rest_api_key()` in `setup-shop.php`, folded in from the
+former standalone `create-rest-api-key.php` by ticket #61). The key/secret
+pair comes back in `setup-shop.php`'s single line of JSON output;
+`scripts/shop/lib/env-file.ts` (invoked by `scripts/shop/setup.ts`) upserts
+it into `.env.local`. This is safe: nothing in this repo persists the old
+key across a `shop:up`, and the worker reads the current one from
+`.env.local` each time it starts.
 
 The three values are upserted into the repo root's gitignored `.env.local`
 (never printed to the console, never committed) -- the same file Next.js
@@ -404,8 +444,12 @@ A few things the brief didn't call out, discovered while wiring this up:
    writes the same keys" acceptance criterion to be testable at all.
 3. **`wp wc webhook update` has no `--delivery_url` option** (WooCommerce's
    own native WP-CLI command only exposes `--name`/`--status`/`--topic`/`--secret`
-   for updates). `shop:up` deletes and recreates the webhook instead if the
-   configured delivery URL ever changes.
+   for updates) -- this used to mean `shop:up` deleted and recreated the
+   webhook whenever the configured delivery URL changed. Ticket #61's
+   `setup-shop.php` calls `WC_Webhook::set_delivery_url()` directly instead
+   (the PHP object itself supports it, only the WP-CLI command doesn't), so
+   a delivery-url change now updates the existing webhook in place and its
+   id stays stable across `shop:up` runs.
 
 4. **WooCommerce's REST API only performs Basic Auth (consumer key/secret)
    over HTTPS.** `WC_REST_Authentication::authenticate()` calls
