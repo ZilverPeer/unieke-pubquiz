@@ -66,6 +66,9 @@ function buildFakeOrderRepository(quiz: QuizRecord | null): OrderRepository {
     listQuizzesByBillingEmail: () => {
       throw new Error("listQuizzesByBillingEmail should not be reachable in this test");
     },
+    listQuizzesByOrderId: () => {
+      throw new Error("listQuizzesByOrderId should not be reachable in this test");
+    },
     listQuizzesDeliveredBefore: () => {
       throw new Error("listQuizzesDeliveredBefore should not be reachable in this test");
     },

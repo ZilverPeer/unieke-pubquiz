@@ -151,6 +151,7 @@ function fakeQuiz(overrides: Partial<QuizRecord>): QuizRecord {
     failureReason: null,
     compositionId: "comp-1",
     downloadToken: "token",
+    prunedAt: null,
     deliveredAt: new Date().toISOString(),
     ...overrides,
   };

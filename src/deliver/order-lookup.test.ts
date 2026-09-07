@@ -15,6 +15,7 @@ function fakeQuiz(overrides: Partial<QuizRecord> = {}): QuizRecord {
     compositionId: "comp-1",
     downloadToken: "token",
     deliveredAt: new Date().toISOString(),
+    prunedAt: null,
     ...overrides,
   };
 }
@@ -39,7 +40,8 @@ function fakeRepository(overrides: Partial<OrderRepository>): OrderRepository {
     upsertOrder: unimplemented,
     transitionQuizStatus: unimplemented,
     recordDelivery: unimplemented,
-    clearDownloadToken: unimplemented,
+    markPruned: unimplemented,
+    clearPruned: unimplemented,
     listQuizzesByBillingEmail: unimplemented,
     listQuizzesByOrderId: unimplemented,
     listQuizzesDeliveredBefore: unimplemented,
@@ -47,6 +49,8 @@ function fakeRepository(overrides: Partial<OrderRepository>): OrderRepository {
     getQuizByDownloadToken: unimplemented,
     listPendingQuizzes: unimplemented,
     getOrderById: unimplemented,
+    listFailedQuizzes: unimplemented,
+    getQuizByCompositionId: unimplemented,
     ...overrides,
   };
 }
