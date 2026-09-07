@@ -72,4 +72,21 @@ describe("parseSetupResult", () => {
     });
     expect(() => parseSetupResult(emptyConsumerKey)).toThrow(/consumerKey/);
   });
+
+  test("never leaks a credential value in its error message on a shape mismatch", () => {
+    const leaky = JSON.stringify({
+      productId: "not-an-id",
+      webhookId: 3,
+      deliveryUrl: "http://host.docker.internal:3000/api/webhooks/woocommerce",
+      consumerKey: "ck_abc",
+      consumerSecret: "SECRET_MARKER",
+    });
+    expect(() => parseSetupResult(leaky)).toThrow();
+    try {
+      parseSetupResult(leaky);
+      expect.unreachable("parseSetupResult should have thrown");
+    } catch (error) {
+      expect((error as Error).message).not.toContain("SECRET_MARKER");
+    }
+  });
 });
