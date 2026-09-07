@@ -1,15 +1,30 @@
 ---
 name: implement
-description: "Implement a piece of work based on a spec or set of tickets."
+description: "Implement one ticket in its worktree the way docs/agents/orchestration.md expects: tdd at the named seams, one verification pass, a PR, the report template."
 disable-model-invocation: true
 ---
 
-Implement the work described by the user in the spec or tickets.
+Implement the ticket the orchestrator's brief names. The brief carries the ticket-specific facts (worktree, file layout, seams, acceptance checks, stack rule); this skill carries the fixed rules. Read `docs/agents/orchestration.md` ("Implementer brief", "Verification budget", "Report template") once.
 
-Use /tdd where possible, at pre-agreed seams.
+## Rules
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+- Work only in the worktree the brief names. Never touch the main checkout or another worktree.
+- Use `/tdd` at the seams the brief names: a red test with a captured failing assertion first, then the code. Keep the red output; the report needs it.
+- While iterating, run only the affected test file and `npm run typecheck`.
+- Once, right before pushing: `npm run typecheck`, `npx vitest run`, `npx eslint src scripts`. Never run `npm run test:integration` (the Spec reviewer runs it once on your branch); if you added an integration test, run only that file. Never run `npm run db:reset`, `npm run build`, or start, stop or reset the Supabase stack or the shop unless the brief says so. If a test fails for state reasons, report the failing assertion and stop; the orchestrator decides.
+- Never end your turn to wait on a background command; poll it and continue.
+- Do not run `/code-review`; the orchestrator dispatches the reviewers.
+- Anything wrong outside the ticket goes in the PR body, not in the code.
+- Locale is data, English identifiers, UI strings through `next-intl`, content never enters git, no new recurring cost (CLAUDE.md).
 
-Once done, use /code-review to review the work.
+## Finish
 
-Commit your work to the current branch.
+Merge `origin/master` into the branch, push, open the PR with `gh pr create` and `Closes #<n>`, do not merge. Commit messages and the PR body end with the trailers the brief gives. Report in the playbook's report template, nothing more:
+
+```
+PR: #<n>  Commits: <hashes>
+Red evidence: <the failing assertion text of each new test before the fix>
+Checks: typecheck <ok>, unit <n/n>, eslint <ok>[, <integration file> <n/n>]
+Out of scope: <one line each, or "none">
+Interface gaps: <anything the brief got wrong, or "none">
+```
