@@ -11,7 +11,7 @@ Every command below was actually run against this branch (ticket #43) to produce
    npx supabase start
    npm run db:reset
    ```
-4. Start the local shop (wp-env + Mailpit + the Pubquiz product/fields/webhook/REST key):
+4. Start the local shop (wp-env + Mailpit + the cron ticker + the Pubquiz product/fields/webhook/REST key):
    ```sh
    npm run shop:up
    ```
@@ -33,13 +33,13 @@ Leave this running. In another shell:
 npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --mode mixed --pick 0=1
 ```
 
-placing a **paid, `processing`** order directly (see `shop/README.md`). WooCommerce delivers its `order.updated` webhook asynchronously via Action Scheduler, which needs real HTTP traffic to tick in this local setup -- a bare WP-CLI order change doesn't trigger it on its own. Kick it manually after every order (or every order status change) you want delivered:
+placing a **paid, `processing`** order directly (see `shop/README.md`). WooCommerce delivers its `order.updated` webhook asynchronously via Action Scheduler, which needs real HTTP traffic to tick in this local setup; since ticket #58, `npm run shop:up`'s cron ticker container requests `wp-cron.php` every 5 seconds for as long as the shop is up, so this happens on its own -- do nothing else. The worker picks the job up on its own next poll (well under a second locally); watch the `next dev` log for `POST /api/webhooks/woocommerce 200` within about 30 seconds, followed, once generation finishes, by the deliver module's calls completing the order.
+
+**Troubleshooting:** if an order sits in `processing` for more than a minute, check `docker ps` for `pubquiz-cron-ticker` -- if it's missing or stuck, kick the scheduler by hand as a fallback:
 
 ```sh
 npx wp-env run cli -- wp action-scheduler run --user=admin
 ```
-
-The worker picks the job up on its own next poll (well under a second locally); watch the `next dev` log for `POST /api/webhooks/woocommerce 200` followed, once generation finishes, by the deliver module's calls completing the order.
 
 ### Multi-quiz orders
 
@@ -57,7 +57,6 @@ Either an unknown Category id (fails at webhook parse time, before any generatio
 
 ```sh
 npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --mode single_category --pick 0=999999
-npx wp-env run cli -- wp action-scheduler run --user=admin
 ```
 
 The order stays `processing`; check the order note and the operator alert mail (see "Inspecting mail" below).
@@ -121,7 +120,7 @@ Note: WooCommerce also sends its own unsigned connectivity **ping** (`webhook_id
 ## Stopping everything
 
 ```sh
-npm run shop:down        # stops wp-env + Mailpit, keeps their data
+npm run shop:down        # stops wp-env + Mailpit + the cron ticker, keeps their data
 npx supabase stop        # stops the Supabase stack, keeps its data
 ```
 

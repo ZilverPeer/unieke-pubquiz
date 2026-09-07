@@ -32,3 +32,13 @@ export const TEST_GATEWAY_ID = "pubquiz_test_gateway";
 export const DEFAULT_WEBHOOK_URL = "http://host.docker.internal:3000/api/webhooks/woocommerce";
 
 export const CAPTURE_PORT = 3000;
+
+/**
+ * The WordPress cron ticker (ticket #58): wp-env's WordPress only runs its
+ * cron on HTTP traffic, so this container requests wp-cron.php every few
+ * seconds so Action Scheduler delivers the `order.updated` webhook without
+ * a manual kick -- see scripts/shop/lib/cron-ticker.ts.
+ */
+export const CRON_TICKER_CONTAINER = "pubquiz-cron-ticker";
+export const CRON_TICKER_IMAGE = "curlimages/curl";
+export const CRON_TICKER_INTERVAL_SECONDS = 5;

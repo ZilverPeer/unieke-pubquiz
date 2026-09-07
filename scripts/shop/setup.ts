@@ -19,12 +19,15 @@
  * as the cause), the Mailpit mail-catcher container (see lib/mailpit.ts),
  * running that one eval-file call and parsing its single line of JSON
  * output (parseSetupResult, in lib/setup-result.ts so it can be
- * unit-tested without booting the whole shop), and upserting the returned
- * REST API credentials into .env.local.
+ * unit-tested without booting the whole shop), upserting the returned REST
+ * API credentials into .env.local, and starting the cron ticker container
+ * (ticket #58, see lib/cron-ticker.ts) so Action Scheduler delivers the
+ * `order.updated` webhook without a manual kick.
  */
 import "../load-env";
 import { wpCli } from "./lib/wp-cli";
 import { ensureMailpit } from "./lib/mailpit";
+import { ensureCronTicker } from "./lib/cron-ticker";
 import { parseSetupResult, type SetupResult } from "./lib/setup-result";
 import { upsertRestApiCredentials } from "./lib/env-file";
 import { DEFAULT_WEBHOOK_URL, WP_ENV_PORT } from "./lib/config";
@@ -51,6 +54,7 @@ async function main() {
   const categories = await loadDutchCategories();
 
   const { uiUrl: mailpitUrl } = ensureMailpit();
+  const { containerName: cronTickerContainer } = ensureCronTicker();
 
   const result = runSetupShop(categories);
 
@@ -70,6 +74,7 @@ async function main() {
   console.log(`  Admin:         http://localhost:${WP_ENV_PORT}/wp-admin (admin/password)`);
   console.log(`  Product:       #${result.productId} (http://localhost:${WP_ENV_PORT}/?p=${result.productId})`);
   console.log(`  Mail catcher:  ${mailpitUrl}`);
+  console.log(`  Cron ticker:   ${cronTickerContainer} (see docs/runbook-local-loop.md)`);
   console.log(`  Webhook:       order.updated -> ${result.deliveryUrl}`);
   console.log(`  REST API key:  upserted into .env.local (WOOCOMMERCE_URL/CONSUMER_KEY/CONSUMER_SECRET)`);
   console.log("");
