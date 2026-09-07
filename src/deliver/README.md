@@ -23,6 +23,8 @@ WooCommerce has no supported REST way to attach a per-order downloadable file to
 
 Any non-2xx response or network error (connection refused, DNS failure, etc.) throws an `Error` naming the HTTP method, the full endpoint URL, and (for a response) its status code, so the worker's retry loop can tell a retryable failure from a bug.
 
+Every path is sent under `/wp-json` (`woocommerce-client.ts`'s `API_PREFIX`) -- WooCommerce's REST API is always mounted there, never at bare `/wc/v3/...`. Locally, WooCommerce also only performs Basic Auth over HTTPS (`is_ssl()`); the local shop's `shop/mu-plugins/pubquiz-force-ssl-for-rest-api.php` works around that (see shop/README.md "Interface gaps") so this module's Basic Auth design works unmodified against a real deployment behind HTTPS.
+
 ## Order lookup
 
 `createDeliverer` never talks to the repository itself -- `order-lookup.ts` is the one file in this module that imports `@/repository`, wrapping `createOrderRepository`'s `getQuizById`/`getOrderById`/`listQuizzesByOrderId` as the small `OrderLookup` interface (`forQuiz(quizId) => { wooOrderId, wooLineItemId, siblingStatuses }`) `createDeliverer` actually needs. This keeps the module's own dependency surface to "WooCommerce plus one small lookup interface" and means `deliverer.test.ts` can stub that interface directly instead of a real repository.

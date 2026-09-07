@@ -264,6 +264,29 @@ A few things the brief didn't call out, discovered while wiring this up:
    for updates). `shop:up` deletes and recreates the webhook instead if the
    configured delivery URL ever changes.
 
+4. **WooCommerce's REST API only performs Basic Auth (consumer key/secret)
+   over HTTPS.** `WC_REST_Authentication::authenticate()` calls
+   `perform_basic_authentication()` only `if ( is_ssl() )`; over plain HTTP it
+   falls through to OAuth 1.0a signing instead, which the deliver module
+   (#41) doesn't implement, so every request looked authenticated-but-anonymous
+   and every order call failed with `woocommerce_rest_cannot_view` (401) --
+   not an "invalid credentials" error, which is what made this one non-obvious.
+   Fixed locally with `shop/mu-plugins/pubquiz-force-ssl-for-rest-api.php`,
+   which sets `$_SERVER['HTTPS'] = 'on'` for requests under `/wp-json/wc/`
+   only, before WooCommerce's REST auth check runs. This shop only ever runs
+   over plain HTTP locally (see top of this file); a real deployment behind
+   the VPS's HTTPS reverse proxy needs no such shim.
+
+5. **`woocommerce_hidden_order_itemmeta` only hides item meta on the
+   wp-admin order screen**, not in the customer-facing template
+   (`order-details-item.php`) that the order view, the completed-order
+   email, and My Account all render through -- that path only skips
+   underscore-prefixed keys (`WC_Order_Item::get_formatted_meta_data()`).
+   `pubquiz-downloads.php` hides its raw `pubquiz_download_*` meta from the
+   customer-facing table via `woocommerce_order_item_get_formatted_meta_data`
+   instead (and keeps the admin-only filter too, since that's a real,
+   separate view).
+
 `src/domain/checkout.ts` needed **no changes** -- the plugin's label-as-key
 behaviour matches `CHECKOUT_META_KEYS` exactly once field labels are set to
 those literal strings (see setup-field-group.php).

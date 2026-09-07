@@ -67,7 +67,7 @@ function pubquiz_download_links_for_item( $item ) {
     return $links;
 }
 
-/** Hides the raw pubquiz_download_* keys from the customer-facing item meta table; the links are rendered separately below. */
+/** Hides the raw pubquiz_download_* keys from the wp-admin order screen's item meta box; the links are rendered separately below. */
 add_filter(
     'woocommerce_hidden_order_itemmeta',
     function ( $hidden ) {
@@ -75,6 +75,26 @@ add_filter(
             $hidden[] = PUBQUIZ_DOWNLOAD_META_PREFIX . $file;
         }
         return $hidden;
+    }
+);
+
+/**
+ * Hides the raw pubquiz_download_* keys from the *customer-facing* item meta
+ * table (order-details-item.php, used by both the order view and the
+ * completed-order email, and by My Account). `woocommerce_hidden_order_itemmeta`
+ * above does not apply here -- WC_Order_Item::get_formatted_meta_data() only
+ * skips underscore-prefixed keys for that path, so this is the filter it
+ * actually runs through instead.
+ */
+add_filter(
+    'woocommerce_order_item_get_formatted_meta_data',
+    function ( $formatted_meta ) {
+        foreach ( $formatted_meta as $meta_id => $meta ) {
+            if ( str_starts_with( $meta->key, PUBQUIZ_DOWNLOAD_META_PREFIX ) ) {
+                unset( $formatted_meta[ $meta_id ] );
+            }
+        }
+        return $formatted_meta;
     }
 );
 
