@@ -67,21 +67,22 @@ README for the exact rules, including issue #34's cross-Round fix).
 
 Shape: 8 Categories, each with 2 Subcategories, each with 5 Subsubcategories
 (10 Subsubcategories per Category). Every Subsubcategory gets 7 text Items
-and 1 picture + 1 music Item per (kind, difficulty) combination — 27 Items
-per Subsubcategory, 2160 Items total (1680 text, 240 picture, 240 music).
+and 2 picture + 2 music Items per (kind, difficulty) combination — 33 Items
+per Subsubcategory, 2640 Items total (1680 text, 480 picture, 480 music).
 
 This means, per Category and per kind, there are exactly 10 Subsubcategories
 carrying an Item of any given Difficulty: the minimum for a Round of 10 to
-never repeat a Subsubcategory. Picture and music keep zero slack here
-(exactly 10 Items per Category/Difficulty) — the check below verifies this
-holds everywhere it needs to. Text is 7x denser (70 Items per
-Category/Difficulty) because a single-category Quiz draws 6 distinct Text
-Rounds — 60 Items, none repeated — from one Category, leaving 10 Items of
-slack over that floor. Per Locale and per Difficulty this yields 560 text
-Items and 80 picture / 80 music Items (8 Categories x 10 Subsubcategories,
-x7 for text), well over the "at least 60 text + 10 picture + 10 music" floor
-for a mixed-mode Quiz, and spread across all 8 Categories rather than
-concentrated in one. That covers both Quiz modes:
+never repeat a Subsubcategory. Picture and music keep one Round's worth of
+slack here (20 Items per Category/Difficulty, twice the 10 a single Round
+needs) — the check below verifies this holds everywhere it needs to. Text is
+7x denser (70 Items per Category/Difficulty) because a single-category Quiz
+draws 6 distinct Text Rounds — 60 Items, none repeated — from one Category,
+leaving 10 Items of slack over that floor. Per Locale and per Difficulty
+this yields 560 text Items and 160 picture / 160 music Items (8 Categories x
+10 Subsubcategories, x7 for text and x2 for picture/music), well over the
+"at least 60 text + 10 picture + 10 music" floor for a mixed-mode Quiz, and
+spread across all 8 Categories rather than concentrated in one. That covers
+both Quiz modes:
 
 - **Mixed mode** (up to 8 distinct Categories, one Round per Category): each
   of the 8 Categories independently has enough Items and Subsubcategories to
