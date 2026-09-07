@@ -8,3 +8,7 @@ Interview me relentlessly about every aspect of this plan until we reach a share
 Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering.
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
+
+## Erik's rule (2026-09-05, repeated 2026-09-07)
+
+Only ask when the answer matters. If you are 95% sure Erik will take your recommendation, do not ask: decide it, and list it in the spec as a fixed decision. For the questions that remain: easy language, minimal wording, recommendation first, one question per turn.
