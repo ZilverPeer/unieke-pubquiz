@@ -61,7 +61,7 @@ export function createDeliverer(config: DelivererConfig, orderLookup: OrderLooku
 
   return {
     async deliverQuiz({ quizId, files }) {
-      const { wooOrderId, wooLineItemId, siblingStatuses } = await orderLookup.forQuiz(quizId);
+      const { wooOrderId, wooLineItemId, sequence, siblingStatuses } = await orderLookup.forQuiz(quizId);
 
       // GET first so a retried/duplicate call updates the same meta_data
       // entries in place (by their WooCommerce meta id) instead of
@@ -75,7 +75,7 @@ export function createDeliverer(config: DelivererConfig, orderLookup: OrderLooku
       const existingMeta = lineItem.meta_data ?? [];
 
       const metaData: WooMetaDatum[] = files.map(({ file, url }) => {
-        const key = downloadMetaKey(file);
+        const key = downloadMetaKey(sequence, file);
         const existing = existingMeta.find((meta) => meta.key === key);
         return existing ? { id: existing.id, key, value: url } : { key, value: url };
       });

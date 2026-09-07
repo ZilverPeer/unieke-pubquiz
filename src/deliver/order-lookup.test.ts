@@ -53,7 +53,7 @@ function fakeRepository(overrides: Partial<OrderRepository>): OrderRepository {
 
 describe("createOrderLookup", () => {
   test("resolves a Quiz's WooCommerce order id, line item id, and sibling statuses", async () => {
-    const quiz = fakeQuiz({ id: "quiz-1", orderId: "order-1", wooLineItemId: 42, status: "delivered" });
+    const quiz = fakeQuiz({ id: "quiz-1", orderId: "order-1", wooLineItemId: 42, sequence: 1, status: "delivered" });
     const sibling = fakeQuiz({ id: "quiz-2", orderId: "order-1", wooLineItemId: 43, status: "pending" });
     const order = fakeOrder({ id: "order-1", wooOrderId: 123 });
 
@@ -69,6 +69,7 @@ describe("createOrderLookup", () => {
     expect(context).toEqual({
       wooOrderId: 123,
       wooLineItemId: 42,
+      sequence: 1,
       siblingStatuses: ["delivered", "pending"],
     });
     expect(repository.listQuizzesByOrderId).toHaveBeenCalledWith("order-1");

@@ -15,6 +15,14 @@ Vercel or Supabase; it reads `src/domain/checkout.ts` and
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
 
+**Windows/PowerShell note:** `npm run shop:order -- --email a@b.com ...` (and
+`shop:capture` with flags) breaks under npm 11 on PowerShell -- npm eats the
+flags after `--` instead of passing them through to the script, so they never
+reach the script's own `argv` parsing. Run the underlying script directly
+instead: `npx tsx scripts/shop/place-order.ts --email a@b.com ...` (and
+`npx tsx scripts/shop/capture-webhook.ts --out <path>` / `--port <n>` for
+`shop:capture`).
+
 ## Ports
 
 | Service | Port | URL |
@@ -164,12 +172,14 @@ Pubquiz-configured line item (matched on the presence of the
 `pubquiz_locale` line item meta) at `processing`. The test gateway therefore
 exercises the exact path a production gateway would.
 
-Both `pubquiz-mailpit-smtp.php` and `pubquiz-test-gateway.php` return early
-unless `wp_get_environment_type()` is `local` or `development` (set via
+`pubquiz-mailpit-smtp.php`, `pubquiz-test-gateway.php`, and
+`pubquiz-force-ssl-for-rest-api.php` return early unless
+`wp_get_environment_type()` is `local` or `development` (set via
 `WP_ENVIRONMENT_TYPE` in `.wp-env.json`); `pubquiz-hold-processing.php` and
 `pubquiz-allow-host-webhooks.php` have no such guard since they are meant to
-run in production too (`pubquiz-operator-mail.php` is also production code,
-gated only by the presence of a prefixed private note).
+run in production too (`pubquiz-operator-mail.php` and `pubquiz-downloads.php`
+are also production code, the former gated only by the presence of a
+prefixed private note).
 
 ## Operator mail proof
 
@@ -273,9 +283,11 @@ A few things the brief didn't call out, discovered while wiring this up:
    not an "invalid credentials" error, which is what made this one non-obvious.
    Fixed locally with `shop/mu-plugins/pubquiz-force-ssl-for-rest-api.php`,
    which sets `$_SERVER['HTTPS'] = 'on'` for requests under `/wp-json/wc/`
-   only, before WooCommerce's REST auth check runs. This shop only ever runs
-   over plain HTTP locally (see top of this file); a real deployment behind
-   the VPS's HTTPS reverse proxy needs no such shim.
+   only, before WooCommerce's REST auth check runs. Gated to `local`/`development`
+   like `pubquiz-mailpit-smtp.php` above -- spoofing `is_ssl()` is only safe
+   because this shop's plain-HTTP setup is itself local-only; a real
+   deployment behind the VPS's HTTPS reverse proxy already has `is_ssl()`
+   true and must never load this shim.
 
 5. **`woocommerce_hidden_order_itemmeta` only hides item meta on the
    wp-admin order screen**, not in the customer-facing template

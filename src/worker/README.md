@@ -50,7 +50,7 @@ pg-boss stores its own state (jobs, queues, schedules) in a `pgboss` schema it c
 
 ## Composition root and the deliver module
 
-`startWorker()` (`index.ts`) calls `createDeliverer()` (`src/deliver`, ticket #41 -- not yet implemented, currently always throws) *lazily*, once per job about to run, inside the `boss.work()` callback -- never at startup. This means starting the worker never depends on #41 being done: a thrown error from `createDeliverer()` today just fails that one job, retryably, exactly like any other thrown error in the handler.
+`startWorker()` (`index.ts`) calls `createDeliverer(resolveDelivererConfigFromEnv(), createOrderLookup(orderRepository))` (`src/deliver`, implemented in ticket #41) *lazily*, once per job about to run, inside the `boss.work()` callback -- never at startup. This means starting the worker never depends on the deliver module's environment (e.g. `WOOCOMMERCE_*`) being configured until a job actually needs it: a thrown error from `resolveDelivererConfigFromEnv()` or `createDeliverer()` just fails that one job, retryably, exactly like any other thrown error in the handler.
 
 ## Testing
 

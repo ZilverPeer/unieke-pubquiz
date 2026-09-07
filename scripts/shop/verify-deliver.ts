@@ -7,28 +7,40 @@
  * anything else from the repository.
  *
  * Usage:
- *   npx tsx scripts/shop/verify-deliver.ts deliver <orderId> <lineItemId>
+ *   npx tsx scripts/shop/verify-deliver.ts deliver <orderId> <lineItemId> [sequence]
  *   npx tsx scripts/shop/verify-deliver.ts fail <orderId> <lineItemId> "<reason>"
+ *
+ * `sequence` (0-based, default 0) is only meaningful for `deliver`: pass a
+ * second sequence on the same line item id to check that quantity-above-one
+ * doesn't clobber links (finding 1, PR #48 review) -- e.g. run
+ * `deliver <id> <lineItemId> 0` then `deliver <id> <lineItemId> 1` against
+ * the same order/line item and confirm eight distinct meta entries.
  */
 import { createDeliverer, type OrderLookup } from "../../src/deliver";
 import { downloadPath } from "../../src/domain";
 
-const [, , mode, orderIdRaw, lineItemIdRaw, reason] = process.argv;
+const [, , mode, orderIdRaw, lineItemIdRaw, thirdArg] = process.argv;
 
 if (!mode || !orderIdRaw || !lineItemIdRaw) {
-  console.error("Usage: verify-deliver.ts <deliver|fail> <orderId> <lineItemId> [reason]");
+  console.error("Usage: verify-deliver.ts <deliver|fail> <orderId> <lineItemId> [sequence|reason]");
   process.exit(1);
 }
 
 const wooOrderId = Number(orderIdRaw);
 const wooLineItemId = Number(lineItemIdRaw);
+const sequence = mode === "deliver" && thirdArg ? Number(thirdArg) : 0;
+const reason = thirdArg;
 
 const fakeOrderLookup: OrderLookup = {
   async forQuiz() {
     return {
       wooOrderId,
       wooLineItemId,
-      // Single-Quiz order: "delivered" here is enough to trigger completion.
+      sequence,
+      // Always reports a single "delivered" sibling regardless of `sequence`,
+      // so completion-gating isn't what this script re-checks (deliverer.test.ts
+      // already covers that) -- this fake exists to check the meta_data itself
+      // (clobbering across sequences) against the real shop.
       siblingStatuses: ["delivered"],
     };
   },

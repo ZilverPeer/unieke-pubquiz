@@ -227,13 +227,16 @@ describe("createDeliverer", () => {
         {
           id: 1,
           meta_data: [
-            { key: downloadMetaKey("quizmaster.pdf"), value: "http://localhost:3000/download/tok/quizmaster.pdf" },
+            { key: downloadMetaKey(0, "quizmaster.pdf"), value: "http://localhost:3000/download/tok/quizmaster.pdf" },
             {
-              key: downloadMetaKey("picture-handout.pdf"),
+              key: downloadMetaKey(0, "picture-handout.pdf"),
               value: "http://localhost:3000/download/tok/picture-handout.pdf",
             },
-            { key: downloadMetaKey("answer-sheet.pdf"), value: "http://localhost:3000/download/tok/answer-sheet.pdf" },
-            { key: downloadMetaKey("music-round.mp3"), value: "http://localhost:3000/download/tok/music-round.mp3" },
+            {
+              key: downloadMetaKey(0, "answer-sheet.pdf"),
+              value: "http://localhost:3000/download/tok/answer-sheet.pdf",
+            },
+            { key: downloadMetaKey(0, "music-round.mp3"), value: "http://localhost:3000/download/tok/music-round.mp3" },
           ],
         },
       ],
@@ -300,6 +303,9 @@ describe("createDeliverer", () => {
     );
     expect(completions).toHaveLength(1);
     expect(completions[0].path).toBe("/wp-json/wc/v3/orders/999");
+    expect(completions[0].authorization).toBe(
+      `Basic ${Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString("base64")}`,
+    );
   });
 
   test("a failed sibling prevents completion even after this Quiz delivers", async () => {
@@ -362,6 +368,53 @@ describe("createDeliverer", () => {
     expect(completionsAfterSecond).toHaveLength(1); // still just the one from the first call
   });
 
+  test("two Quizzes sharing a line item (quantity above one) get distinct meta_data keyed by sequence, and the order completes only once both are delivered", async () => {
+    stub.seedOrder({ id: 999, status: "processing", line_items: [{ id: 1, meta_data: [] }] });
+    const order = fakeOrderRecord({ wooOrderId: 999 });
+    const quizzes = new Map<string, QuizRecord>([
+      ["quiz-a", fakeQuiz({ id: "quiz-a", wooLineItemId: 1, sequence: 0, status: "delivered" })],
+      ["quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 1, sequence: 1, status: "pending" })],
+    ]);
+    const lookup = fakeOrderLookup(quizzes, order);
+    const deliverer = createDeliverer(config, lookup);
+    const filesFor = (label: string) =>
+      (["quizmaster.pdf", "picture-handout.pdf", "answer-sheet.pdf", "music-round.mp3"] as const).map((file) => ({
+        file,
+        url: `http://localhost:3000/download/${label}/${file}`,
+      }));
+
+    await deliverer.deliverQuiz({ quizId: "quiz-a", files: filesFor("a") });
+
+    // Order isn't complete yet -- quiz-b is still pending.
+    expect(stub.requests.some((r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed")).toBe(
+      false,
+    );
+
+    // Second Quiz now also delivered.
+    quizzes.set("quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 1, sequence: 1, status: "delivered" }));
+    await deliverer.deliverQuiz({ quizId: "quiz-b", files: filesFor("b") });
+
+    const finalOrder = await new Promise<WooOrder>((resolve) => {
+      const req = httpRequest(
+        { hostname: "127.0.0.1", port: new URL(config.baseUrl).port, path: "/wp-json/wc/v3/orders/999", method: "GET" },
+        (res: IncomingMessage) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () => resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))));
+        },
+      );
+      req.end();
+    });
+    const keys = finalOrder.line_items[0].meta_data.map((m) => m.key);
+    expect(new Set(keys).size).toBe(8); // eight distinct meta entries: 4 files x 2 Quizzes, no clobbering
+    expect(keys).toEqual(expect.arrayContaining([downloadMetaKey(0, "quizmaster.pdf"), downloadMetaKey(1, "quizmaster.pdf")]));
+
+    const completions = stub.requests.filter(
+      (r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed",
+    );
+    expect(completions).toHaveLength(1); // completes only after both Quizzes of the shared line item are delivered
+  });
+
   test("noteFailure posts a private order note with the OPERATOR_NOTE_PREFIX and line item id", async () => {
     stub.seedOrder({ id: 999, status: "processing", line_items: [{ id: 1, meta_data: [] }] });
     const order = fakeOrderRecord({ wooOrderId: 999 });
@@ -380,6 +433,9 @@ describe("createDeliverer", () => {
     ]);
     const postRequest = stub.requests.find((r) => r.method === "POST");
     expect(postRequest?.path).toBe("/wp-json/wc/v3/orders/999/notes");
+    expect(postRequest?.authorization).toBe(
+      `Basic ${Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString("base64")}`,
+    );
 
     const statusUpdates = stub.requests.filter(
       (r) => r.method === "PUT" && (r.body as { status?: string }).status !== undefined,

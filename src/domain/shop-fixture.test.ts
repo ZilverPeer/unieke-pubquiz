@@ -60,7 +60,8 @@ describe("shop/mu-plugins/pubquiz-operator-mail.php", () => {
 describe("shop/mu-plugins/pubquiz-downloads.php", () => {
   test("declares the PUBQUIZ_DOWNLOAD_META_PREFIX literal matching downloadMetaKey's stem", () => {
     const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
-    const stem = downloadMetaKey("quizmaster.pdf").replace("quizmaster.pdf", "");
+    // downloadMetaKey's stem is everything before "<1-based sequence>_<file>".
+    const stem = downloadMetaKey(0, "quizmaster.pdf").replace("1_quizmaster.pdf", "");
     expect(php).toContain(`PUBQUIZ_DOWNLOAD_META_PREFIX = '${stem}'`);
   });
 });

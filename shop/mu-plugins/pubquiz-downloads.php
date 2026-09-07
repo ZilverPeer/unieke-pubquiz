@@ -2,11 +2,16 @@
 /**
  * Plugin Name: Pubquiz Downloads
  * Description: Renders the deliver module's line item meta_data
- *              (pubquiz_download_<file>, one per Deliverable -- see
- *              downloadMetaKey() in src/domain/checkout.ts) as labelled
- *              download links, since WooCommerce has no supported REST way
- *              to attach per-order downloadable files to a line item (see
- *              src/deliver/README.md "How downloads are attached"). Renders
+ *              (pubquiz_download_<sequence>_<file>, one per Deliverable per
+ *              Quiz -- see downloadMetaKey() in src/domain/checkout.ts) as
+ *              labelled download links, since WooCommerce has no supported
+ *              REST way to attach per-order downloadable files to a line
+ *              item (see src/deliver/README.md "How downloads are
+ *              attached"). A line item's quantity can be above one, so
+ *              several Quizzes can share one line item -- the key's
+ *              1-based sequence keeps each Quiz's four files distinct, and
+ *              this plugin groups them back by sequence, showing a "Quiz N"
+ *              heading per group only when there is more than one. Renders
  *              in the customer order view, the completed-order email (both
  *              use the same order-details-item template, hence one hook),
  *              and My Account -> Downloads. Hides the raw meta_data
@@ -21,10 +26,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-/** Keep in sync with downloadMetaKey() in src/domain/checkout.ts. */
+/** Keep in sync with downloadMetaKey()'s stem in src/domain/checkout.ts. */
 const PUBQUIZ_DOWNLOAD_META_PREFIX = 'pubquiz_download_';
 
-/** Keep in sync with DELIVERABLE_FILES in src/domain/orders.ts. */
+/** Matches a downloadMetaKey() key: capture group 1 is the 1-based sequence, group 2 the file name. */
+const PUBQUIZ_DOWNLOAD_META_PATTERN = '/^pubquiz_download_(\d+)_(.+)$/';
+
+/** Keep in sync with DELIVERABLE_FILES in src/domain/orders.ts -- display order within a Quiz's group. */
 const PUBQUIZ_DELIVERABLE_FILES = array( 'quizmaster.pdf', 'picture-handout.pdf', 'answer-sheet.pdf', 'music-round.mp3' );
 
 /**
@@ -52,27 +60,54 @@ function pubquiz_download_label( $file, $locale ) {
     return isset( $set[ $file ] ) ? $set[ $file ] : $file;
 }
 
-/**
- * @param WC_Order_Item $item
- * @return array<string,string> Deliverable file name => absolute download URL.
- */
-function pubquiz_download_links_for_item( $item ) {
-    $links = array();
-    foreach ( PUBQUIZ_DELIVERABLE_FILES as $file ) {
-        $url = (string) $item->get_meta( PUBQUIZ_DOWNLOAD_META_PREFIX . $file, true );
-        if ( '' !== $url ) {
-            $links[ $file ] = $url;
-        }
-    }
-    return $links;
+/** "Quiz N" heading for a group -- same word in Dutch and English, so no locale table needed. */
+function pubquiz_quiz_heading( $sequence ) {
+    return sprintf( 'Quiz %d', $sequence );
 }
 
-/** Hides the raw pubquiz_download_* keys from the wp-admin order screen's item meta box; the links are rendered separately below. */
+/**
+ * Groups an order item's pubquiz_download_* meta_data by the Quiz sequence
+ * baked into the key (downloadMetaKey(), src/domain/checkout.ts) -- a line
+ * item's quantity can be above one, so more than one Quiz's files can live
+ * on the same item.
+ *
+ * @param WC_Order_Item $item
+ * @return array<int,array<string,string>> 1-based sequence => (Deliverable file name => absolute download URL), ordered by sequence then by PUBQUIZ_DELIVERABLE_FILES.
+ */
+function pubquiz_download_groups_for_item( $item ) {
+    $groups = array();
+    foreach ( $item->get_meta_data() as $meta ) {
+        if ( preg_match( PUBQUIZ_DOWNLOAD_META_PATTERN, $meta->key, $captured ) ) {
+            $sequence                          = (int) $captured[1];
+            $file                              = $captured[2];
+            $groups[ $sequence ][ $file ] = (string) $meta->value;
+        }
+    }
+    ksort( $groups );
+    foreach ( $groups as $sequence => $files ) {
+        uksort(
+            $files,
+            fn( $a, $b ) => array_search( $a, PUBQUIZ_DELIVERABLE_FILES, true ) <=> array_search( $b, PUBQUIZ_DELIVERABLE_FILES, true )
+        );
+        $groups[ $sequence ] = $files;
+    }
+    return $groups;
+}
+
+/**
+ * Hides the raw pubquiz_download_* keys from the wp-admin order screen's item
+ * meta box; the links are rendered separately below. `woocommerce_hidden_order_itemmeta`
+ * only supports exact-match keys, not patterns, so this enumerates every
+ * sequence up to a generous bound rather than matching the regex -- the meta
+ * box only reads this list to decide what to skip, it never needs a group.
+ */
 add_filter(
     'woocommerce_hidden_order_itemmeta',
     function ( $hidden ) {
-        foreach ( PUBQUIZ_DELIVERABLE_FILES as $file ) {
-            $hidden[] = PUBQUIZ_DOWNLOAD_META_PREFIX . $file;
+        foreach ( range( 1, 20 ) as $sequence ) {
+            foreach ( PUBQUIZ_DELIVERABLE_FILES as $file ) {
+                $hidden[] = PUBQUIZ_DOWNLOAD_META_PREFIX . $sequence . '_' . $file;
+            }
         }
         return $hidden;
     }
@@ -105,21 +140,27 @@ add_filter(
  * order-details-item template, which fires this action once per item.
  */
 function pubquiz_render_download_links( $item_id, $item, $order ) {
-    $links = pubquiz_download_links_for_item( $item );
-    if ( empty( $links ) ) {
+    $groups = pubquiz_download_groups_for_item( $item );
+    if ( empty( $groups ) ) {
         return;
     }
 
-    $locale = (string) $item->get_meta( 'pubquiz_locale', true );
-    echo '<ul class="pubquiz-downloads">';
-    foreach ( $links as $file => $url ) {
-        printf(
-            '<li><a href="%1$s">%2$s</a></li>',
-            esc_url( $url ),
-            esc_html( pubquiz_download_label( $file, $locale ) )
-        );
+    $locale     = (string) $item->get_meta( 'pubquiz_locale', true );
+    $show_headings = count( $groups ) > 1; // only when the line item's quantity is above one
+    foreach ( $groups as $sequence => $links ) {
+        if ( $show_headings ) {
+            printf( '<p class="pubquiz-downloads-heading"><strong>%s</strong></p>', esc_html( pubquiz_quiz_heading( $sequence ) ) );
+        }
+        echo '<ul class="pubquiz-downloads">';
+        foreach ( $links as $file => $url ) {
+            printf(
+                '<li><a href="%1$s">%2$s</a></li>',
+                esc_url( $url ),
+                esc_html( pubquiz_download_label( $file, $locale ) )
+            );
+        }
+        echo '</ul>';
     }
-    echo '</ul>';
 }
 add_action( 'woocommerce_order_item_meta_end', 'pubquiz_render_download_links', 10, 3 );
 
@@ -146,30 +187,36 @@ add_filter(
             }
 
             foreach ( $order->get_items() as $item ) {
-                $links = pubquiz_download_links_for_item( $item );
-                if ( empty( $links ) ) {
+                $groups = pubquiz_download_groups_for_item( $item );
+                if ( empty( $groups ) ) {
                     continue;
                 }
 
-                $locale = (string) $item->get_meta( 'pubquiz_locale', true );
-                foreach ( $links as $file => $url ) {
-                    $label       = pubquiz_download_label( $file, $locale );
-                    $downloads[] = array(
-                        'download_url'        => $url,
-                        'download_id'         => md5( $order_id . '-' . $item->get_id() . '-' . $file ),
-                        'product_id'          => $item->get_product_id(),
-                        'product_name'        => $label,
-                        'product_url'         => '',
-                        'download_name'       => $label,
-                        'order_id'            => $order_id,
-                        'order_key'           => $order->get_order_key(),
-                        'downloads_remaining' => '',
-                        'access_expires'      => '',
-                        'file'                => array(
-                            'name' => $label,
-                            'file' => $url,
-                        ),
-                    );
+                $locale        = (string) $item->get_meta( 'pubquiz_locale', true );
+                $show_sequence = count( $groups ) > 1; // only when the line item's quantity is above one
+                foreach ( $groups as $sequence => $links ) {
+                    foreach ( $links as $file => $url ) {
+                        $label = pubquiz_download_label( $file, $locale );
+                        if ( $show_sequence ) {
+                            $label = pubquiz_quiz_heading( $sequence ) . ' – ' . $label;
+                        }
+                        $downloads[] = array(
+                            'download_url'        => $url,
+                            'download_id'         => md5( $order_id . '-' . $item->get_id() . '-' . $sequence . '-' . $file ),
+                            'product_id'          => $item->get_product_id(),
+                            'product_name'        => $label,
+                            'product_url'         => '',
+                            'download_name'       => $label,
+                            'order_id'            => $order_id,
+                            'order_key'           => $order->get_order_key(),
+                            'downloads_remaining' => '',
+                            'access_expires'      => '',
+                            'file'                => array(
+                                'name' => $label,
+                                'file' => $url,
+                            ),
+                        );
+                    }
                 }
             }
         }

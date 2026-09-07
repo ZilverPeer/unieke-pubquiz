@@ -11,6 +11,13 @@ import type { OrderRepository } from "@/repository";
 export interface QuizOrderContext {
   wooOrderId: number;
   wooLineItemId: number;
+  /**
+   * This Quiz's 0-based position among the Quizzes sharing its line item
+   * (`quizzes.sequence`, src/repository/orders.ts) -- a line item's quantity
+   * can be above one, so this is what keeps each Quiz's downloadMetaKey
+   * distinct instead of siblings clobbering each other's links.
+   */
+  sequence: number;
   /** Status of every Quiz belonging to the order, this one included. */
   siblingStatuses: readonly QuizStatus[];
 }
@@ -38,6 +45,7 @@ export function createOrderLookup(repository: OrderRepository): OrderLookup {
       return {
         wooOrderId: order.wooOrderId,
         wooLineItemId: quiz.wooLineItemId,
+        sequence: quiz.sequence,
         siblingStatuses: siblings.map((sibling) => sibling.status),
       };
     },

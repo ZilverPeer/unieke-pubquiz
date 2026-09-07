@@ -14,7 +14,22 @@
  * works exactly as the deliver module (and CONTEXT.md "Delivery") expects.
  * Scoped to /wp-json/wc/ so nothing else that reads is_ssl() (cookies,
  * admin redirects, etc.) is affected.
+ *
+ * Gated to local/development environments only, same pattern as
+ * pubquiz-mailpit-smtp.php: spoofing is_ssl() is only safe because this
+ * shop's plain-HTTP setup is itself local-only. A real deployment sits
+ * behind the VPS's HTTPS reverse proxy, where is_ssl() is already true (or
+ * derivable from X-Forwarded-Proto) without this shim -- it must never also
+ * spoof SSL there.
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+if ( ! in_array( wp_get_environment_type(), [ 'local', 'development' ], true ) ) {
+    return;
+}
 
 if ( isset( $_SERVER['REQUEST_URI'] ) && str_contains( $_SERVER['REQUEST_URI'], '/wp-json/wc/' ) ) {
     $_SERVER['HTTPS'] = 'on';

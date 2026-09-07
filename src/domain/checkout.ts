@@ -28,11 +28,20 @@ export const OPERATOR_NOTE_PREFIX = "[pubquiz]";
 
 /**
  * The line item meta_data key the deliver module (#41) writes a Deliverable's
- * download URL under. `shop/mu-plugins/pubquiz-downloads.php` reads this same
- * key stem to find and render the download links; a fixture test
+ * download URL under. A line item's quantity can be above one -- several
+ * Quizzes then share one wooLineItemId (src/repository/orders.ts,
+ * CONTEXT.md "Order"/"Quiz") -- so the key carries the Quiz's `sequence`
+ * (0-based internally, 1-based here for customers, same convention as
+ * `CHECKOUT_META_KEYS.categoryPick`) to keep each Quiz's four files distinct
+ * instead of the last-delivered Quiz's links clobbering the others'.
+ * `shop/mu-plugins/pubquiz-downloads.php` reads this same key stem to find,
+ * group, and render the download links; a fixture test
  * (shop-fixture.test.ts) checks the PHP literal stays in sync by hand (PHP
  * cannot import this constant).
  */
-export function downloadMetaKey(file: DeliverableFile): string {
-  return `pubquiz_download_${file}`;
+export function downloadMetaKey(sequence: number, file: DeliverableFile): string {
+  if (!Number.isInteger(sequence) || sequence < 0) {
+    throw new RangeError(`sequence must be a non-negative integer, got ${sequence}`);
+  }
+  return `pubquiz_download_${sequence + 1}_${file}`;
 }
