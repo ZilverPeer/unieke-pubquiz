@@ -168,6 +168,29 @@ describe("shop/mu-plugins/pubquiz-fast-scheduler.php", () => {
   });
 });
 
+describe(".wp-env.json", () => {
+  /**
+   * Ticket #58 fix round 3: spawn_cron() (wp-includes/cron.php) writes the
+   * `doing_cron` transient lock BEFORE firing its loopback POST to
+   * wp-cron.php, and that loopback never completes inside the wp-env
+   * container -- so the lock sits for the full WP_CRON_LOCK_TIMEOUT (60s)
+   * every time a normal page load (checkout, REST, admin) re-arms it,
+   * which is why the cron ticker's own external wp-cron.php requests kept
+   * getting turned away early (wp-cron.php's own lock check) and webhook
+   * latency clustered near 0s or near 60s instead of consistently under
+   * the ticket's 30s target. DISABLE_WP_CRON makes _wp_cron() a no-op on
+   * page loads (it returns 0 before ever taking the lock) without
+   * affecting wp-cron.php itself, which the ticker calls directly and
+   * which does not check the constant.
+   */
+  test("disables WordPress's own page-load cron spawn (DISABLE_WP_CRON)", () => {
+    const config = JSON.parse(readFileSync(join(REPO_ROOT, ".wp-env.json"), "utf8")) as {
+      config?: Record<string, unknown>;
+    };
+    expect(config.config?.DISABLE_WP_CRON).toBe(true);
+  });
+});
+
 describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
   /**
    * Ticket #61 (single-bootstrap shop:up) moved the Pubquiz product's slug,

@@ -471,6 +471,21 @@ one:
    Action Scheduler's own async loopback request back out anywhere useful)
    -- a real deployment's async runner already delivers within the same
    request cycle, so this plugin is a no-op in production.
+3. **`DISABLE_WP_CRON` (`.wp-env.json`).** Even with both pieces above,
+   latency clustered near 0s or near 60s instead of consistently landing
+   under 30s: WordPress's own page-load cron spawn
+   (`spawn_cron()`/`_wp_cron()`, `wp-includes/cron.php`) writes its
+   `doing_cron` transient lock *before* firing a loopback HTTP request back
+   to `wp-cron.php` -- a loopback that never completes from inside the
+   wp-env container -- so every normal page load (checkout, REST, admin)
+   re-armed a lock that then sat for the full `WP_CRON_LOCK_TIMEOUT` (60s),
+   during which the ticker's own external `wp-cron.php` requests got
+   turned away early by wp-cron.php's own lock check. `DISABLE_WP_CRON`
+   makes `_wp_cron()` a no-op on page loads (it returns before ever taking
+   the lock) without touching `wp-cron.php` itself, which the ticker calls
+   directly and which does not check the constant -- so the ticker's own
+   5-second requests are the only thing spawning cron now, and the lock is
+   never held by a losing loopback.
 
 **Troubleshooting:** if an order sits in `processing` for more than a
 minute, check `docker ps` for `pubquiz-cron-ticker`; if it's missing or
