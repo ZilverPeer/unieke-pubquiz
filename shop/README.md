@@ -6,6 +6,10 @@ receiver (#39) and the deliver module (#41) see. Nothing here talks to
 Vercel or Supabase; it reads `src/domain/checkout.ts` and
 `src/domain/types.ts` for the pinned meta-key/slot constants.
 
+Since ticket #56 the shop is Dutch: the Storefront theme, `nl_NL` site
+language, EUR/NL WooCommerce settings, a Dutch product, and a guest checkout
+that only asks for a name and an email. See "Dutch storefront" below.
+
 ## Commands
 
 | Command | What it does |
@@ -68,6 +72,133 @@ published at 45333 (reachable from wp-env's containers via Docker Desktop's
 `host.docker.internal`) and its web UI at http://127.0.0.1:45332. All
 outgoing `wp_mail()` calls are routed there by
 `shop/mu-plugins/pubquiz-mailpit-smtp.php`.
+
+## Dutch storefront (ticket #56)
+
+`npm run shop:up` brings the shop to a Dutch, guest-checkout-ready state,
+idempotently, with WP-CLI (see `scripts/shop/lib/wordpress-settings.ts` and
+`scripts/shop/lib/product.ts`):
+
+- **Theme.** The Storefront theme (WooCommerce's own free theme, chosen per
+  spec #55 "Theme" -- it works with the classic Cart/Checkout shortcodes
+  this shop already needs for the Advanced Product Fields plugin, see
+  "Plugin choice" below) is installed via `.wp-env.json`'s declarative
+  `themes` array (the same idempotent-on-`wp-env start` mechanism the
+  `plugins` array already used for WooCommerce and Advanced Product Fields),
+  using the plain `https://downloads.wordpress.org/theme/storefront.zip`
+  URL rather than a `.latest-stable.zip` one -- wp-env names the extracted
+  directory after the zip filename minus `.zip`
+  (`node_modules/@wordpress/env/lib/download-sources.js`), so a
+  `.latest-stable.zip` URL would extract to
+  `wp-content/themes/storefront.latest-stable/` instead of
+  `wp-content/themes/storefront/`, same bug already documented below for
+  plugins. `scripts/shop/setup.ts` then runs `wp theme activate storefront`
+  every run (a no-op once already active).
+- **Language.** `wp language core install nl_NL --activate` sets the site
+  language to Dutch; `wp language plugin install woocommerce nl_NL` and
+  `wp language theme install storefront nl_NL` install the Dutch
+  translations for WooCommerce's and Storefront's own strings;
+  `wp language core update` refreshes all installed translations. All four
+  are idempotent on their own (re-running an install/activate that's
+  already done is a no-op).
+- **WooCommerce store settings.** `woocommerce_currency=EUR`,
+  `woocommerce_default_country=NL`,
+  `woocommerce_enable_guest_checkout=yes`,
+  `woocommerce_enable_signup_and_login_from_checkout=yes` -- option names
+  verified against the installed WooCommerce itself
+  (`wp option list --search=woocommerce_*`), not assumed.
+- **Product.** The Pubquiz product's name, short description and
+  (placeholder, 14.95 EUR) price are Dutch, set by
+  `scripts/shop/lib/product.ts` both at creation and, so a re-run converges
+  an already-existing product too, on every subsequent `shop:up`.
+- **Pages.** WooCommerce's own install creates its Shop/Cart/Checkout/My
+  account pages with English titles and slugs *before* the language switch
+  runs -- switching the site language doesn't retitle already-existing
+  content, so left alone, every page's `<title>` and Storefront's primary
+  navigation (which falls back to listing published pages when no menu is
+  assigned, true here) would stay English forever, reruns included.
+  `ensureDutchPages()` (`scripts/shop/lib/wordpress-settings.ts`) renames
+  them in place, by `woocommerce_<page>_page_id` option (never by slug, so
+  WooCommerce's own page-id wiring keeps pointing at the same post): Shop ->
+  Winkel/`winkel`, Cart -> Winkelwagen/`winkelwagen`, Checkout ->
+  Afrekenen/`afrekenen`, My account -> Mijn account/`mijn-account` -- and
+  deletes the "Sample Page" WooCommerce leaves behind (otherwise the one
+  remaining English entry in the fallback navigation). `setup.ts` re-applies
+  the classic Cart/Checkout shortcodes under the new (`winkelwagen`/
+  `afrekenen`) slugs right after.
+- **Guest checkout, minimal fields.** `shop/mu-plugins/pubquiz-checkout-fields.php`
+  filters `woocommerce_billing_fields` down to first name, last name and
+  email at checkout (`is_checkout()`, true for both the checkout page and
+  the wc-ajax checkout submission WooCommerce validates the fields against
+  -- see the plugin's own comment) whenever the cart doesn't need shipping
+  (true for any cart made up only of virtual products, the Pubquiz product
+  included) -- WooCommerce already drops the shipping fields for such a
+  cart by itself, this does the same for billing. Scoped to checkout only,
+  so My Account -> Addresses still shows every billing field for a
+  customer's saved address. Ticks WooCommerce's own "create an account" box
+  at checkout to opt into an account; guest checkout otherwise needs nothing
+  beyond the three kept fields.
+- **The customer notice.** `shop/mu-plugins/pubquiz-customer-notice.php`
+  adds a Dutch notice -- "Je quiz wordt gemaakt. Je ontvangt binnen enkele
+  minuten een e-mail met de downloadlink." -- to the order-received
+  (thank-you) page (`woocommerce_thankyou`) and to the processing-order
+  mail (`woocommerce_email_order_details`, filtered to
+  `customer_processing_order` only), for any order carrying a
+  Pubquiz-configured line item (same `pubquiz_locale` line-item-meta match
+  as `pubquiz-hold-processing.php`). An order without a Pubquiz product
+  gets neither.
+
+### Key verification (ticket #56): guest checkout, Dutch chrome, the notice
+
+Reproduced against a running `shop:up` (theme active, `nl_NL`, EUR/NL, guest
+checkout and account creation on -- read back with `wp theme list
+--status=active`, `wp option get WPLANG`, `wp option get
+woocommerce_currency`, `wp option get woocommerce_default_country`, `wp
+option get woocommerce_enable_guest_checkout`, `wp option get
+woocommerce_enable_signup_and_login_from_checkout`):
+
+1. **Dutch chrome, no English leftovers.** `curl` of `/product/pubquiz/`,
+   `/winkelwagen/` (after an add-to-cart) and `/afrekenen/` all show a Dutch
+   `<title>` ("Pubquiz – digitale download", "Winkelwagen", "Afrekenen"),
+   `wp-theme-storefront`/`storefront-primary-navigation` in the body/markup,
+   Dutch WooCommerce strings ("Toevoegen aan winkelwagen", "Afrekenen",
+   "Voornaam", "Achternaam", "E-mailadres", "Plaats bestelling" on the
+   submit button), and a primary navigation of exactly Winkel/Winkelwagen/
+   Afrekenen/Mijn account (`wp post list --post_type=page
+   --fields=ID,post_title,post_name` shows those four titles/slugs, and no
+   "Sample Page") -- no English WooCommerce chrome or leftover default page
+   anywhere.
+2. **Minimal-fields guest checkout.** The checkout page's rendered billing
+   fields are exactly `billing_first_name`, `billing_last_name`,
+   `billing_email` (verified by grepping the checkout HTML for
+   `id="billing_*"`) -- every other billing field (address, city, postcode,
+   country, phone) is gone, per `pubquiz-checkout-fields.php`. Scoped to
+   checkout only: `/mijn-account/edit-address/billing/` for a logged-in
+   customer still renders every billing field (address, city, postcode,
+   country, phone included).
+3. **The documented checkout path, name and email only.** Using the same
+   add-to-cart -> scrape-nonce -> submit-checkout curl sequence as "Key
+   verification (ticket item 3)" below, but with only
+   `billing_first_name`, `billing_last_name`, `billing_email` and no address
+   fields at all: the order is accepted (`"result":"success"`) and
+   `wp wc shop_order get <id> --field=status` reads `processing` -- omitting
+   the address fields is not rejected as a missing address.
+4. **The notice, on the order-received page and in the mail.** The
+   order-received page (the `redirect` URL the checkout AJAX call returns)
+   contains "Je quiz wordt gemaakt."; Mailpit's API
+   (`curl http://127.0.0.1:45332/api/v1/message/<id>`, message id from
+   `curl http://127.0.0.1:45332/api/v1/messages`) shows the same text in the
+   customer's "Je bestelling ... is ontvangen!" mail (WooCommerce's Dutch
+   subject for its processing-order email).
+5. **No notice without a Pubquiz product.** A second, plain product created
+   with `wp wc product create` (not the Pubquiz product), bought through the
+   same checkout path, reaches `processing` too but its order-received page
+   and processing-order mail contain no notice text. The plain product is
+   deleted afterwards.
+6. **Idempotent setup.** Running `npm run shop:up` twice leaves exactly one
+   Pubquiz product (`wp wc product list --field=id`), the same product id,
+   Storefront still active, and `nl_NL`/EUR/NL/guest-checkout/signup
+   unchanged.
 
 ## Plugin choice: Advanced Product Fields (Product Addons) for WooCommerce
 

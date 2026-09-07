@@ -6,6 +6,9 @@
     "https://downloads.wordpress.org/plugin/woocommerce.zip",
     "https://downloads.wordpress.org/plugin/advanced-product-fields-for-woocommerce.zip"
   ],
+  "themes": [
+    "https://downloads.wordpress.org/theme/storefront.zip"
+  ],
   "mappings": {
     "wp-content/mu-plugins": "./shop/mu-plugins"
   },
