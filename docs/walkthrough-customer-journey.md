@@ -19,15 +19,15 @@ When you're done: `npm run loop:down` (see the end of this document).
 
 ## The product page
 
-Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three always-visible fields above the price (ticket #72):
+Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three always-visible fields above the price (ticket #72), no Beoordelingen (reviews) tab, and no quantity box next to "Toevoegen aan winkelwagen" (spec 3c, #83: the product is sold individually):
 
 - **Taal** -- Nederlands (preselected) / Engels
 - **Moeilijkheid** -- Makkelijk / Gemiddeld / Moeilijk / Gemengd (preselected)
-- **Categorieën** -- a group of checkboxes, one per seeded Category's Dutch name (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has), none preselected, capped at 8 -- checking a 9th shows "Kies maximaal 8 categorieën." and the item is not added. Below it: "Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt." -- picking nothing is a valid, explained choice (the sampler then gives every round a random, distinct Category, per CONTEXT.md "Quiz"); picking *k* Categories cycles those *k* picks evenly over the 8 rounds, in the order you checked them.
+- **Categorieën** -- a searchable dropdown with removable chips (spec 3c, #83), one choice per seeded Category's Dutch name (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has), opened with the full list in Category id order and filtered as you type; none preselected, capped at 8 -- trying a 9th pick shows "Kies maximaal 8 categorieën." next to the picker and it is not added. Below it: "Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt." -- picking nothing is a valid, explained choice (the sampler then gives every round a random, distinct Category, per CONTEXT.md "Quiz"); picking *k* Categories cycles those *k* picks evenly over the 8 rounds, in the order you picked them. Without JavaScript, or via `curl` (see below), the picker falls back to the plain checkbox group it's built from -- add to cart works identically either way.
 
-Check zero to eight boxes, then click **Toevoegen aan winkelwagen**.
+Pick zero to eight Categories, then click **Toevoegen aan winkelwagen**. Trying to add the exact same Taal/Moeilijkheid/Categorieën combination a second time is refused with WooCommerce's own message ("Je hebt ... al in je winkelwagen ..."); a *different* combination becomes a second cart line -- see "A second Quiz in the same order" below.
 
-**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` repeats, once per pick, in pick order -- three picks below, so the sampler's cycle rule gives 3/3/2 rounds per pick, per CONTEXT.md "Quiz"):
+**Curl equivalent** (posts straight to the underlying checkbox field, bypassing the dropdown entirely -- the same request the checkbox fallback sends without JavaScript. A fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` repeats, once per pick, in pick order -- three picks below, so the sampler's cycle rule gives 3/3/2 rounds per pick, per CONTEXT.md "Quiz"):
 
 ```powershell
 $productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
@@ -116,6 +116,13 @@ curl.exe -o quiz-2.zip "http://localhost:3000/download/<token 2>/quiz.zip"
 ```
 
 Each zip unpacks to the four Deliverables (`quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3`; a script and answer-sheet PDF around 15-30 KB, a picture hand-out PDF a few hundred KB depending on the images sampled, an MP3 under a megabyte).
+
+## A second Quiz in the same order
+
+Because the Pubquiz product is sold individually (spec 3c, #83), the only way to buy more than one Quiz in one order is to configure a *different* combination of Taal/Moeilijkheid/Categorieën and add it as a second cart line -- the identical configuration a second time is refused (see "The product page" above). Add the first configuration, then go back to http://localhost:45330/product/pubquiz/, pick a different Taal, Moeilijkheid or set of Categorieën, and click **Toevoegen aan winkelwagen** again: **Winkelwagen** now shows two lines, each &euro;14,95, no quantity column. Checkout, the mails and the downloads all follow exactly as in the single-order flow above, except the order summary lists both configurations and the completed mail carries two zip rows instead of one:
+
+- `pubquiz-<order number>-1-nl.zip` -- Categorieën: ... (the first configuration)
+- `pubquiz-<order number>-2-<locale>.zip` -- Categorieën: ... (the second)
 
 ## My Account downloads (an account created at checkout)
 

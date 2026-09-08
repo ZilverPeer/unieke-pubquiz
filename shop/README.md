@@ -142,15 +142,22 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
 - **WooCommerce store settings.** `woocommerce_currency=EUR`,
   `woocommerce_default_country=NL`,
   `woocommerce_enable_guest_checkout=yes`,
-  `woocommerce_enable_signup_and_login_from_checkout=yes` -- option names
-  verified against the installed WooCommerce itself
-  (`wp option list --search=woocommerce_*`), not assumed. `setup-shop.php`
-  reads each option first and only calls `update_option()` when the value
-  differs.
+  `woocommerce_enable_signup_and_login_from_checkout=yes`,
+  `woocommerce_enable_reviews=no` (spec 3c, #83: no Beoordelingen tab or
+  star rating anywhere in the shop) -- option names verified against the
+  installed WooCommerce itself (`wp option list --search=woocommerce_*`),
+  not assumed. `setup-shop.php` reads each option first and only calls
+  `update_option()` when the value differs.
 - **Product.** The Pubquiz product's name, short description and
   (placeholder, 14.95 EUR) price are Dutch, set by `setup-shop.php`'s
   `pubquiz_ensure_product()` both at creation and, so a re-run converges an
-  already-existing product too, on every subsequent `shop:up`.
+  already-existing product too, on every subsequent `shop:up`. Since spec 3c
+  (#83) the product is also `reviews_allowed=false` (no per-product review
+  form) and `sold_individually=true` -- no quantity box on the product page
+  or in the cart, and adding an identical configuration a second time is
+  refused with WooCommerce's own message (a cart line is keyed on the
+  product plus its field values, so a *different* configuration still
+  becomes a second line, and a multi-Quiz order stays possible).
 - **Pages.** WooCommerce's own install creates its Shop/Cart/Checkout/My
   account pages with English titles and slugs *before* the language switch
   runs -- switching the site language doesn't retitle already-existing
@@ -325,6 +332,13 @@ Makkelijk/Gemiddeld/Moeilijk/Gemengd; each Category's `nl` name) -- see
 "Readable Dutch options and the label-to-key bridge" below for why that
 doesn't break the webhook wire format.
 
+In the browser (spec 3c, #83), `shop/mu-plugins/pubquiz-category-dropdown.php`
+turns the `categories` checkbox group into a searchable multi-select
+dropdown with removable chips (a vendored copy of Tom Select, see "Searchable
+Categorieën dropdown" below); a plain `curl` of the product page still shows
+the underlying checkbox inputs -- the dropdown is a client-side enhancement
+of the same field, not a replacement for it.
+
 The `categories` field's description text renders through this plugin's own
 free-tier template (`views/frontend/field-group.php` calls
 `Html::field_description($field)`, which prints `$field->description`
@@ -342,7 +356,11 @@ to set the `number` field type's HTML `max` attribute; nothing reads it for
 `pubquiz-checkout-meta.php` hooks `woocommerce_add_to_cart_validation` and
 rejects an add-to-cart whose `wapf[field_categories][]` POST array has more
 than 8 entries, with the Dutch notice "Kies maximaal 8 categorieën." (`wc_add_notice(..., 'error')`,
-`return false`); 0 picks always passes.
+`return false`); 0 picks always passes. The cap number and its notice text
+are each a single PHP constant (`PUBQUIZ_MAX_CATEGORY_PICKS`,
+`PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE`, `pubquiz-checkout-meta.php`) -- the
+dropdown's own client-side cap (below) reads both from a data attribute
+printed from these same constants, so server and browser can't drift apart.
 
 **Pick order.** A browser always serialises a checked group of same-named
 inputs in DOM order, i.e. the order the choices were rendered in --
@@ -351,6 +369,35 @@ order `$pubquiz_categories` lists them in, from `loadDutchCategories()`).
 So "pick order" -- what `pubquiz_category_1..N` and the sampler's cycle
 rule (CONTEXT.md "Quiz") both use -- is Category id order among the
 customer's checked boxes, not click order.
+
+### Searchable Categorieën dropdown (spec 3c, #83)
+
+`shop/mu-plugins/pubquiz-category-dropdown.php` enqueues a vendored copy of
+[Tom Select](https://tom-select.js.org/) (`shop/assets/tom-select/`, one JS
+and one CSS file, version and licence in that directory's own `VERSION` and
+`LICENSE` files; no CDN) on the single product page, then prints a small
+inline script that, once the DOM is ready: builds a `<select multiple>`
+from the `categories` checkbox group's own checkboxes (label = choice
+label, value = choice slug, in DOM order -- Category id order, "Pick order"
+above), hides the checkbox group, and initialises Tom Select on the
+`<select>` with the remove-button plugin (chips) and a `maxItems` read from
+a `data-pubquiz-max-picks` attribute the plugin prints (from
+`PUBQUIZ_MAX_CATEGORY_PICKS`, see "Cap of 8" above). Every selection change
+mirrors back onto the (now hidden) checkboxes' `checked` state, so the form
+still posts `wapf[field_categories][]` exactly as before -- the meta bridge,
+the server-side cap, the fixture and the parser are all untouched. A ninth
+pick shows the same Dutch cap message (`data-pubquiz-max-picks-message`,
+from `PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE`) next to the picker, before the
+customer ever clicks "Toevoegen aan winkelwagen". **Without JavaScript**
+nothing here runs: the checkbox group stays visible and posts as it always
+has -- this is also what a plain `curl` of the product page sees. The
+description sentence below the picker is unchanged.
+
+The assets are served through a second `wp-env` mapping,
+`wp-content/mu-plugins/assets` -> `./shop/assets` (`.wp-env.json`), a
+subdirectory of the existing mu-plugins mount, so `plugins_url()` (which
+resolves relative to `WPMU_PLUGIN_DIR` for a file in `wp-content/mu-plugins`)
+finds them without a new top-level mount.
 
 ## Key verification (ticket item 3, updated by #72): does the real checkout path write the same keys?
 

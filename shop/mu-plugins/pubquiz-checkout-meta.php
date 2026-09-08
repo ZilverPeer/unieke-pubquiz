@@ -84,6 +84,18 @@ const PUBQUIZ_CATEGORIES_FIELD_ID = 'categories';
 const PUBQUIZ_MAX_CATEGORY_PICKS = 8;
 
 /**
+ * The cap notice text, shared with the browser (spec 3c, #83):
+ * `pubquiz-category-dropdown.php` prints this same string into a
+ * `data-pubquiz-max-picks-message` attribute so its client-side cap check
+ * never has to type the message a second time. Both constants are only
+ * ever read from inside a hook callback in either mu-plugin (never at
+ * top-level file scope), which runs after every mu-plugin's top-level code
+ * has already executed -- so the two files' alphabetical load order (this
+ * one after `pubquiz-category-dropdown.php`) doesn't matter here.
+ */
+const PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE = 'Kies maximaal 8 categorieën.';
+
+/**
  * Writes `pubquiz_category_1..N` from the `categories` field's `raw`
  * `_wapf_meta` value, in pick order, skipping empty and duplicate ids.
  * `$raw` is an array of Category id slugs when at least one box is checked
@@ -170,7 +182,7 @@ add_filter(
         }
 
         if ( count( $picks ) > PUBQUIZ_MAX_CATEGORY_PICKS ) {
-            wc_add_notice( esc_html__( 'Kies maximaal 8 categorieën.', 'pubquiz' ), 'error' );
+            wc_add_notice( esc_html__( PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE, 'pubquiz' ), 'error' );
             return false;
         }
 

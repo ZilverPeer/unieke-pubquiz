@@ -37,7 +37,11 @@ npx wp-env run cli -- wp action-scheduler run --user=admin
 
 ### Multi-quiz orders
 
-Start a second line item with `--quiz`:
+The Pubquiz product is sold individually (spec 3c, #83): a real add-to-cart
+of the exact same configuration twice is refused, and only a *different*
+Taal/Moeilijkheid/Categorieën combination becomes a second cart line. This
+script bypasses the cart, so it doesn't hit that check -- start a second
+line item with `--quiz`:
 
 ```sh
 npx tsx scripts/shop/place-order.ts --email you@example.com \
