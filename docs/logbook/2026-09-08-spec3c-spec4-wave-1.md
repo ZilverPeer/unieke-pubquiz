@@ -36,6 +36,7 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
 - PR 108 reviewers: standards a72b201e32446197c, spec a75139b2aec7d6635
 - PR 109 reviewers: standards aa95fd34333ab92f1, spec a169ecfb1ee97ca76
+- PR 110 reviewers: standards a560a5b314d499aa3, spec a4ce24d348b16aad0
 
 ## Spec 5 tickets (18:44)
 
@@ -85,6 +86,11 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 ### #87 (PR 109)
 
 - 18:52 PR opened (62027e2) after 32 min. Unit 17 red-first (stub throwing), integration 7/7. Forms are Client Components with `useActionState` (not curl-drivable; reviewers judge). Delete guard is count-then-delete, two statements. Adds `assertOperator()` and injectable `revalidateCategories`. Seed sequence defect filed as #107. Reviewers dispatched 18:55.
+- 19:08 Standards: HARD, validation error keys carry the `categories.` prefix while the form translator is namespace-scoped, so every field error renders as a missing key (untested path); HARD, `assertOperator()` collision with PR 108 (decided: #87 wins). JUDGEMENTs accepted: two-statement delete guard (Items FK restricts anyway), `useActionState` client forms. Fix round 1 sent with a message-key existence test.
+
+### #88 (PR 110)
+
+- 19:05 PR opened (2d9e8bb) after 44 min. Unit 9 red-first, integration 7/7 (first real run red on `revalidatePath` outside a request, fixed with a swallow-on-throw guard; reviewers judge against #87's injectable deps). Filters expose only the Subsubcategory path. Reviewers dispatched 19:10.
 
 ### #87, #88, #92, #93
 
