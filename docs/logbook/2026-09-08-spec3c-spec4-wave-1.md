@@ -101,6 +101,8 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 19:13 Standards: HARD swallow-all try/catch around `revalidatePath` (decided: injectable `deps.revalidateItems` like #87); HARD raw Difficulty enum in the list column; JUDGEMENT decided HARD: Category and Subcategory filter selects missing while the issue and the message files name them; `session.ts` collision with #87 and #93 (same decision: #87's version wins, others reconcile after PR 109 merges). Fix round 1 sent.
 - 19:28 fix round 1 landed (7cbe3e9): injectable `deps.revalidateItems`, translated Difficulty column, Category and Subcategory selects; unit 273, integration 7/7. Waits for the PR 109 merge to reconcile `session.ts`.
 - 19:56 merged master (cdfa185), full check green (290 unit), items integration 7/7 alone. Spec review still running on the fix-round tip; told to re-verify cdfa185 too.
+- 20:15 Spec at cdfa185: clean (red reproduced; 9 unit, 7 integration; list total 2645 = db; every filter incl. the new Category and Subcategory selects matches psql counts; forms driven through the actions since `useActionState` forms carry no action id; redirects; check and build green). JUDGEMENTs for a follow-up: the combined filter test asserts inclusion only; failure cases do not assert nothing written. Merged 654633f at 20:17; master check green (typecheck, 299 unit, eslint).
+- Wave 1 code complete: 9 of 9 PRs merged. Wave-end verification (integration suite on master with the worker stopped, mail proofs, stack cleanup, retro) deferred to the resume.
 
 ### #87, #88, #92, #93
 
