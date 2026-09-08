@@ -1,0 +1,24 @@
+{
+  "title": "Categories",
+  "form": {
+    "nameNl": "Name (NL)",
+    "nameEn": "Name (EN)",
+    "add": {
+      "category": "Add category",
+      "subcategory": "Add subcategory",
+      "subsubcategory": "Add subsubcategory"
+    },
+    "rename": "Save",
+    "delete": "Delete"
+  },
+  "errors": {
+    "nameRequired": "Enter a name.",
+    "nameTooLong": "Name must be at most 120 characters.",
+    "invalidLevel": "Invalid level.",
+    "invalidParent": "Invalid parent category.",
+    "invalidId": "Invalid id.",
+    "invalidLocale": "Invalid locale.",
+    "deleteHasChildren": "Cannot delete: {count} child categories still reference it.",
+    "deleteHasItems": "Cannot delete: {count} items still reference it."
+  }
+}
