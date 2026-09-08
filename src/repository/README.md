@@ -49,6 +49,10 @@ Private helpers live alongside it: `client.ts` (Supabase client construction), `
 
 Deleting an `orders` row while any `quizzes` row references it fails (no cascade, migration `00008_orders_quizzes.sql`); the same is true for a `compositions` row referenced by a Quiz's `composition_id`. Deleting a Quiz never touches its Composition.
 
+## Admin: categories
+
+`src/repository/admin/categories.ts` exports `createCategoriesAdminRepository(config): CategoriesAdminRepository` (spec 4, ticket #87) -- the only writer of the `categories`/`subcategories`/`subsubcategories` tables and their per-Locale translation tables from the admin UI (`src/app/admin/(shell)/categories`). A sibling module of `ContentRepository`/`OrderRepository`, not folded into either: it writes tables neither existing repository touches. `loadCategoryTree()` reads the full three-level tree with both Locale names per node; `createCategory`/`createSubcategory`/`createSubsubcategory` each insert one row plus its two translation rows (nl, en); `renameNode` updates one translation row (every node always has both Locale rows from creation, so no upsert is needed); `deleteNode` refuses while a Category/Subcategory still has children, or a Subsubcategory still has Items, returning the blocking count -- see that file's docblock for why the guard is a count-read then a conditional delete (two statements) rather than one atomic statement, given this ticket's brief keeps `supabase/migrations` untouched.
+
 ## Running the integration tests
 
 Two test files, `repository.integration.test.ts` and `orders.integration.test.ts`, run against the real local Supabase stack -- migrations and seed applied, no mocking. One documented command sequence, from the repo root:
