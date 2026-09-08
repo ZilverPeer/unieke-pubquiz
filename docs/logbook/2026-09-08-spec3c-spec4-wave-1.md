@@ -91,6 +91,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 ### #88 (PR 110)
 
 - 19:05 PR opened (2d9e8bb) after 44 min. Unit 9 red-first, integration 7/7 (first real run red on `revalidatePath` outside a request, fixed with a swallow-on-throw guard; reviewers judge against #87's injectable deps). Filters expose only the Subsubcategory path. Reviewers dispatched 19:10.
+- 19:13 Standards: HARD swallow-all try/catch around `revalidatePath` (decided: injectable `deps.revalidateItems` like #87); HARD raw Difficulty enum in the list column; JUDGEMENT decided HARD: Category and Subcategory filter selects missing while the issue and the message files name them; `session.ts` collision with #87 and #93 (same decision: #87's version wins, others reconcile after PR 109 merges). Fix round 1 sent.
 
 ### #87, #88, #92, #93
 
