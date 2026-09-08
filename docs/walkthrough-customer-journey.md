@@ -27,11 +27,12 @@ Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz 
 
 Check zero to eight boxes, then click **Toevoegen aan winkelwagen**.
 
-**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; `14` is the Pubquiz product id, confirm with `npm run shop:up`'s own "Product: #14" line if it's ever different locally; `wapf[field_categories][]` may repeat, once per pick, in pick order):
+**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` may repeat, once per pick, in pick order):
 
 ```powershell
+$productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
 curl.exe -s -c cookies.txt -b cookies.txt `
-  -d "quantity=1" -d "add-to-cart=14" -d "wapf_field_groups=14" `
+  -d "quantity=1" -d "add-to-cart=$productId" -d "wapf_field_groups=$productId" `
   -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
   -d "wapf[field_categories][]=1" `
   "http://localhost:45330/product/pubquiz/"

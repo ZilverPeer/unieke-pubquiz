@@ -22,13 +22,18 @@
  * unit-tested without booting the whole shop), upserting the returned REST
  * API credentials into .env.local, and starting the cron ticker container
  * (ticket #58, see lib/cron-ticker.ts) so Action Scheduler delivers the
- * `order.updated` webhook without a manual kick.
+ * `order.updated` webhook without a manual kick, and -- since ticket #67 --
+ * persisting the parsed `SetupResult` to `.local/shop-setup.json` (see
+ * lib/setup-result-file.ts) so `npm run loop:up`, a separate process run
+ * right after this one exits, can print the product id and add-to-cart URL
+ * without re-running any WP-CLI call.
  */
 import "../load-env";
 import { wpCli } from "./lib/wp-cli";
 import { ensureMailpit } from "./lib/mailpit";
 import { ensureCronTicker } from "./lib/cron-ticker";
 import { parseSetupResult, type SetupResult } from "./lib/setup-result";
+import { writeSetupResultFile } from "./lib/setup-result-file";
 import { upsertRestApiCredentials } from "./lib/env-file";
 import { DEFAULT_WEBHOOK_URL, WP_ENV_PORT } from "./lib/config";
 import { encodeCategoriesForWpCli, loadDutchCategories, type DutchCategory } from "./lib/categories";
@@ -57,6 +62,10 @@ async function main() {
   const { containerName: cronTickerContainer } = ensureCronTicker();
 
   const result = runSetupShop(categories);
+
+  // See lib/setup-result-file.ts's docblock: the one place a later,
+  // separate `loop:up` process can read this result from.
+  writeSetupResultFile(result);
 
   // Rotated on every run (see setup-shop.php's docblock for why reuse isn't
   // possible) and upserted into .env.local -- never printed in full here,
