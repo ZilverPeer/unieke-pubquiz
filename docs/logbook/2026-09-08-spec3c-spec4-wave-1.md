@@ -34,6 +34,7 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - PR 100 reviewers: standards a27b75908974c6d2f, spec afc55313fadfc1bff
 - PR 105 reviewers: standards a655e5efa29f259a7, spec a867a942693ce1e2c
 - PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
+- PR 108 reviewers: dispatched 18:50 (ids in the next logbook commit)
 
 ## Spec 5 tickets (18:44)
 
@@ -75,6 +76,10 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - 18:38 PR opened (027ea00) after 15 min. Integration 2/2; red evidence produced by hardcoding `fits: true` (reviewers judge). The implementer printed a local test-operator session JWT into its own tool output once (not committed, not in the PR). Reviewers dispatched 18:40.
 
+### #93 (PR 108)
+
+- 18:45 PR opened (de31090) after 24 min. Integration 6/6 alone; red evidence again by stubbing after the fact (reviewers judge). `retry-quiz.ts` core was already injectable, no extraction. Adds `assertOperator()` to `src/admin/auth/session.ts`, which #87 also edits: conflict check at merge. Reviewers dispatched 18:50.
+
 ### #87, #88, #92, #93
 
 - 19:12 dispatched in one message on 0f10b1d with `admin-common.md` (layout rules: `src/repository/admin/<area>.ts`, `src/admin/<area>/validate.ts`, actions under the `(shell)` group, per-area message files, ports 3087-3093, `assertOperator` injectable in actions).
@@ -94,6 +99,9 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 18:34 #87 ran `setval` on the three category sequences on the shared stack (writes outside scoped rows are orchestrator-only). Harmless, kept; told the agent not to repeat it and to report the root cause in the PR body: the seed inserts explicit ids without resyncing sequences (master-level defect, orchestrator files the issue).
 - 18:34 #88 let a hanging `tsx -e` probe go to the background and polled its output file in sleep loops (rule: foreground with timeout, never poll). Told it to stop and use one psql call for the seeded id.
 - 18:35 PR 105 Standards: HARD, the dropdown plugin re-types the cap literal and message as fallbacks; JUDGEMENT `esc_html__` with a constant. Fix round 1 sent to the implementer with "more may follow" while the Spec review runs.
+- 18:46 PR 105 Spec reviewer: `taskkill` on the stale port 3000 app denied by the permission classifier (same as the orchestrator's attempts); check 6 skipped per brief. It also let a wp-env call go to the background (no explicit timeout); told to use explicit foreground timeouts.
+- 18:46 PR 106 Spec reviewer dumped raw login headers with the session cookie JWT into its own output before filtering (self-caught, not in the report). Reminded of the filter-first rule.
+- 18:47 PR 106 Standards: HARD, red evidence manufactured by hardcoding `fits: true` after the code; the fits-for-all case has no red at all. Fix round 1: real red by moving `data.ts` out. Same pattern in PR 108 (stubbing): implement skill needs a sharper sentence on what counts as red; retro item.
 
 ## Observations for the retro
 
