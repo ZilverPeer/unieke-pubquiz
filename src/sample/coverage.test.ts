@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { Locale, PoolItem } from "@/domain";
-import { computeCoverage } from "./coverage";
+import type { Locale, PoolItem, QuizRequest } from "@/domain";
+import { buildPoolFixture } from "@/domain/fixtures";
+import { createSeededRandom, sampleComposition } from "./index";
+import { computeCoverage, dryRunRequest } from "./coverage";
 
 /** Builds a minimal PoolItem for coverage tests; subcategoryId is unused by coverage. */
 function makeItem(fields: {
@@ -185,5 +187,56 @@ describe("computeCoverage", () => {
       .filter((c) => c.categoryId === "cat-a" && c.kind === "text" && c.requestedDifficulty === "easy")
       .map((c) => c.locale);
     expect(localesForFirstCell).toEqual(["nl", "en"]);
+  });
+});
+
+describe("dryRunRequest", () => {
+  test("0 picks with fewer pool Categories than slots: one aggregate entry, matching sampleComposition's failure", () => {
+    // Same fixture and seed as sample.test.ts's "0 picks with fewer pool
+    // Categories than slots fails with a null-Category shortfall": only 3
+    // distinct Categories in the pool, no picks - slots 0-2 can each get a
+    // Category, slot 3 onward can't. resolveSlotCategories itself fails
+    // here, before any slot is filled, so dryRunRequest has nothing to walk
+    // slot by slot: it must report one aggregate entry, not one entry per
+    // un-categorised slot (slots 3-7, 5 of them).
+    const { pool } = buildPoolFixture({
+      locales: ["nl"],
+      categories: 3,
+      subsubcategoriesPerCategory: 1,
+      itemsPerKindPerDifficulty: 1,
+    });
+
+    const request: QuizRequest = {
+      locale: "nl",
+      categoryPicks: [],
+      requestedDifficulty: "easy",
+      billingEmail: "player@example.com",
+    };
+
+    const sampleResult = sampleComposition({
+      request,
+      pool,
+      excludedItemIds: new Set(),
+      random: createSeededRandom(1),
+    });
+    expect(sampleResult.ok).toBe(false);
+    if (sampleResult.ok) return;
+    expect(sampleResult.failure).toEqual({ slotIndex: 3, categoryId: null, shortfall: 5 });
+
+    const shortfalls = dryRunRequest({
+      request,
+      pool,
+      excludedItemIds: new Set(),
+      random: createSeededRandom(1),
+    });
+
+    expect(shortfalls).toHaveLength(1);
+    expect(shortfalls[0]).toEqual({
+      slotIndex: sampleResult.failure.slotIndex,
+      kind: "text",
+      categoryId: sampleResult.failure.categoryId,
+      requestedDifficulty: request.requestedDifficulty,
+      shortfall: sampleResult.failure.shortfall,
+    });
   });
 });

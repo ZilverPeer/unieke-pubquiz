@@ -23,12 +23,21 @@ const KINDS_USED = Array.from(new Set(SLOT_KINDS));
  * required for the "success implies fits" property below to hold for mixed
  * requests too, since coverage's `fits` demands all three placements while
  * `sampleComposition` only ever draws one of them.
+ *
+ * `pickCount` is mostly 1 (a single Category pick, cycled onto all 8 slots -
+ * the case the two properties below are really about) but sometimes 0: with
+ * only one pool Category, a 0-pick request always exercises
+ * `resolveSlotCategories`'s own failure (not enough distinct Categories for
+ * 8 slots) - the aggregate, single-entry `dryRunRequest` path covered
+ * directly in `coverage.test.ts`'s unit case, here exercised across many
+ * generated pools and seeds too.
  */
 interface World {
   subsubcategoriesPerCategory: number;
   itemsPerKindPerDifficulty: number;
   requestedDifficulty: RequestedDifficulty;
   locale: Locale;
+  pickCount: 0 | 1;
   seed: number;
 }
 
@@ -37,6 +46,10 @@ const worldArb: fc.Arbitrary<World> = fc.record({
   itemsPerKindPerDifficulty: fc.integer({ min: 20, max: 60 }),
   requestedDifficulty: fc.constantFrom(...REQUESTED_DIFFICULTIES),
   locale: fc.constantFrom<Locale>("nl", "en"),
+  pickCount: fc.oneof(
+    { weight: 4, arbitrary: fc.constant<0 | 1>(1) },
+    { weight: 1, arbitrary: fc.constant<0 | 1>(0) },
+  ),
   seed: fc.integer(),
 });
 
@@ -50,7 +63,7 @@ function buildScenario(world: World) {
   const categoryId = categories[0].id;
   const request: QuizRequest = {
     locale: world.locale,
-    categoryPicks: [categoryId],
+    categoryPicks: world.pickCount === 1 ? [categoryId] : [],
     requestedDifficulty: world.requestedDifficulty,
     billingEmail: "player@example.com",
   };
@@ -129,6 +142,12 @@ describe("dryRunRequest properties", () => {
             requestedDifficulty: request.requestedDifficulty,
             shortfall: sampleResult.failure.shortfall,
           });
+          // The no-Category-left case (0 picks, not enough distinct pool
+          // Categories) has nothing to walk slot by slot, so it is always
+          // exactly one aggregate entry, never one per un-categorised slot.
+          if (sampleResult.failure.categoryId === null) {
+            expect(shortfalls).toHaveLength(1);
+          }
         }
       }),
     );

@@ -4,12 +4,25 @@
  * (spec 5) can never disagree with what `sampleComposition` would actually
  * do. No I/O, imports only from `@/domain` and the sampler's own modules.
  */
-import type { ItemKind, Locale, PoolItem, RequestedDifficulty } from "@/domain";
+import type { ItemKind, Locale, PoolItem, QuizRequest, RequestedDifficulty } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT, SLOT_KINDS } from "@/domain";
-import type { SampleInput } from "./index";
-import { resolveSlotCategories } from "./index";
 import { createSeededRandom } from "./random";
+import type { RandomSource } from "./random";
+import { resolveSlotCategories } from "./slot-categories";
 import { fillSlot } from "./slots";
+
+/**
+ * Same shape as `index.ts`'s `SampleInput` (kept structurally compatible,
+ * not imported, so this module never imports from `index.ts` - `index.ts`
+ * re-exports this module, which would otherwise be a cycle).
+ */
+export interface DryRunInput {
+  request: QuizRequest;
+  pool: readonly PoolItem[];
+  /** Item ids already delivered to this billing email (the no-repeat rule). */
+  excludedItemIds: ReadonlySet<string>;
+  random: RandomSource;
+}
 
 const KINDS: readonly ItemKind[] = Array.from(new Set(SLOT_KINDS));
 const REQUESTED_DIFFICULTIES: readonly RequestedDifficulty[] = ["easy", "medium", "hard", "mixed"];
@@ -153,8 +166,16 @@ export interface DryRunShortfall {
  * later slot of the same kind still sees a correctly shrunk pool. For the
  * same input and seed, the first entry equals `sampleComposition`'s failure;
  * an empty array means the request generates.
+ *
+ * When the pool doesn't have enough distinct Categories to give every slot
+ * one (only reachable with 0 picks - `resolveSlotCategories` itself fails),
+ * there is nothing left to walk slot by slot: the result is a single
+ * aggregate entry covering every slot from that point onward
+ * (`categoryId: null`, `shortfall` the count of such slots), the same shape
+ * `sampleComposition`'s own failure takes - not one entry per un-categorised
+ * slot.
  */
-export function dryRunRequest(input: SampleInput): DryRunShortfall[] {
+export function dryRunRequest(input: DryRunInput): DryRunShortfall[] {
   const { request, pool, excludedItemIds, random } = input;
 
   const resolved = resolveSlotCategories(request, pool, random);
