@@ -208,7 +208,7 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
   });
 
   it(
-    "a single-pick Quiz whose Category runs short ends failed after one attempt, with slot/Category/shortfall in the reason, nothing in the bucket",
+    "a single-pick Quiz whose Category runs short ends failed after one attempt, with the plain-words reason (Category, Round kind, missing count, What to do), nothing in the bucket",
     async () => {
       // Same fixture as generate.integration.test.ts's "unsatisfiable
       // requests" suite: Category id 1 ("Sport"/"Sports") gets 70 hard Text
@@ -250,16 +250,22 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
 
       const quiz = await orderRepository.getQuizById(quizId);
       expect(quiz?.status).toBe("failed");
-      expect(quiz?.failureReason).toBe(`slot 1, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10`);
+      // The failing slot is 1 (0-based), a "text" slot (SLOT_KINDS[1]).
+      for (const fragment of [`Category "${HARD_TEXT_CATEGORY_NAME.nl}"`, "text round", "10 Items short", "What to do"]) {
+        expect(quiz?.failureReason).toContain(fragment);
+      }
       expect(quiz?.compositionId).toBeNull();
 
       const objectNames = await listDeliverableObjectNames(quizId);
       expect(objectNames).toEqual([]);
 
       expect(deliverer.deliverCalls).toHaveLength(0);
-      expect(deliverer.failureCalls).toEqual([
-        { quizId, reason: `slot 1, Category ${HARD_TEXT_CATEGORY_NAME.nl}, shortfall 10` },
-      ]);
+      expect(deliverer.failureCalls).toHaveLength(1);
+      const failureCall = deliverer.failureCalls[0];
+      expect(failureCall.quizId).toBe(quizId);
+      for (const fragment of [`Category "${HARD_TEXT_CATEGORY_NAME.nl}"`, "text round", "10 Items short", "What to do"]) {
+        expect(failureCall.reason).toContain(fragment);
+      }
     },
   );
 

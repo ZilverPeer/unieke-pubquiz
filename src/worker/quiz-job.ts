@@ -12,7 +12,7 @@
  * WooCommerce knowledge.
  */
 import { randomBytes } from "node:crypto";
-import { DELIVERABLE_CONTENT_TYPES, downloadPath, SLOT_COUNT } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, downloadPath, orderWideQuizSequence, SLOT_COUNT } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
 import { QuizStatusChangedConcurrentlyError } from "@/repository";
@@ -20,6 +20,7 @@ import type { QuizRecord } from "@/domain";
 import { buildQuizZip } from "@/render";
 import { generateQuiz as generateQuizImpl, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import type { GenerateOptions } from "@/scripts/cli-args";
+import { buildFailureReason, type FailureReasonInput } from "./failure-reason";
 
 /** Thrown for a Quiz whose checkout configuration cannot be satisfied at all -- never retried. */
 export class InvalidQuizConfigError extends Error {
@@ -86,6 +87,28 @@ function buildDownloadUrl(appBaseUrl: string, token: string): string {
 }
 
 /**
+ * The Quiz's 1-based position among every Quiz belonging to its order --
+ * the same number `quizZipFilename`'s `sequence` argument is built from
+ * (`orderWideQuizSequence(...) + 1`, src/domain/orders.ts). Needed only for
+ * the plain-words failure text (buildFailureReason's `quizNumber`), so it's
+ * computed lazily, right before a failure text is built, rather than on
+ * every job.
+ */
+async function computeQuizNumber(deps: QuizJobDeps, quiz: QuizRecord): Promise<number> {
+  const orderedQuizzes = await deps.orderRepository.listQuizzesByOrderId(quiz.orderId);
+  return orderWideQuizSequence(quiz.id, orderedQuizzes.map((q) => q.id)) + 1;
+}
+
+function baseFailureReasonInput(quiz: QuizRecord, billingEmail: string, quizNumber: number) {
+  return {
+    quizNumber,
+    billingEmail,
+    locale: quiz.config.locale,
+    requestedDifficulty: quiz.config.requestedDifficulty,
+  };
+}
+
+/**
  * Builds the engine's request from a Quiz's stored config. Throws
  * InvalidQuizConfigError for a combination the sampler could never satisfy
  * regardless of pool contents (mirrors resolveSlotCategories's own
@@ -95,17 +118,31 @@ function buildDownloadUrl(appBaseUrl: string, token: string): string {
  * treated as retryable) -- a malformed or incomplete checkout configuration
  * is a terminal failure (spec #36 user story 27), not a retryable one.
  */
-function buildGenerateOptions(quiz: QuizRecord, billingEmail: string): GenerateOptions {
+function buildGenerateOptions(
+  quiz: QuizRecord,
+  billingEmail: string,
+  quizNumber: number,
+): GenerateOptions {
   const { config } = quiz;
   const { categoryPicks } = config;
 
   if (categoryPicks.length > SLOT_COUNT) {
     throw new InvalidQuizConfigError(
-      `Quiz ${quiz.id}: at most ${SLOT_COUNT} Category picks, got ${categoryPicks.length}`,
+      buildFailureReason({
+        ...baseFailureReasonInput(quiz, billingEmail, quizNumber),
+        kind: "invalid-config",
+        detail: `This Quiz was configured with ${categoryPicks.length} Category picks, more than the maximum of ${SLOT_COUNT}.`,
+      }),
     );
   }
   if (new Set(categoryPicks).size !== categoryPicks.length) {
-    throw new InvalidQuizConfigError(`Quiz ${quiz.id}: Category picks must be distinct`);
+    throw new InvalidQuizConfigError(
+      buildFailureReason({
+        ...baseFailureReasonInput(quiz, billingEmail, quizNumber),
+        kind: "invalid-config",
+        detail: "This Quiz was configured with duplicate Category picks; each pick must be a distinct Category.",
+      }),
+    );
   }
 
   return {
@@ -121,10 +158,6 @@ function buildGenerateOptions(quiz: QuizRecord, billingEmail: string): GenerateO
     // itself (see generate-quiz.ts).
     out: "unused",
   };
-}
-
-function formatShortfallReason(slotIndex: number, categoryLabel: string, shortfall: number): string {
-  return `slot ${slotIndex}, Category ${categoryLabel}, shortfall ${shortfall}`;
 }
 
 /**
@@ -172,7 +205,8 @@ async function generateAndRecord(
   quiz: QuizRecord,
   billingEmail: string,
 ): Promise<{ url: string }> {
-  const generateOptions = buildGenerateOptions(quiz, billingEmail);
+  const quizNumber = await computeQuizNumber(deps, quiz);
+  const generateOptions = buildGenerateOptions(quiz, billingEmail, quizNumber);
 
   const writeDeliverables = async (files: GeneratedQuizFiles): Promise<void> => {
     const zip = buildQuizZip(files);
@@ -182,8 +216,13 @@ async function generateAndRecord(
   const result = await deps.generateQuiz(generateOptions, deps.contentRepository, writeDeliverables);
 
   if (!result.ok) {
-    const { slotIndex, shortfall } = result.failure;
-    throw new QuizShortfallError(formatShortfallReason(slotIndex, result.categoryLabel, shortfall));
+    const { failure, categoryLabel } = result;
+    const base = baseFailureReasonInput(quiz, billingEmail, quizNumber);
+    const failureInput: FailureReasonInput =
+      failure.categoryId === null
+        ? { ...base, kind: "no-category-left", missingSlotCount: failure.shortfall }
+        : { ...base, kind: "shortfall", slotIndex: failure.slotIndex, categoryLabel, missingCount: failure.shortfall };
+    throw new QuizShortfallError(buildFailureReason(failureInput));
   }
 
   const token = generateDownloadToken();
