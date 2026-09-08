@@ -84,6 +84,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - 18:45 PR opened (de31090) after 24 min. Integration 6/6 alone; red evidence again by stubbing after the fact (reviewers judge). `retry-quiz.ts` core was already injectable, no extraction. Adds `assertOperator()` to `src/admin/auth/session.ts`, which #87 also edits: conflict check at merge. Reviewers dispatched 18:50.
 - 19:00 Standards: HARD, `assertOperator()` conflicts with #87's version in `session.ts` (decision: #87's wins, PR 108 reconciles after PR 109 merges); HARD, red evidence by stubbing after the fact (fix round 1: real red by moving the modules out). JUDGEMENTs accepted: own `boss-client.ts` mirror, direct `WOOCOMMERCE_URL` read. Note: the reviewer misread branch commit 62027e2 as merged; PR 109 is still open.
+- 19:20 fix round 1: PR body only (real red by moving the modules out; head unchanged de31090). 19:32 Spec: clean (red reproduced; 9 unit, 6 integration; search by number and email, detail with Composition names, HPOS link; retry on an own failed Quiz enqueued exactly one job; redirects; check and build green). Waits for the PR 109 merge (session.ts).
 
 ### #87 (PR 109)
 
@@ -95,6 +96,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - 19:05 PR opened (2d9e8bb) after 44 min. Unit 9 red-first, integration 7/7 (first real run red on `revalidatePath` outside a request, fixed with a swallow-on-throw guard; reviewers judge against #87's injectable deps). Filters expose only the Subsubcategory path. Reviewers dispatched 19:10.
 - 19:13 Standards: HARD swallow-all try/catch around `revalidatePath` (decided: injectable `deps.revalidateItems` like #87); HARD raw Difficulty enum in the list column; JUDGEMENT decided HARD: Category and Subcategory filter selects missing while the issue and the message files name them; `session.ts` collision with #87 and #93 (same decision: #87's version wins, others reconcile after PR 109 merges). Fix round 1 sent.
+- 19:28 fix round 1 landed (7cbe3e9): injectable `deps.revalidateItems`, translated Difficulty column, Category and Subcategory selects; unit 273, integration 7/7. Waits for the PR 109 merge to reconcile `session.ts`.
 
 ### #87, #88, #92, #93
 
