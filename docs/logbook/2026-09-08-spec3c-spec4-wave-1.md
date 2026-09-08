@@ -77,6 +77,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 ### #92 (PR 106)
 
 - 18:38 PR opened (027ea00) after 15 min. Integration 2/2; red evidence produced by hardcoding `fits: true` (reviewers judge). The implementer printed a local test-operator session JWT into its own tool output once (not committed, not in the PR). Reviewers dispatched 18:40.
+- Standards: HARD manufactured red (fix round 1: real red by moving `data.ts` out, b604f91); JUDGEMENT `localeCompare` locale, fixed. Spec: clean at b604f91 (red reproduced by deleting the folder; 2/2; 8 Categories; Muziek text/hard nl 70 = db 70, en 70 = 70; UI and data Locale independent; check and build green; the reviewer once dumped a session cookie into its own output). Merged 71609e4 at 19:22; master check green (typecheck, 264 unit, eslint); wt-92 removed.
 
 ### #93 (PR 108)
 
@@ -87,6 +88,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - 18:52 PR opened (62027e2) after 32 min. Unit 17 red-first (stub throwing), integration 7/7. Forms are Client Components with `useActionState` (not curl-drivable; reviewers judge). Delete guard is count-then-delete, two statements. Adds `assertOperator()` and injectable `revalidateCategories`. Seed sequence defect filed as #107. Reviewers dispatched 18:55.
 - 19:08 Standards: HARD, validation error keys carry the `categories.` prefix while the form translator is namespace-scoped, so every field error renders as a missing key (untested path); HARD, `assertOperator()` collision with PR 108 (decided: #87 wins). JUDGEMENTs accepted: two-statement delete guard (Items FK restricts anyway), `useActionState` client forms. Fix round 1 sent with a message-key existence test.
+- 19:23 fix round 1 landed (87f88a6): relative error keys, key-existence assertion in the integration test; unit 281, integration 7/7. Spec review told to re-verify on the new tip.
 
 ### #88 (PR 110)
 
