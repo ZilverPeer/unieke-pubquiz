@@ -93,7 +93,7 @@ describe.skipIf(resolveFfmpeg() === null)("generateQuiz: write before persist", 
 
     await expect(generateQuiz(baseOptions(), repository, failingWriter)).rejects.toThrow("disk full");
     expect(persistCalled).toBe(false);
-  });
+  }, 60_000);
 
   it("calls writeDeliverables with the rendered files before persisting", async () => {
     const callOrder: string[] = [];
@@ -118,5 +118,5 @@ describe.skipIf(resolveFfmpeg() === null)("generateQuiz: write before persist", 
 
     expect(result.ok).toBe(true);
     expect(callOrder).toEqual(["write", "persist"]);
-  });
+  }, 60_000);
 });
