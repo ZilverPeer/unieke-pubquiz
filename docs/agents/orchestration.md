@@ -38,7 +38,7 @@ Every brief contains, in this order:
 
 Run once, right before pushing, not after every edit:
 
-- `npm run typecheck`, `npm test`, `npx eslint src scripts`: always.
+- `npm run check` (typecheck, unit tests and eslint, concurrently; about 30 s): always, right before pushing. Never run them one after another. While iterating, a subset: `npm run check -- typecheck unit`. Report the results from its output.
 - `npm run test:integration`: implementers never run it (trial from spec 2 wave 2, agreed 2026-09-07 after wave 1: implementers repeating the suite, with resets, was the waste). The Spec reviewer runs it once on the branch; the orchestrator runs it once on master at the end of the wave. An implementer that adds an integration test runs only that file. Every suite scopes its own cleanup to the rows it created (by billing email, or by id for the Order-less case -- `src/test-support/scoped-cleanup.ts`, ticket #51), so the suites clean up after themselves and running the full suite is safe even against a stack that also has real orders on it.
 - `npm run db:reset`: agents never run it. If a test fails for state reasons, report the failing assertion; the orchestrator decides.
 - `npm run build`: never, unless the ticket changes the Next.js app itself.
@@ -92,7 +92,7 @@ Any agent that starts `next dev` (or any other server) stops it with `taskkill /
 
 ## Merge
 
-Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run typecheck, unit tests and eslint on master (after `npm ci` if the PR added a dependency), run `npm run shop:down` from the worktree (the shop stays up for the whole ticket, through review and fix rounds; the orchestrator is the one who stops it, once, here; its containers bind-mount the worktree's `shop/` directory), remove the worktree, append to the wave logbook. At the end of the wave: `npm run test:integration` once on master, stop the stacks, complete the logbook, then a retro with Erik before the next wave starts.
+Orchestrator: inspect the fix diff, `git merge-tree --write-tree origin/master origin/<branch>` (after `git fetch`; local `master` in a review clone can be stale) for conflicts, `gh pr merge <n> --merge --delete-branch=false`, confirm the issue closed, run `npm run check` on master (after `npm ci` if the PR added a dependency), run `npm run shop:down` from the worktree (the shop stays up for the whole ticket, through review and fix rounds; the orchestrator is the one who stops it, once, here; its containers bind-mount the worktree's `shop/` directory), remove the worktree, append to the wave logbook. At the end of the wave: `npm run test:integration` once on master, stop the stacks, complete the logbook, then a retro with Erik before the next wave starts.
 
 ## Logbook
 

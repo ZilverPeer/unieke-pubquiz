@@ -20,13 +20,14 @@
     "shop:order": "tsx scripts/shop/place-order.ts",
     "shop:capture": "tsx scripts/shop/capture-webhook.ts",
     "loop:up": "tsx scripts/loop/up.ts",
-    "loop:down": "tsx scripts/loop/down.ts"
+    "loop:down": "tsx scripts/loop/down.ts",
+    "check": "tsx scripts/check.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.115.0",
-    "ffmpeg-static": "^5.3.0",
     "fflate": "^0.8.3",
+    "ffmpeg-static": "^5.3.0",
     "next": "16.3.3",
     "pg": "^8.23.0",
     "pg-boss": "^12.30.0",
@@ -41,6 +42,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.1",
     "@wordpress/env": "^11.14.0",
+    "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
