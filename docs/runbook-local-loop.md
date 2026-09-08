@@ -65,7 +65,7 @@ curl -s -X DELETE http://127.0.0.1:45332/api/v1/messages # clear, before placing
 curl -s http://127.0.0.1:45332/api/v1/message/<message-id>  # one message, HTML/Text/headers included
 ```
 
-Three mails per successful order: "... order has been received!" (pending->processing), "[Pubquiz-wt-N]: New order #N" (to the shop admin), and once every Quiz is delivered, "Your ... order is now complete" (the one with the download links, WooCommerce's own completed-order template). A failed Quiz instead produces "[Pubquiz] Order #N needs attention" (the operator alert, from `shop/mu-plugins/pubquiz-operator-mail.php`) and never a completed-order mail.
+Three mails per successful order: "Je bestelling bij `<site name>` is ontvangen!" (pending->processing), "[`<site name>`]: Je hebt een nieuwe bestelling: #N" (to the shop admin), and once every Quiz is delivered, "Je bestelling van `<site name>` is onderweg!" (the one with the download links, WooCommerce's own completed-order template). A failed Quiz instead produces "[Pubquiz] Order #N needs attention" (the operator alert, from `shop/mu-plugins/pubquiz-operator-mail.php`) and never a completed-order mail.
 
 ## Inspecting jobs (pg-boss)
 
