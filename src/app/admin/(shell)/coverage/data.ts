@@ -52,7 +52,7 @@ export async function loadCoverage(locale: Locale): Promise<CoverageCategory[]> 
   const cells = computeCoverage(pool.map((entry) => entry.item)).filter((cell) => cell.locale === locale);
 
   const categoryIds = Array.from(categoryNameById.keys()).sort((a, b) =>
-    (categoryNameById.get(a) ?? "").localeCompare(categoryNameById.get(b) ?? ""),
+    (categoryNameById.get(a) ?? "").localeCompare(categoryNameById.get(b) ?? "", locale),
   );
 
   return categoryIds.map((categoryId) => {
