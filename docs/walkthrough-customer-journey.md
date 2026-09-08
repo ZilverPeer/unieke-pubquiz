@@ -27,14 +27,14 @@ Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz 
 
 Check zero to eight boxes, then click **Toevoegen aan winkelwagen**.
 
-**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` may repeat, once per pick, in pick order):
+**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` repeats, once per pick, in pick order -- three picks below, so the sampler's cycle rule gives 3/3/2 rounds per pick, per CONTEXT.md "Quiz"):
 
 ```powershell
 $productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
 curl.exe -s -c cookies.txt -b cookies.txt `
   -d "quantity=1" -d "add-to-cart=$productId" -d "wapf_field_groups=$productId" `
   -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
-  -d "wapf[field_categories][]=1" `
+  -d "wapf[field_categories][]=1" -d "wapf[field_categories][]=2" -d "wapf[field_categories][]=3" `
   "http://localhost:45330/product/pubquiz/"
 ```
 
@@ -87,11 +87,11 @@ to list messages and get an `ID`, then:
 curl.exe -s "http://127.0.0.1:45332/api/v1/message/<message id>"
 ```
 
-for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij Pubquiz-wt-shop is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Categorieën, in Dutch, matching what you picked).
+for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij `<site name>` is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Categorieën, in Dutch, matching what you picked). `<site name>` is WordPress's own site title, which `wp-env` sets to the checkout directory's name (this worktree's folder -- locally, whatever `../Pubquiz-wt-*` or similar you're running from), so it varies by checkout; every mail subject below carries the same value.
 
-If you ticked **Een account aanmaken?**, a second mail arrives: **"Je account bij Pubquiz-wt-shop is aangemaakt!"**, naming your username and a password-reset link (WooCommerce never mails a plaintext password) -- you don't need it for this walkthrough, since checkout already logs the new account in for the rest of your browser session.
+If you ticked **Een account aanmaken?**, a second mail arrives: **"Je account bij `<site name>` is aangemaakt!"**, naming your username and a password-reset link (WooCommerce never mails a plaintext password) -- you don't need it for this walkthrough, since checkout already logs the new account in for the rest of your browser session.
 
-A third mail, **"[Pubquiz-wt-shop]: nieuwe bestelling #<n> ontvangen"**, goes to the shop admin (also routed to Mailpit locally) -- not customer-facing, safe to ignore.
+A third mail, **"[`<site name>`]: Je hebt een nieuwe bestelling: #<n>"**, goes to the shop admin (also routed to Mailpit locally) -- not customer-facing, safe to ignore.
 
 ## Waiting for generation
 
@@ -99,7 +99,7 @@ Do nothing else. `npm run shop:up`'s cron ticker keeps WordPress's cron ticking 
 
 ## The completed mail
 
-A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling bij Pubquiz-wt-shop is nu afgerond"**. It repeats the order summary and adds one row per Quiz (ticket #73): a plain link (no `target`) named after that Quiz's zip, with the picked Category names underneath as "Categorieën: ...":
+A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling van `<site name>` is onderweg!"** (WooCommerce's own Dutch completed-order subject). It repeats the order summary and adds one row per Quiz (ticket #73): a plain link (no `target`) named after that Quiz's zip, with the picked Category names underneath as "Categorieën: ...":
 
 - `pubquiz-<order number>-1-nl.zip` -- Categorieën: ...
 - `pubquiz-<order number>-2-nl.zip` -- Categorieën: ... (only on a multi-Quiz order)
