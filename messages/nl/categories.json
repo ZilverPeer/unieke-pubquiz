@@ -1,0 +1,24 @@
+{
+  "title": "Categorieën",
+  "form": {
+    "nameNl": "Naam (NL)",
+    "nameEn": "Naam (EN)",
+    "add": {
+      "category": "Categorie toevoegen",
+      "subcategory": "Subcategorie toevoegen",
+      "subsubcategory": "Subsubcategorie toevoegen"
+    },
+    "rename": "Opslaan",
+    "delete": "Verwijderen"
+  },
+  "errors": {
+    "nameRequired": "Vul een naam in.",
+    "nameTooLong": "Naam mag maximaal 120 tekens zijn.",
+    "invalidLevel": "Ongeldig niveau.",
+    "invalidParent": "Ongeldige bovenliggende categorie.",
+    "invalidId": "Ongeldig id.",
+    "invalidLocale": "Ongeldige taal.",
+    "deleteHasChildren": "Kan niet verwijderd worden: er verwijzen nog {count} onderliggende categorieën naar.",
+    "deleteHasItems": "Kan niet verwijderd worden: er verwijzen nog {count} items naar."
+  }
+}

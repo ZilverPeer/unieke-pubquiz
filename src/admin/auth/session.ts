@@ -32,37 +32,27 @@ export async function requireOperator(): Promise<OperatorSession | null> {
   return { email: user.email };
 }
 
-/**
- * Thrown by assertOperator() when the session is not an allowlisted
- * operator, so a server action can refuse the write without redirecting
- * (a server action can't `redirect()` mid-mutation the way a page render
- * can).
- */
+/** Thrown by assertOperator() when the caller has no allowlisted operator session. */
 export class NotAnOperatorError extends Error {
   constructor() {
-    super("Not an allowlisted operator");
+    super("Not signed in as an allowlisted operator");
     this.name = "NotAnOperatorError";
   }
 }
 
 /**
- * Re-check for area server actions (spec 4 admin tickets, #87/#88/#92/#93,
- * additive): the shell layout already guards page renders with
- * requireOperator(), but a server action is a separate request and must
- * re-check for itself rather than trust that the page that rendered its
- * form was actually guarded. Throws NotAnOperatorError instead of
- * redirecting, since a form action has no natural "redirect to login"
- * moment mid-mutation.
- *
- * A thin wrapper around requireOperator() so every area's actions.ts can
- * take an injectable `deps.assertOperator` (defaulting to this real
- * implementation), letting integration tests bypass the Supabase Auth
- * session entirely by passing a stub (see admin-common brief "Tests").
+ * Additive, spec 4 wave pin (ticket #87): the seam server actions re-check
+ * through, since the layout's requireOperator() only guards the page render,
+ * not a direct POST to the action (see node_modules/next/dist/docs's
+ * mutating-data guide: "Always verify authentication and authorization
+ * inside every Server Function"). Reuses requireOperator() rather than
+ * duplicating the session/allowlist check; throws instead of redirecting so
+ * an action can turn the failure into an ActionResult, and so tests can
+ * inject a stub that never touches cookies/Supabase Auth (see each admin
+ * area's actions.ts `deps.assertOperator` default parameter).
  */
 export async function assertOperator(): Promise<OperatorSession> {
   const operator = await requireOperator();
-  if (!operator) {
-    throw new NotAnOperatorError();
-  }
+  if (!operator) throw new NotAnOperatorError();
   return operator;
 }
