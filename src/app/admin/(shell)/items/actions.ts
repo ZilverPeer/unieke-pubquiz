@@ -22,9 +22,22 @@ import {
 
 export interface ActionDeps {
   assertOperator: typeof assertOperator;
+  /**
+   * Defaults to next/cache's revalidatePath. Injectable (same shape as
+   * ticket #87's deps.revalidateCategories) because revalidatePath()
+   * throws ("static generation store missing") outside a real Next.js
+   * request -- actions.integration.test.ts calls these actions directly
+   * under vitest, with no such request, and stubs this to a no-op.
+   */
+  revalidateItems: (id?: string) => void;
 }
 
-const defaultDeps: ActionDeps = { assertOperator };
+function defaultRevalidateItems(id?: string): void {
+  revalidatePath("/admin/items");
+  if (id) revalidatePath(`/admin/items/${id}`);
+}
+
+const defaultDeps: ActionDeps = { assertOperator, revalidateItems: defaultRevalidateItems };
 
 function readLocaleInput(formData: FormData, locale: "nl" | "en"): LocaleTextInput {
   return {
@@ -41,20 +54,6 @@ function readFormInput(formData: FormData): TextItemFormInput {
     nl: readLocaleInput(formData, "nl"),
     en: readLocaleInput(formData, "en"),
   };
-}
-
-/**
- * revalidatePath() requires a Next.js request/render context; the
- * integration suite calls these actions directly with vitest, outside any
- * such context, where it throws "static generation store missing" -- a
- * no-op there is correct (there is no cached route render to invalidate).
- */
-function revalidateItemsPaths(paths: string[]): void {
-  try {
-    for (const path of paths) revalidatePath(path);
-  } catch {
-    // No Next.js request context (e.g. this suite's direct vitest calls).
-  }
 }
 
 function buildTranslations(input: TextItemFormInput): TextItemTranslations {
@@ -88,7 +87,7 @@ export async function createTextItem(
   };
 
   const { id } = await createTextItemRepo(client, repositoryInput);
-  revalidateItemsPaths(["/admin/items"]);
+  deps.revalidateItems();
   return succeed({ id });
 }
 
@@ -113,6 +112,6 @@ export async function updateTextItem(
   };
 
   const result = await updateTextItemRepo(client, id, repositoryInput);
-  revalidateItemsPaths(["/admin/items", `/admin/items/${id}`]);
+  deps.revalidateItems(id);
   return succeed(result);
 }

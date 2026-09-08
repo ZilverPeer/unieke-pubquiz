@@ -27,7 +27,12 @@ afterEach(async () => {
 
 // A stub that never throws NotAnOperatorError -- the tests exercise the
 // action's own logic, not the Supabase Auth session (see docblock above).
-const deps = { assertOperator: async () => ({ email: "operator@example.com" }) };
+// revalidateItems is stubbed to a no-op: revalidatePath() throws outside a
+// real Next.js request context, which these direct vitest calls never have.
+const deps = {
+  assertOperator: async () => ({ email: "operator@example.com" }),
+  revalidateItems: () => {},
+};
 
 async function seedSubsubcategoryId(): Promise<string> {
   const { data, error } = await db.from("subsubcategories").select("id").order("id").limit(1).single();
@@ -201,6 +206,7 @@ describe("listItems", () => {
     if (chainError) throw chainError;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const categoryId = String((chain as any).subcategories.category_id);
+    const subcategoryId = String(chain.subcategory_id);
 
     const marker = uniqueMarker();
     const created = await createTextItem(
@@ -215,6 +221,9 @@ describe("listItems", () => {
 
     const byCategory = await listItems(db, { locale: "nl", categoryId, page: 1, pageSize: 5000 });
     expect(byCategory.items.some((item) => item.id === created.value.id)).toBe(true);
+
+    const bySubcategory = await listItems(db, { locale: "nl", subcategoryId, page: 1, pageSize: 5000 });
+    expect(bySubcategory.items.some((item) => item.id === created.value.id)).toBe(true);
 
     const byDifficulty = await listItems(db, { locale: "nl", difficulty: "hard", page: 1, pageSize: 5000 });
     expect(byDifficulty.items.some((item) => item.id === created.value.id)).toBe(true);

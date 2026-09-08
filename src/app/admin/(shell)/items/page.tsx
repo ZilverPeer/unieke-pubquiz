@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { Difficulty, ItemKind, Locale } from "@/domain";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
-import { listItems, loadSubsubcategoryOptions } from "@/repository/admin/items";
+import { listItems, loadCategoryOptions, loadSubcategoryOptions, loadSubsubcategoryOptions } from "@/repository/admin/items";
 
 const PAGE_SIZE = 25;
 
@@ -22,6 +22,12 @@ function asLocale(value: string | undefined): Locale | undefined {
   return value === "nl" || value === "en" ? value : undefined;
 }
 
+const DIFFICULTY_KEYS: Record<Difficulty, "form.difficultyEasy" | "form.difficultyMedium" | "form.difficultyHard"> = {
+  easy: "form.difficultyEasy",
+  medium: "form.difficultyMedium",
+  hard: "form.difficultyHard",
+};
+
 export default async function ItemsPage({ searchParams }: PageProps<"/admin/items">) {
   const params = (await searchParams) ?? {};
   const t = await getTranslations("items");
@@ -37,7 +43,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
   const page = Math.max(1, Number(first(params.page) ?? "1") || 1);
 
   const client = createSupabaseClient(resolveLocalStackConfig());
-  const [{ items, total }, subsubcategoryOptions] = await Promise.all([
+  const [{ items, total }, categoryOptions, subcategoryOptions, subsubcategoryOptions] = await Promise.all([
     listItems(client, {
       locale: "nl",
       query,
@@ -51,6 +57,8 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
       page,
       pageSize: PAGE_SIZE,
     }),
+    loadCategoryOptions(client, "nl"),
+    loadSubcategoryOptions(client, "nl", categoryId),
     loadSubsubcategoryOptions(client, "nl"),
   ]);
 
@@ -84,6 +92,30 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
             <option value="text">{t("list.kindText")}</option>
             <option value="picture">{t("list.kindPicture")}</option>
             <option value="music">{t("list.kindMusic")}</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span>{t("list.category")}</span>
+          <select name="categoryId" defaultValue={categoryId ?? ""} className="border px-2 py-1">
+            <option value="">{t("list.categoryAll")}</option>
+            {categoryOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span>{t("list.subcategory")}</span>
+          <select name="subcategoryId" defaultValue={subcategoryId ?? ""} className="border px-2 py-1">
+            <option value="">{t("list.subcategoryAll")}</option>
+            {subcategoryOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -150,7 +182,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
                 <td className="py-2">
                   {item.categoryName} / {item.subcategoryName} / {item.subsubcategoryName}
                 </td>
-                <td className="py-2">{item.difficulty}</td>
+                <td className="py-2">{t(DIFFICULTY_KEYS[item.difficulty])}</td>
                 <td className="py-2">
                   {(["nl", "en"] as const).map((locale) => (
                     <span key={locale} className="mr-2">

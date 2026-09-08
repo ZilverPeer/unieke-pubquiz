@@ -122,6 +122,50 @@ export async function loadSubsubcategoryOptions(
   return options;
 }
 
+export interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Every Category as a `{ id, name }` dropdown option, names in the
+ * requested Locale -- the list page's own Category filter (issue #88 names
+ * Category and Subcategory as separate filters alongside Subsubcategory;
+ * the message keys for both already exist, `list.category`/`list.subcategory`).
+ * Own small read, same reasoning as loadSubsubcategoryOptions.
+ */
+export async function loadCategoryOptions(client: SupabaseClient<Database>, locale: Locale): Promise<CategoryOption[]> {
+  const { data, error } = await client.from("category_translations").select("category_id, name").eq("locale", locale);
+  if (error) throw error;
+  const options = data.map((row) => ({ id: String(row.category_id), name: row.name }));
+  options.sort((a, b) => a.name.localeCompare(b.name));
+  return options;
+}
+
+/**
+ * Every Subcategory as a `{ id, name }` dropdown option, optionally
+ * narrowed to one Category's children (the list page passes the selected
+ * `categoryId`, if any, so the Subcategory select only offers that
+ * Category's own Subcategories).
+ */
+export async function loadSubcategoryOptions(
+  client: SupabaseClient<Database>,
+  locale: Locale,
+  categoryId?: string,
+): Promise<CategoryOption[]> {
+  const { chainBySubsubcategoryId, subcategoryNameById } = await loadChainMaps(client, locale);
+
+  const subcategoryIds = new Set<string>();
+  for (const chain of chainBySubsubcategoryId.values()) {
+    if (categoryId && chain.categoryId !== categoryId) continue;
+    subcategoryIds.add(chain.subcategoryId);
+  }
+
+  const options = [...subcategoryIds].map((id) => ({ id, name: subcategoryNameById.get(id) ?? "" }));
+  options.sort((a, b) => a.name.localeCompare(b.name));
+  return options;
+}
+
 export interface ListItemsFilters {
   locale: Locale;
   query?: string;
@@ -397,6 +441,8 @@ export async function updateTextItem(
 }
 
 export interface ItemsAdminRepository {
+  loadCategoryOptions(locale: Locale): Promise<CategoryOption[]>;
+  loadSubcategoryOptions(locale: Locale, categoryId?: string): Promise<CategoryOption[]>;
   loadSubsubcategoryOptions(locale: Locale): Promise<SubsubcategoryOption[]>;
   listItems(filters: ListItemsFilters): Promise<ListItemsResult>;
   getItem(id: string): Promise<ItemDetail | null>;
@@ -407,6 +453,8 @@ export interface ItemsAdminRepository {
 export function createItemsAdminRepository(config: RepositoryConfig): ItemsAdminRepository {
   const client = createSupabaseClient(config);
   return {
+    loadCategoryOptions: (locale) => loadCategoryOptions(client, locale),
+    loadSubcategoryOptions: (locale, categoryId) => loadSubcategoryOptions(client, locale, categoryId),
     loadSubsubcategoryOptions: (locale) => loadSubsubcategoryOptions(client, locale),
     listItems: (filters) => listItems(client, filters),
     getItem: (id) => getItem(client, id),
