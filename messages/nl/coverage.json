@@ -1,0 +1,27 @@
+{
+  "title": "Dekking",
+  "intro": "Aantal beschikbare Items per Categorie, Itemtype en Moeilijkheidsgraad, voor de datalocale hieronder. Dit is los van de taal van dit scherm.",
+  "dataLocale": {
+    "label": "Datalocale",
+    "nl": "Nederlands",
+    "en": "Engels"
+  },
+  "table": {
+    "kindHeader": "Itemtype",
+    "kind": {
+      "text": "Tekst",
+      "picture": "Foto",
+      "music": "Muziek"
+    },
+    "difficulty": {
+      "easy": "Makkelijk",
+      "medium": "Gemiddeld",
+      "hard": "Moeilijk",
+      "mixed": "Gemengd"
+    }
+  },
+  "cell": {
+    "doesNotFit": "onvoldoende"
+  },
+  "empty": "Nog geen Content voor deze datalocale."
+}
