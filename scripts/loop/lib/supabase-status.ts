@@ -35,11 +35,26 @@ export function parseSupabaseStatusResult(result: SupabaseStatusProcessResult): 
  * succeeds. `npx supabase start`'s stdout is one JSON line carrying the
  * local stack's keys (publishable, secret, service role, S3 access key --
  * the well-known local demo keys, but the repo rule is that no key ever
- * appears in printed output). This function takes the parsed status object
- * but deliberately never reads any of its values, so the "started" line it
- * builds can never leak one, however key-shaped the object's contents are.
+ * appears in printed output). This function takes no argument at all --
+ * `up.ts` never parses or even reads that stdout, so there is no path for
+ * one of those keys to reach this line, structurally, not just by
+ * discipline.
  */
-export function formatSupabaseStartedLine(status: Record<string, unknown>): string {
-  void status; // deliberately unread -- see the docblock above.
+export function formatSupabaseStartedLine(): string {
   return "Supabase: started.";
+}
+
+/**
+ * Ticket #66: the failure message `loop/up.ts` prints when `npx supabase
+ * start` exits non-zero. Takes the exit code and the last few lines of
+ * *stderr* only -- never `npx supabase start`'s stdout, which is where the
+ * JSON with the keys lives. stderr is what a real failure's diagnostics
+ * land on (verified empirically, see supabase-status.test.ts/up.ts), so
+ * those lines are printed unchanged -- there is nothing to redact there,
+ * only stdout is off limits, and this function has no parameter for it.
+ */
+export function formatSupabaseStartFailure(exitCode: number | null, stderrTail: string[]): string {
+  const lines = [`npx supabase start exited with status ${exitCode ?? "null"}.`, ...stderrTail];
+  lines.push('Run "npx supabase start" by hand.');
+  return lines.join("\n");
 }

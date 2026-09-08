@@ -37,7 +37,7 @@ import { existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { createSupabaseClient, resolveLocalStackConfig } from "../../src/repository";
 import { isPidAlive, type PidAliveDeps } from "./lib/pid-alive";
-import { formatSupabaseStartedLine, parseSupabaseStatusResult } from "./lib/supabase-status";
+import { formatSupabaseStartedLine, formatSupabaseStartFailure, parseSupabaseStatusResult } from "./lib/supabase-status";
 import { formatShopSetupLines } from "./lib/shop-setup-summary";
 import { readSetupResultFile } from "../shop/lib/setup-result-file";
 import { waitUntilUrlAnswers } from "./lib/wait-for-url";
@@ -72,12 +72,14 @@ function ensureSupabaseUp(): void {
   }
 
   console.log("Supabase: not running, starting it (npx supabase start)...");
-  // Both stdout and stderr captured, neither inherited: `npx supabase
-  // start`'s stdout is one JSON line carrying the local stack's keys
-  // (publishable, secret, service role, S3 access key -- the well-known
-  // local demo keys, but the repo rule is that no key ever appears in
-  // printed output). On failure only the last few lines of stderr (never
-  // stdout, which is where the JSON is) are printed.
+  // stdout captured, never inherited AND NEVER READ, not even to parse it:
+  // `npx supabase start`'s stdout is one JSON line carrying the local
+  // stack's keys (publishable, secret, service role, S3 access key -- the
+  // well-known local demo keys, but the repo rule is that no key ever
+  // appears in printed output). stderr is captured too, and only its last
+  // few lines are used on failure, via formatSupabaseStartFailure -- see
+  // that function's docblock for why passing it stdout would defeat the
+  // point of never reading it.
   const startResult = spawnSync("npx supabase start", {
     encoding: "utf8",
     shell: true,
@@ -85,23 +87,11 @@ function ensureSupabaseUp(): void {
   });
   if (startResult.status !== 0) {
     const stderrLines = (startResult.stderr ?? "").split(/\r?\n/).filter((line) => line.length > 0);
-    const lastLines = stderrLines.slice(-5).join("\n");
-    console.error(`npx supabase start exited with status ${startResult.status ?? "null"}.`);
-    if (lastLines) console.error(lastLines);
-    console.error('Run "npx supabase start" by hand.');
+    console.error(formatSupabaseStartFailure(startResult.status, stderrLines.slice(-5)));
     throw new Error("npx supabase start failed -- see the output above.");
   }
 
-  let parsedStdout: Record<string, unknown> = {};
-  try {
-    parsedStdout = JSON.parse(startResult.stdout ?? "{}") as Record<string, unknown>;
-  } catch {
-    // `npx supabase start`'s stdout didn't parse as JSON (e.g. an older CLI
-    // printing a table instead) -- formatSupabaseStartedLine never reads
-    // its argument's values anyway, so an empty object is just as safe.
-    parsedStdout = {};
-  }
-  console.log(formatSupabaseStartedLine(parsedStdout));
+  console.log(formatSupabaseStartedLine());
 }
 
 async function ensureSeeded(): Promise<void> {
