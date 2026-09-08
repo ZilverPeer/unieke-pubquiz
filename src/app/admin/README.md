@@ -16,7 +16,7 @@ Login, the operator allowlist, the locale switch, and the operator CLI for the p
 
 ## Locale
 
-`next-intl` reads the locale from the `pubquiz_admin_locale` cookie (`src/i18n/request.ts`), defaulting to `nl`. `src/app/admin/(shell)/locale/actions.ts`'s `setLocale` action sets the cookie and revalidates the admin layout, so the switch is visible immediately, not just after the next full reload. Message files are `messages/nl.json` and `messages/en.json` at the repo root, namespaced `admin.nav`, `admin.login`, `admin.locale`, `admin.refused`.
+`next-intl` reads the locale from the `pubquiz_admin_locale` cookie (`src/i18n/request.ts`), defaulting to `nl`. `src/app/admin/(shell)/locale/actions.ts`'s `setLocale` action sets the cookie and revalidates the admin layout, so the switch is visible immediately, not just after the next full reload. Message files live under `messages/nl/` and `messages/en/`, one JSON file per top-level namespace (`admin.json` holds `admin.nav`, `admin.login`, `admin.locale`, `admin.refused`); `src/i18n/request.ts` merges every file in the Locale folder at request time, so a new page adds its own file rather than editing a shared one. Both Locales must carry the same file names and key sets. Server actions return the `ActionResult` shape from `src/admin/forms.ts` (field errors keyed by field name, values are message keys).
 
 ## Operator CLI
 
