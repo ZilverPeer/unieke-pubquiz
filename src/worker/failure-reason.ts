@@ -6,9 +6,9 @@
  * OPERATOR_NOTE_PREFIX and the line item id itself; this module's output
  * carries no marker of its own).
  *
- * A pure function: every fact it needs (the Quiz's 1-based position within
- * its order -- the same number quizZipFilename's `sequence + 1` uses --
- * the billing email, the Locale, the requested Difficulty, and the
+ * A pure function: every fact it needs (the Quiz's id, its 1-based position
+ * within its order -- the same number quizZipFilename's `sequence + 1` uses
+ * -- the billing email, the Locale, the requested Difficulty, and the
  * kind-specific detail) is passed in by the caller (src/worker/quiz-job.ts),
  * which is the one place allowed to read the Order and the shortfall result
  * this data comes from.
@@ -17,6 +17,8 @@ import type { Locale, RequestedDifficulty } from "@/domain";
 import { SLOT_KINDS } from "@/domain";
 
 interface FailureReasonBase {
+  /** The Quiz's id -- printed in the retry command so the operator can copy it as-is. */
+  quizId: string;
   /** The Quiz's 1-based position among every Quiz of its order (quizZipFilename's sequence + 1). */
   quizNumber: number;
   billingEmail: string;
@@ -49,7 +51,9 @@ function header(input: FailureReasonBase): string {
   return `Quiz ${input.quizNumber} of order for ${input.billingEmail} (locale ${input.locale}) could not be generated.`;
 }
 
-const RETRY_COMMAND = "`npm run generate -- --retry-quiz <quiz id>`";
+function retryCommand(quizId: string): string {
+  return `\`npm run generate -- --retry-quiz ${quizId}\``;
+}
 
 /**
  * Builds the multi-line plain-words failure text. Every branch keeps the
@@ -67,7 +71,7 @@ export function buildFailureReason(input: FailureReasonInput): string {
         `The ${roundKind} round for Category "${input.categoryLabel}" at Difficulty ${input.requestedDifficulty} is ${input.missingCount} Items short: the pool has too few Items this customer has not already received.`,
       );
       lines.push(
-        `What to do: add at least ${input.missingCount} ${roundKind} Items to "${input.categoryLabel}" (${input.requestedDifficulty}, ${input.locale}) and retry this Quiz with ${RETRY_COMMAND}, or refund the order in WooCommerce.`,
+        `What to do: add at least ${input.missingCount} ${roundKind} Items to "${input.categoryLabel}" (${input.requestedDifficulty}, ${input.locale}) and retry this Quiz with ${retryCommand(input.quizId)}, or refund the order in WooCommerce.`,
       );
       break;
     }
@@ -76,7 +80,7 @@ export function buildFailureReason(input: FailureReasonInput): string {
         `${input.missingSlotCount} Round slots had no Category left to assign: the pool does not have enough distinct Categories with Items at Difficulty ${input.requestedDifficulty} (${input.locale}) to fill every Round.`,
       );
       lines.push(
-        `What to do: add at least ${input.missingSlotCount} more Categories with Items at Difficulty ${input.requestedDifficulty} (${input.locale}) and retry this Quiz with ${RETRY_COMMAND}, or refund the order in WooCommerce.`,
+        `What to do: add at least ${input.missingSlotCount} more Categories with Items at Difficulty ${input.requestedDifficulty} (${input.locale}) and retry this Quiz with ${retryCommand(input.quizId)}, or refund the order in WooCommerce.`,
       );
       break;
     }

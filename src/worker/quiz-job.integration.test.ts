@@ -266,6 +266,9 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
       for (const fragment of [`Category "${HARD_TEXT_CATEGORY_NAME.nl}"`, "text round", "10 Items short", "What to do"]) {
         expect(failureCall.reason).toContain(fragment);
       }
+      // The retry command must carry the actual Quiz id, not a placeholder
+      // -- the operator needs to be able to copy it as-is.
+      expect(failureCall.reason).toContain(`--retry-quiz ${quizId}`);
     },
   );
 

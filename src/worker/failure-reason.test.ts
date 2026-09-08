@@ -11,6 +11,7 @@ describe("buildFailureReason", () => {
   it("text Round shortfall", () => {
     const reason = buildFailureReason({
       kind: "shortfall",
+      quizId: "11111111-1111-4111-8111-111111111111",
       quizNumber: 1,
       billingEmail: "jane@example.com",
       locale: "nl",
@@ -24,7 +25,7 @@ describe("buildFailureReason", () => {
       [
         "Quiz 1 of order for jane@example.com (locale nl) could not be generated.",
         'The text round for Category "Sport" at Difficulty hard is 10 Items short: the pool has too few Items this customer has not already received.',
-        'What to do: add at least 10 text Items to "Sport" (hard, nl) and retry this Quiz with `npm run generate -- --retry-quiz <quiz id>`, or refund the order in WooCommerce.',
+        'What to do: add at least 10 text Items to "Sport" (hard, nl) and retry this Quiz with `npm run generate -- --retry-quiz 11111111-1111-4111-8111-111111111111`, or refund the order in WooCommerce.',
       ].join("\n"),
     );
   });
@@ -32,6 +33,7 @@ describe("buildFailureReason", () => {
   it("picture Round shortfall", () => {
     const reason = buildFailureReason({
       kind: "shortfall",
+      quizId: "22222222-2222-4222-8222-222222222222",
       quizNumber: 2,
       billingEmail: "jane@example.com",
       locale: "nl",
@@ -45,7 +47,7 @@ describe("buildFailureReason", () => {
       [
         "Quiz 2 of order for jane@example.com (locale nl) could not be generated.",
         'The picture round for Category "Geschiedenis" at Difficulty hard is 4 Items short: the pool has too few Items this customer has not already received.',
-        'What to do: add at least 4 picture Items to "Geschiedenis" (hard, nl) and retry this Quiz with `npm run generate -- --retry-quiz <quiz id>`, or refund the order in WooCommerce.',
+        'What to do: add at least 4 picture Items to "Geschiedenis" (hard, nl) and retry this Quiz with `npm run generate -- --retry-quiz 22222222-2222-4222-8222-222222222222`, or refund the order in WooCommerce.',
       ].join("\n"),
     );
   });
@@ -53,6 +55,7 @@ describe("buildFailureReason", () => {
   it("music Round shortfall", () => {
     const reason = buildFailureReason({
       kind: "shortfall",
+      quizId: "33333333-3333-4333-8333-333333333333",
       quizNumber: 1,
       billingEmail: "jan@example.com",
       locale: "en",
@@ -66,7 +69,7 @@ describe("buildFailureReason", () => {
       [
         "Quiz 1 of order for jan@example.com (locale en) could not be generated.",
         'The music round for Category "Movies" at Difficulty easy is 3 Items short: the pool has too few Items this customer has not already received.',
-        'What to do: add at least 3 music Items to "Movies" (easy, en) and retry this Quiz with `npm run generate -- --retry-quiz <quiz id>`, or refund the order in WooCommerce.',
+        'What to do: add at least 3 music Items to "Movies" (easy, en) and retry this Quiz with `npm run generate -- --retry-quiz 33333333-3333-4333-8333-333333333333`, or refund the order in WooCommerce.',
       ].join("\n"),
     );
   });
@@ -74,6 +77,7 @@ describe("buildFailureReason", () => {
   it("no Category left for a slot (categoryId null)", () => {
     const reason = buildFailureReason({
       kind: "no-category-left",
+      quizId: "44444444-4444-4444-8444-444444444444",
       quizNumber: 3,
       billingEmail: "piet@example.com",
       locale: "nl",
@@ -85,7 +89,7 @@ describe("buildFailureReason", () => {
       [
         "Quiz 3 of order for piet@example.com (locale nl) could not be generated.",
         "2 Round slots had no Category left to assign: the pool does not have enough distinct Categories with Items at Difficulty mixed (nl) to fill every Round.",
-        "What to do: add at least 2 more Categories with Items at Difficulty mixed (nl) and retry this Quiz with `npm run generate -- --retry-quiz <quiz id>`, or refund the order in WooCommerce.",
+        "What to do: add at least 2 more Categories with Items at Difficulty mixed (nl) and retry this Quiz with `npm run generate -- --retry-quiz 44444444-4444-4444-8444-444444444444`, or refund the order in WooCommerce.",
       ].join("\n"),
     );
   });
@@ -93,6 +97,7 @@ describe("buildFailureReason", () => {
   it("unknown Category id", () => {
     const reason = buildFailureReason({
       kind: "invalid-config",
+      quizId: "55555555-5555-4555-8555-555555555555",
       quizNumber: 1,
       billingEmail: "jane@example.com",
       locale: "nl",
@@ -112,6 +117,7 @@ describe("buildFailureReason", () => {
   it("invalid picks (too many or duplicate)", () => {
     const reason = buildFailureReason({
       kind: "invalid-config",
+      quizId: "66666666-6666-4666-8666-666666666666",
       quizNumber: 1,
       billingEmail: "jane@example.com",
       locale: "nl",

@@ -101,6 +101,7 @@ async function computeQuizNumber(deps: QuizJobDeps, quiz: QuizRecord): Promise<n
 
 function baseFailureReasonInput(quiz: QuizRecord, billingEmail: string, quizNumber: number) {
   return {
+    quizId: quiz.id,
     quizNumber,
     billingEmail,
     locale: quiz.config.locale,
