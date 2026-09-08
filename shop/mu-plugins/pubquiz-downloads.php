@@ -72,7 +72,11 @@ function pubquiz_download_urls_for_item( $item ) {
  * `$order->get_items()` in its own (stable, creation-order) sequence and
  * assigns one running counter across every item's URLs, matching the order
  * `listQuizzesByOrderId` uses on the TypeScript side
- * (src/app/download/resolve-download.ts's DownloadQuizLookup).
+ * (src/app/download/resolve-download.ts's DownloadQuizLookup). This relies
+ * on WooCommerce's `$order->get_items()` returning items ordered by item id
+ * ascending (its default, undocumented but stable ordering) -- item ids are
+ * assigned in creation order, i.e. checkout order, matching the ascending
+ * `woo_line_item_id` the TypeScript side sorts by.
  *
  * @param WC_Order $order
  * @return array<int,array<int,int>> item id => [per-item sequence => order-wide 1-based number].

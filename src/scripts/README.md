@@ -28,9 +28,10 @@ npx tsx src/scripts/generate.ts --locale en --mode single_category --pick 0=1 --
 
 ### Output
 
-On success, four fixed-name files plus one inspection file, all written to `--out`:
+On success, four fixed-name files plus the zip they're packaged into for delivery, plus one inspection file, all written to `--out`:
 
 - `quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3` — the four Deliverables.
+- `quiz.zip` — the same four files zipped (`buildQuizZip`, `src/render`), exactly what a customer receives (ticket #73); written locally alongside the loose files purely for Erik's inspection, not read back by this script.
 - `composition.json` — the persisted `CompositionRecord` plus its `compositionId`, for inspection.
 
 The Composition is persisted last, after every Deliverable has been written, so a render or write failure never consumes Items that a customer could otherwise still receive.
@@ -71,7 +72,7 @@ Looks the Quiz up, refuses (exit code 1, nothing changed) if it isn't currently 
 npx tsx src/scripts/generate.ts --composition <composition id>
 ```
 
-Loads the Composition by id (`getCompositionById` — no re-sampling, no new `compositions` row), finds the Quiz that owns it (`getQuizByCompositionId`), re-renders all four Deliverables through the same `assembleQuizContent` → `renderQuizFiles` path `generateQuiz` uses, re-uploads them to `deliverables/<quiz id>/<file>` (overwriting the prior ones, `upsert: true` — see `src/repository/README.md`), and re-attaches them via the pinned `Deliverer` interface, rebuilding each file's download URL from the Quiz's own (still-valid) download token.
+Loads the Composition by id (`getCompositionById` — no re-sampling, no new `compositions` row), finds the Quiz that owns it (`getQuizByCompositionId`), re-renders all four Deliverables through the same `assembleQuizContent` → `renderQuizFiles` path `generateQuiz` uses, zips them (`buildQuizZip`, `src/render`, ticket #73), re-uploads the single zip to `deliverables/<quiz id>/quiz.zip` (overwriting the prior one, `upsert: true` — see `src/repository/README.md`), and re-attaches it via the pinned `Deliverer` interface, rebuilding the zip's download URL from the Quiz's own (still-valid) download token.
 
 Refuses (exit code 1, nothing uploaded) when the Composition doesn't exist, has no owning Quiz, or the Quiz's download token has already been cleared by the daily pruning job (ticket #42's `prune.ts`) -- there's no valid download URL to hand the deliverer in that case; re-delivering a pruned Quiz is out of scope here.
 
@@ -81,5 +82,5 @@ Refuses (exit code 1, nothing uploaded) when the Composition doesn't exist, has 
 
 - `cli-args.test.ts`, `assemble-quiz-content.test.ts`, `generate-quiz.test.ts`, `retry-quiz.test.ts`, `recompose-quiz.test.ts` — unit, no DB (`npm test`). `generate-quiz.test.ts` proves the write-before-persist ordering by injecting a failing `writeDeliverables` and asserting `persistComposition` was never called; it renders for real (including the ffmpeg-driven music round), so it skips like `src/render/music-round-mp3.test.ts` does when `resolveFfmpeg()` is `null`. `retry-quiz.test.ts`/`recompose-quiz.test.ts` only exercise the pure decision logic (status checks, refusal paths) against fakes -- no rendering, so no ffmpeg dependency.
 - `generate.integration.test.ts` — runs against the real local stack (`npm run test:integration`, after `supabase start && npm run db:reset`), including one real CLI invocation (spawned via `node --import tsx`) so the argv path and exit codes are exercised for real. Deletes every Composition it creates in `afterEach`. ffmpeg-dependent assertions skip the same way `src/render/music-round-mp3.test.ts` does when `resolveFfmpeg()` is `null`.
-- `recompose-quiz.integration.test.ts` — `recomposeQuiz` driven directly (not through the CLI) against the real stack and a fake `Deliverer`, so it can assert the fake was called once with all four files, without waiting on ticket #41.
+- `recompose-quiz.integration.test.ts` — `recomposeQuiz` driven directly (not through the CLI) against the real stack and a fake `Deliverer`, so it can assert the fake was called once with the zip's URL, without waiting on ticket #41.
 - `reprocess-cli.integration.test.ts` — `--retry-quiz`/`--composition` driven through the real spawned CLI process, including the real (still-throwing) `createDeliverer()` for `--composition`, proving the "uploaded, delivery not implemented yet" message end to end.

@@ -1,4 +1,4 @@
-The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its single zip Deliverable. Started from `src/instrumentation.ts` when `PUBQUIZ_WORKER=1`. May import `src/domain`, `src/repository`, `src/scripts/generate-quiz` and `src/deliver`'s interface -- the one module in the codebase allowed to cross those boundaries (CLAUDE.md "Orthogonal pipeline"). No WooCommerce knowledge lives here.
+The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its single zip Deliverable. Started from `src/instrumentation.ts` when `PUBQUIZ_WORKER=1`. May import `src/domain`, `src/repository`, `src/scripts/generate-quiz`, `src/render` (`buildQuizZip`, to package the four rendered files into the single zip Deliverable before upload -- ticket #73) and `src/deliver`'s interface -- the one module in the codebase allowed to cross those boundaries (CLAUDE.md "Orthogonal pipeline"). No WooCommerce knowledge lives here.
 
 ## Files
 
