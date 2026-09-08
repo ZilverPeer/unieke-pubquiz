@@ -317,8 +317,8 @@ required -- one choice per `nl` Category name, none preselected, with the
 description "Zonder keuze krijgt elke ronde een willekeurige categorie.
 Kies categorieën als je ze in je quiz wilt."). The eight `category_1`..
 `category_8` selects and the `mode` select from before this ticket are gone
--- see CONTEXT.md "Quiz" for the cycle rule that replaced "Soort quiz", and
-"Cap of 8" below for why `categories` has no plugin-level maximum. Field
+-- see CONTEXT.md "Quiz" for the cycle rule, and "Cap of 8" below for why
+`categories` has no plugin-level maximum. Field
 **ids** stay `locale`/`difficulty`/`categories`; field and choice **labels**
 are readable Dutch text (Taal/Moeilijkheid/Categorieën; Nederlands/Engels;
 Makkelijk/Gemiddeld/Moeilijk/Gemengd; each Category's `nl` name) -- see
