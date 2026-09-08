@@ -11,10 +11,12 @@
  * on Windows bind mounts (see shop/README.md "Single bootstrap"). This one
  * `wp eval-file` call does, in order: theme activation, the Dutch site/
  * plugin/theme language, WooCommerce's Dutch store settings, the Dutch page
- * renames (plus deleting the leftover "Sample Page"), the Pubquiz product,
- * the Advanced Product Fields field group (setup-field-group.php, required
- * below), the classic Cart/Checkout shortcodes, the `order.updated` webhook,
- * and a freshly rotated WooCommerce REST API key.
+ * renames (plus deleting the leftover "Sample Page"), the front-page
+ * settings that make Winkel the visible front page (tickets #68/#70), the
+ * Pubquiz product, the Advanced Product Fields field group
+ * (setup-field-group.php, required below), the classic Cart/Checkout
+ * shortcodes, the `order.updated` webhook, and a freshly rotated
+ * WooCommerce REST API key.
  *
  * `<base64CategoriesJson>` (ticket #57) is base64 of a JSON array of
  * `{"id": "...", "name": "..."}` -- the running Supabase stack's `nl`
@@ -254,7 +256,26 @@ if ( $pubquiz_sample_page ) {
 }
 
 // -----------------------------------------------------------------------
-// 5. The Pubquiz product: Dutch name/short description/placeholder price,
+// 5. Front page: Winkel visible to a logged-out visitor instead of
+//    WooCommerce's coming-soon placeholder or the default "Hello world!"
+//    blog post (tickets #68/#70). Idempotent like every other option write
+//    above; folds into every `shop:up` run, so a re-run converges an
+//    existing instance too, not just a fresh one.
+// -----------------------------------------------------------------------
+pubquiz_ensure_option( 'woocommerce_coming_soon', 'no' );
+pubquiz_ensure_option( 'show_on_front', 'page' );
+pubquiz_ensure_option( 'page_on_front', (string) wc_get_page_id( 'shop' ) );
+
+$pubquiz_hello_world = get_post( 1 );
+if ( $pubquiz_hello_world && 'trash' !== $pubquiz_hello_world->post_status ) {
+    pubquiz_log( 'Trashing post #1 ("Hello world!").' );
+    wp_trash_post( 1 );
+} else {
+    pubquiz_log( 'Post #1 already gone or already trashed.' );
+}
+
+// -----------------------------------------------------------------------
+// 6. The Pubquiz product: Dutch name/short description/placeholder price,
 //    converged onto an already-existing product too (see
 //    scripts/shop/lib/config.ts -- these three literal strings are the
 //    single source, pinned against this file by
@@ -309,14 +330,14 @@ function pubquiz_ensure_product() {
 $pubquiz_product_id = pubquiz_ensure_product();
 
 // -----------------------------------------------------------------------
-// 6. The Advanced Product Fields field group (ticket #37/#56 -- see that
+// 7. The Advanced Product Fields field group (ticket #37/#56 -- see that
 //    file's own docblock). Always re-applies in place; this is the same
 //    idempotency it had before this ticket.
 // -----------------------------------------------------------------------
 require __DIR__ . '/setup-field-group.php';
 
 // -----------------------------------------------------------------------
-// 7. Classic Cart/Checkout shortcodes -- required for the Advanced Product
+// 8. Classic Cart/Checkout shortcodes -- required for the Advanced Product
 //    Fields plugin's free tier, which has no Store API/Blocks integration
 //    (see shop/README.md "Interface gaps").
 // -----------------------------------------------------------------------
@@ -343,7 +364,7 @@ pubquiz_ensure_page_shortcode( 'woocommerce_cart_page_id', '[woocommerce_cart]' 
 pubquiz_ensure_page_shortcode( 'woocommerce_checkout_page_id', '[woocommerce_checkout]' );
 
 // -----------------------------------------------------------------------
-// 8. The `order.updated` webhook. Uses WC_Webhook's own setters directly
+// 9. The `order.updated` webhook. Uses WC_Webhook's own setters directly
 //    (including set_delivery_url(), which the native `wp wc webhook
 //    update` WP-CLI command does not expose -- see shop/README.md
 //    "Interface gaps"), so unlike the old delete+recreate workaround, a
@@ -407,7 +428,7 @@ function pubquiz_ensure_webhook( $name, $topic, $delivery_url, $secret ) {
 $pubquiz_webhook_id = pubquiz_ensure_webhook( PUBQUIZ_WEBHOOK_NAME, PUBQUIZ_WEBHOOK_TOPIC, $webhook_delivery_url, $webhook_secret );
 
 // -----------------------------------------------------------------------
-// 9. A fresh WooCommerce REST API key for the deliver module (#41).
+// 10. A fresh WooCommerce REST API key for the deliver module (#41).
 //    Rotated on every run: WooCommerce stores only a one-way hash of the
 //    consumer key (wc_api_hash()), so an existing key's plaintext can
 //    never be recovered for reuse -- see shop/README.md "REST
