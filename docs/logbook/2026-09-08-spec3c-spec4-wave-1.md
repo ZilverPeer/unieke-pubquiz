@@ -25,8 +25,15 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - #86: ab2495ee12130c602
 - PR 99 reviewers: standards a22cbb11155bcfdfe, spec ad9c5c4cce7e1ba9c
 - #102: ac1595d6304058526
+- #87: ae1067dae00a74845
+- #88: a3a6364597521dc3f
+- #92: a39a6bd398ce4f908
+- #93: a3d25fa182de8f818
+- PR 104 reviewers: standards ade0f74c0be66c6f1, spec a9b2f3bceb03fec4e
 - PR 101 reviewers: standards aefc40978883814c4, spec a49796d173f4457eb
 - PR 100 reviewers: standards a27b75908974c6d2f, spec afc55313fadfc1bff
+- PR 105 reviewers: standards a655e5efa29f259a7, spec a867a942693ce1e2c
+- PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
 
 ## Spec 5 tickets (18:44)
 
@@ -48,6 +55,29 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - 18:08 PR opened (e4e3af1), 14 minutes of implementer time. Red evidence again missing from the PR body; implementer asked to add it. Reviewers dispatched 18:10; Spec reviewer uses a fresh clone (`package.json` changed) on port 3001 without a worker.
 - 18:12 Standards review: HARD, the admin layout guards the login page too (redirect loop; wrong-password error unreachable); the proxy test never renders the layout, so it gave false confidence. Sent to the implementer at once (route group fix); Spec review still running.
 - 18:35 fix round 1 (591a123): route group `(shell)`, login outside it; curl evidence 307-to-self before, 200 after; wrong-password error renders. Spec reviewer told to re-sync.
+- 18:56 Spec review at 591a123: all criteria reproduced with curl (guard 307, login 200, Dutch nav, English after the switch and a reload, refusal for a non-allowlisted account, webhook 401 and download 404 untouched, CLI created/updated, build with only the two pre-existing instrumentation warnings). Note: `git checkout origin/master -- src` does not remove branch-only files, so that red-claim recipe is void for new-file tickets; briefs now say to delete the new folder. Merged 18:58 as 7b6022e, #85 closed, worktree removed.
+
+### Pin 2 (19:05, 0f10b1d)
+
+Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at request time (`src/i18n/request.ts`), so parallel tickets add files instead of editing one JSON; `src/admin/forms.ts` with the `ActionResult` shape. Verified by rendering the login page from a worktree on 3001. The main `.env.local` lacked the admin variables (#85 had appended them to its worktree only); appended from `.env.example`'s local defaults to main and every worktree. Next 16 refuses a second `next dev` from the same directory as a running one, so manual checks run from worktrees.
+
+### #102 (PR 104)
+
+- 18:59 PR opened (fbe2482), parser red evidence, integration file 7/7 first run. Reviewers dispatched 19:12.
+- Standards: no findings. Spec: no findings (red proven by deleting the folder; 11 parser + 7 integration; live 200/401/400, 9 picks invalid; warm call 0.14 s). Merged 15d5663; master check green (typecheck, 264 unit, eslint); wt-102 removed.
+
+### #83 (PR 105)
+
+- PR opened (eb0c604) after 43 min. Evidence 1 to 5, 7, 8 in the body; check 6 (completed mail with two zip rows) has a gap: the app on 3000 was the main checkout's `next dev` with a WooCommerce key made stale by the worktree's `shop:up`, so delivery got 401 three times; zips were proven through the download route instead (order 38). Tom Select is Apache-2.0, not MIT as the brief said; assets served through a second wp-env mapping.
+- Orchestrator tried to stop the stale app itself (`taskkill`, `Stop-Process`); both denied by the permission classifier. Spec reviewer gets a sole-agent exception to stop that tree and run `loop:up` from the worktree, then proves check 6 with a fresh email. Reviewers dispatched right after the master check for PR 104.
+
+### #92 (PR 106)
+
+- 18:38 PR opened (027ea00) after 15 min. Integration 2/2; red evidence produced by hardcoding `fits: true` (reviewers judge). The implementer printed a local test-operator session JWT into its own tool output once (not committed, not in the PR). Reviewers dispatched 18:40.
+
+### #87, #88, #92, #93
+
+- 19:12 dispatched in one message on 0f10b1d with `admin-common.md` (layout rules: `src/repository/admin/<area>.ts`, `src/admin/<area>/validate.ts`, actions under the `(shell)` group, per-area message files, ports 3087-3093, `assertOperator` injectable in actions).
 
 ### #86 (PR 100)
 
@@ -61,6 +91,9 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 
 - 18:05 orchestrator drift: the PR 99 Spec reviewer and the #84 fix round both ran `quiz-job.integration.test.ts` (real pg-boss on the shared queue) at the same time; the reviewer saw a cleanup FK error and a retry timeout. Told the reviewer to wait and rerun in isolation. Rule for later briefs: a pg-boss suite runs alone; sequence the reviewer's run after the fix round.
 - 18:09 PR 99 Spec reviewer ended its turn to wait on a background 4-minute sleep (brief and playbook: wait with one blocking foreground command). Messaged to rerun in the foreground and finish.
+- 18:34 #87 ran `setval` on the three category sequences on the shared stack (writes outside scoped rows are orchestrator-only). Harmless, kept; told the agent not to repeat it and to report the root cause in the PR body: the seed inserts explicit ids without resyncing sequences (master-level defect, orchestrator files the issue).
+- 18:34 #88 let a hanging `tsx -e` probe go to the background and polled its output file in sleep loops (rule: foreground with timeout, never poll). Told it to stop and use one psql call for the seeded id.
+- 18:35 PR 105 Standards: HARD, the dropdown plugin re-types the cap literal and message as fallbacks; JUDGEMENT `esc_html__` with a constant. Fix round 1 sent to the implementer with "more may follow" while the Spec review runs.
 
 ## Observations for the retro
 
