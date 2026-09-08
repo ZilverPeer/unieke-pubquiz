@@ -10,7 +10,8 @@
     "https://downloads.wordpress.org/theme/storefront.zip"
   ],
   "mappings": {
-    "wp-content/mu-plugins": "./shop/mu-plugins"
+    "wp-content/mu-plugins": "./shop/mu-plugins",
+    "wp-content/mu-plugins/assets": "./shop/assets"
   },
   "config": {
     "WP_DEBUG": true,

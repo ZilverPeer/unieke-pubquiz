@@ -1,0 +1,27 @@
+{
+  "title": "Coverage",
+  "intro": "Number of available Items per Category, Item kind and Difficulty, for the data locale below. This is independent of this screen's own language.",
+  "dataLocale": {
+    "label": "Data locale",
+    "nl": "Dutch",
+    "en": "English"
+  },
+  "table": {
+    "kindHeader": "Item kind",
+    "kind": {
+      "text": "Text",
+      "picture": "Picture",
+      "music": "Music"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "mixed": "Mixed"
+    }
+  },
+  "cell": {
+    "doesNotFit": "insufficient"
+  },
+  "empty": "No Content yet for this data locale."
+}

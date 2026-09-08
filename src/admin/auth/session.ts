@@ -32,24 +32,27 @@ export async function requireOperator(): Promise<OperatorSession | null> {
   return { email: user.email };
 }
 
+/** Thrown by assertOperator() when the caller has no allowlisted operator session. */
+export class NotAnOperatorError extends Error {
+  constructor() {
+    super("Not signed in as an allowlisted operator");
+    this.name = "NotAnOperatorError";
+  }
+}
+
 /**
- * Server-action-side re-check (spec 4 admin wave brief, "Layout rules"): the
- * guarded layout already keeps a non-operator off the page, but a server
- * action is reachable on its own, so every write action calls this too.
- * Unlike requireOperator() it never redirects -- a rejected call throws, for
- * the action to turn into a rejected ActionResult, not a navigation. Tests
- * bypass the real check by injecting a stub of the same shape (see
- * src/app/admin/(shell)/orders/actions.integration.test.ts).
+ * Additive, spec 4 wave pin (ticket #87): the seam server actions re-check
+ * through, since the layout's requireOperator() only guards the page render,
+ * not a direct POST to the action (see node_modules/next/dist/docs's
+ * mutating-data guide: "Always verify authentication and authorization
+ * inside every Server Function"). Reuses requireOperator() rather than
+ * duplicating the session/allowlist check; throws instead of redirecting so
+ * an action can turn the failure into an ActionResult, and so tests can
+ * inject a stub that never touches cookies/Supabase Auth (see each admin
+ * area's actions.ts `deps.assertOperator` default parameter).
  */
 export async function assertOperator(): Promise<OperatorSession> {
-  const supabase = await createAdminSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user?.email || !isAllowedOperator(user.email, process.env.ADMIN_EMAILS)) {
-    throw new Error("assertOperator: no allowlisted operator session");
-  }
-
-  return { email: user.email };
+  const operator = await requireOperator();
+  if (!operator) throw new NotAnOperatorError();
+  return operator;
 }

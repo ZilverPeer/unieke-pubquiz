@@ -211,6 +211,8 @@ pubquiz_ensure_option( 'woocommerce_currency', 'EUR' );
 pubquiz_ensure_option( 'woocommerce_default_country', 'NL' );
 pubquiz_ensure_option( 'woocommerce_enable_guest_checkout', 'yes' );
 pubquiz_ensure_option( 'woocommerce_enable_signup_and_login_from_checkout', 'yes' );
+// Spec 3c (#83): no Beoordelingen tab or star rating anywhere in the shop.
+pubquiz_ensure_option( 'woocommerce_enable_reviews', 'no' );
 
 // -----------------------------------------------------------------------
 // 4. Dutch pages: rename WooCommerce's Shop/Cart/Checkout/My account pages
@@ -327,6 +329,17 @@ function pubquiz_ensure_product() {
             $product->set_regular_price( PUBQUIZ_PRODUCT_PRICE );
             $changed = true;
         }
+        // Spec 3c (#83): no per-product reviews/rating, and the product is
+        // sold individually so the quantity box disappears and an
+        // identical configuration can't be added to the cart twice.
+        if ( $product->get_reviews_allowed() !== false ) {
+            $product->set_reviews_allowed( false );
+            $changed = true;
+        }
+        if ( $product->get_sold_individually() !== true ) {
+            $product->set_sold_individually( true );
+            $changed = true;
+        }
         if ( $changed ) {
             pubquiz_log( 'Updating Pubquiz product #' . $product->get_id() );
             $product->save();
@@ -346,6 +359,8 @@ function pubquiz_ensure_product() {
     $product->set_virtual( true );
     $product->set_downloadable( true );
     $product->set_download_expiry( 30 );
+    $product->set_reviews_allowed( false );
+    $product->set_sold_individually( true );
     $product->save();
     return $product->get_id();
 }
