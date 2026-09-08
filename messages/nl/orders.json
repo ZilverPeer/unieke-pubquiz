@@ -1,0 +1,47 @@
+{
+  "search": {
+    "title": "Bestellingen",
+    "label": "WooCommerce-bestelnummer of e-mailadres",
+    "placeholder": "Bijvoorbeeld 12345 of klant@voorbeeld.nl",
+    "submit": "Zoeken",
+    "invalid": "Voer een bestelnummer (cijfers) of een e-mailadres in.",
+    "empty": "Geen bestelling gevonden.",
+    "results": "Gevonden bestellingen",
+    "orderNumber": "Bestelnummer",
+    "email": "E-mailadres",
+    "view": "Bekijken"
+  },
+  "detail": {
+    "title": "Bestelling {orderNumber}",
+    "back": "Terug naar zoeken",
+    "email": "E-mailadres",
+    "wooLink": "Openen in WooCommerce",
+    "quiz": "Quiz {number}",
+    "status": {
+      "pending": "In wachtrij",
+      "generating": "Wordt gegenereerd",
+      "delivered": "Afgeleverd",
+      "failed": "Mislukt"
+    },
+    "failureReason": "Foutmelding: {reason}",
+    "deliveredAt": "Afgeleverd op {date}",
+    "downloadTokenPresent": "Downloadlink beschikbaar",
+    "downloadTokenAbsent": "Nog geen downloadlink",
+    "notFound": "Deze bestelling bestaat niet.",
+    "composition": {
+      "heading": "Samenstelling",
+      "notAvailable": "Nog geen samenstelling voor deze quiz.",
+      "slotKind": {
+        "text": "Tekstronde",
+        "picture": "Fotoronde",
+        "music": "Muziekronde"
+      }
+    },
+    "retry": {
+      "button": "Opnieuw proberen",
+      "confirm": "Deze quiz opnieuw in de wachtrij zetten?",
+      "success": "Quiz staat weer in de wachtrij.",
+      "retryRefused": "Deze quiz kan niet opnieuw geprobeerd worden."
+    }
+  }
+}

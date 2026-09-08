@@ -1,0 +1,47 @@
+{
+  "search": {
+    "title": "Orders",
+    "label": "WooCommerce order number or email address",
+    "placeholder": "For example 12345 or customer@example.com",
+    "submit": "Search",
+    "invalid": "Enter an order number (digits) or an email address.",
+    "empty": "No order found.",
+    "results": "Orders found",
+    "orderNumber": "Order number",
+    "email": "Email address",
+    "view": "View"
+  },
+  "detail": {
+    "title": "Order {orderNumber}",
+    "back": "Back to search",
+    "email": "Email address",
+    "wooLink": "Open in WooCommerce",
+    "quiz": "Quiz {number}",
+    "status": {
+      "pending": "Queued",
+      "generating": "Generating",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
+    "failureReason": "Failure reason: {reason}",
+    "deliveredAt": "Delivered on {date}",
+    "downloadTokenPresent": "Download link available",
+    "downloadTokenAbsent": "No download link yet",
+    "notFound": "This order does not exist.",
+    "composition": {
+      "heading": "Composition",
+      "notAvailable": "No composition for this quiz yet.",
+      "slotKind": {
+        "text": "Text round",
+        "picture": "Picture round",
+        "music": "Music round"
+      }
+    },
+    "retry": {
+      "button": "Retry",
+      "confirm": "Move this quiz back to the queue?",
+      "success": "Quiz is back in the queue.",
+      "retryRefused": "This quiz cannot be retried."
+    }
+  }
+}

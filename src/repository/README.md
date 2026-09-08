@@ -49,6 +49,10 @@ Private helpers live alongside it: `client.ts` (Supabase client construction), `
 
 Deleting an `orders` row while any `quizzes` row references it fails (no cascade, migration `00008_orders_quizzes.sql`); the same is true for a `compositions` row referenced by a Quiz's `composition_id`. Deleting a Quiz never touches its Composition.
 
+## Admin: orders
+
+`src/repository/admin/orders.ts` (spec 4, ticket #93) is the Orders support view's read model -- a sibling of this module, not folded into `orders.ts`. `findOrders(client, { query })` looks up an Order by WooCommerce order number (digits) or billing email (contains `@`), per `src/admin/orders/classify.ts`'s `classifyQuery`; `getOrderByWooOrderId` is exported alongside it (this file's own addition -- the pipeline repository never needed a wooOrderId lookup before). `loadOrderDetail(client, orderId)` resolves the Order's Quizzes (status, failure reason, delivery date, order-wide 1-based number, whether a download token exists) and, for a Quiz with a Composition, its Round slots -- kind, Category name and each Item's display text (the answer translation for Text/Picture Items, `"<artist> - <title>"` for Music Items, which are never translated). A plain module of functions taking the typed client, like `orders.ts` itself, deliberately not reusing that file's private helpers (same "no shared private module" reasoning as `compositions.ts`'s own `normalizeBillingEmail`).
+
 ## Running the integration tests
 
 Two test files, `repository.integration.test.ts` and `orders.integration.test.ts`, run against the real local Supabase stack -- migrations and seed applied, no mocking. One documented command sequence, from the repo root:
