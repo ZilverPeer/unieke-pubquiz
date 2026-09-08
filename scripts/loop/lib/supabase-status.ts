@@ -6,7 +6,12 @@
  * useful on stdout (its error goes to stderr instead), so a non-zero (or
  * null, on a spawn failure) exit status is the only "not running" signal
  * this needs -- see docs/runbook-local-loop.md.
+ *
+ * The `KEY="value"` line parser itself is not duplicated here -- it's
+ * `parseStatusEnv`, exported from src/repository/local-stack-config.ts
+ * (the original owner of this exact parsing need), reused as-is.
  */
+import { parseStatusEnv } from "../../../src/repository";
 
 export interface SupabaseStatusProcessResult {
   status: number | null;
@@ -18,19 +23,9 @@ export interface SupabaseStatus {
   env: Record<string, string>;
 }
 
-/** Parses `KEY="value"` (or `KEY=value`) lines, one per line, same shape as `supabase status -o env` prints. */
-function parseEnvLines(output: string): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const line of output.split(/\r?\n/)) {
-    const match = /^([A-Z0-9_]+)="?(.*?)"?$/.exec(line.trim());
-    if (match) values[match[1]] = match[2];
-  }
-  return values;
-}
-
 export function parseSupabaseStatusResult(result: SupabaseStatusProcessResult): SupabaseStatus {
   if (result.status !== 0) {
     return { running: false, env: {} };
   }
-  return { running: true, env: parseEnvLines(result.stdout) };
+  return { running: true, env: parseStatusEnv(result.stdout) };
 }

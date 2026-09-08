@@ -32,9 +32,10 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { createSupabaseClient, resolveLocalStackConfig } from "../../src/repository";
+import { isPidAlive, type PidAliveDeps } from "./lib/pid-alive";
 import { parseSupabaseStatusResult } from "./lib/supabase-status";
 import { waitUntilUrlAnswers } from "./lib/wait-for-url";
-import { writePidFile } from "./lib/pidfile";
+import { deletePidFile, readPidFile, writePidFile } from "./lib/pidfile";
 import {
   APP_POLL_INTERVAL_MS,
   APP_START_TIMEOUT_MS,
@@ -78,12 +79,10 @@ async function ensureSeeded(): Promise<void> {
     throw new Error(`Could not query the local Supabase stack's "categories" table: ${error.message}`);
   }
   if (!count) {
-    console.error(
+    throw new Error(
       'The local Supabase stack has no Categories seeded. This loop never resets the database on its own -- ' +
         'run "npm run db:reset" once, then re-run "npm run loop:up".',
     );
-    process.exitCode = 1;
-    throw new Error("seed missing");
   }
   console.log(`Supabase: seed looks present (${count} Categories).`);
 }
@@ -96,10 +95,60 @@ function runShopUp(): void {
   }
 }
 
+/** Real platform probes for `isPidAlive` -- `tasklist` is only spawned on win32, `posixProbe` only called elsewhere. */
+function pidAliveDeps(): PidAliveDeps {
+  return {
+    platform: process.platform,
+    tasklist: (pid) => spawnSync("tasklist", ["/FI", `PID eq ${pid}`], { encoding: "utf8" }).stdout ?? "",
+    posixProbe: (pid) => {
+      process.kill(pid, 0);
+      return true;
+    },
+  };
+}
+
+/**
+ * If `.local/next-dev.pid` names a pid that's no longer alive, deletes it
+ * (printing why) so callers don't act on stale state. Returns the still-live
+ * pid, or null if there wasn't one.
+ */
+function reconcilePidFile(): number | null {
+  const pid = readPidFile(NEXT_DEV_PID_PATH);
+  if (pid === null) return null;
+  if (isPidAlive(pid, pidAliveDeps())) return pid;
+  console.log(`App: pid file named pid ${pid}, which is no longer alive, deleting it.`);
+  deletePidFile(NEXT_DEV_PID_PATH);
+  return null;
+}
+
 async function ensureAppUp(): Promise<void> {
   const alreadyUp = await waitUntilUrlAnswers(APP_URL, { timeoutMs: 1, intervalMs: 1 });
   if (alreadyUp) {
     console.log(`App: ${APP_URL} already answers, reusing it.`);
+    // Never leave a stale pid file behind a reused app: either it still
+    // names a live process (fine, leave it), or it doesn't and reconciling
+    // deletes it with a printed note.
+    reconcilePidFile();
+    return;
+  }
+
+  const trackedPid = reconcilePidFile();
+  if (trackedPid !== null) {
+    console.log(
+      `App: pid file names a live process (pid ${trackedPid}) that hasn't answered on ${APP_URL} yet -- ` +
+        "waiting instead of starting a second one...",
+    );
+    const answered = await waitUntilUrlAnswers(APP_URL, {
+      timeoutMs: APP_START_TIMEOUT_MS,
+      intervalMs: APP_POLL_INTERVAL_MS,
+    });
+    if (!answered) {
+      throw new Error(
+        `${APP_URL} did not answer within ${APP_START_TIMEOUT_MS / 1000}s even though pid ${trackedPid} is alive. ` +
+          `Check ${NEXT_DEV_LOG_PATH} for the reason.`,
+      );
+    }
+    console.log(`App: ${APP_URL} is up (pid ${trackedPid}).`);
     return;
   }
 
