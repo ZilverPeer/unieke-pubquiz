@@ -85,6 +85,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 18:45 PR opened (de31090) after 24 min. Integration 6/6 alone; red evidence again by stubbing after the fact (reviewers judge). `retry-quiz.ts` core was already injectable, no extraction. Adds `assertOperator()` to `src/admin/auth/session.ts`, which #87 also edits: conflict check at merge. Reviewers dispatched 18:50.
 - 19:00 Standards: HARD, `assertOperator()` conflicts with #87's version in `session.ts` (decision: #87's wins, PR 108 reconciles after PR 109 merges); HARD, red evidence by stubbing after the fact (fix round 1: real red by moving the modules out). JUDGEMENTs accepted: own `boss-client.ts` mirror, direct `WOOCOMMERCE_URL` read. Note: the reviewer misread branch commit 62027e2 as merged; PR 109 is still open.
 - 19:20 fix round 1: PR body only (real red by moving the modules out; head unchanged de31090). 19:32 Spec: clean (red reproduced; 9 unit, 6 integration; search by number and email, detail with Composition names, HPOS link; retry on an own failed Quiz enqueued exactly one job; redirects; check and build green). Waits for the PR 109 merge (session.ts).
+- 19:55 merged master (7821206, master's `assertOperator` kept, README sections both kept), full check green, integration 6/6 alone. Merged eda25bf at 19:57; master check green (typecheck, 290 unit, eslint); wt-93 removed.
 
 ### #87 (PR 109)
 
@@ -99,6 +100,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 19:05 PR opened (2d9e8bb) after 44 min. Unit 9 red-first, integration 7/7 (first real run red on `revalidatePath` outside a request, fixed with a swallow-on-throw guard; reviewers judge against #87's injectable deps). Filters expose only the Subsubcategory path. Reviewers dispatched 19:10.
 - 19:13 Standards: HARD swallow-all try/catch around `revalidatePath` (decided: injectable `deps.revalidateItems` like #87); HARD raw Difficulty enum in the list column; JUDGEMENT decided HARD: Category and Subcategory filter selects missing while the issue and the message files name them; `session.ts` collision with #87 and #93 (same decision: #87's version wins, others reconcile after PR 109 merges). Fix round 1 sent.
 - 19:28 fix round 1 landed (7cbe3e9): injectable `deps.revalidateItems`, translated Difficulty column, Category and Subcategory selects; unit 273, integration 7/7. Waits for the PR 109 merge to reconcile `session.ts`.
+- 19:56 merged master (cdfa185), full check green (290 unit), items integration 7/7 alone. Spec review still running on the fix-round tip; told to re-verify cdfa185 too.
 
 ### #87, #88, #92, #93
 
@@ -122,6 +124,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 18:46 PR 105 Spec reviewer: `taskkill` on the stale port 3000 app denied by the permission classifier (same as the orchestrator's attempts); check 6 skipped per brief. It also let a wp-env call go to the background (no explicit timeout); told to use explicit foreground timeouts.
 - 18:46 PR 106 Spec reviewer dumped raw login headers with the session cookie JWT into its own output before filtering (self-caught, not in the report). Reminded of the filter-first rule.
 - 18:47 PR 106 Standards: HARD, red evidence manufactured by hardcoding `fits: true` after the code; the fits-for-all case has no red at all. Fix round 1: real red by moving `data.ts` out. Same pattern in PR 108 (stubbing): implement skill needs a sharper sentence on what counts as red; retro item.
+- 19:52 #88 let `npm run check` go to the background once more (a `timeout 180` wrapper without the tool timeout), then reran it in the foreground itself. Self-corrected; no message.
 
 ## Observations for the retro
 
