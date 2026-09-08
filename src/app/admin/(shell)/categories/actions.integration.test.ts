@@ -13,6 +13,8 @@
  * key on) -- afterEach deletes tracked ids in child-first order along with
  * any Item created in a test, before its parent Subsubcategory.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OperatorSession } from "@/admin/auth/session";
@@ -27,6 +29,28 @@ const contentRepository = createRepository(config);
 // Raw client for test arrangement/verification the admin repository doesn't
 // expose (Items) and for cleanup.
 const db: SupabaseClient<Database> = createClient(config.url, config.serviceRoleKey);
+
+// Guards against the "categories.categories.errors..." bug (PR #109 fix
+// round 1): validate.ts's error values are namespace-relative to the
+// "categories" translator (src/app/admin/(shell)/categories/forms.tsx's
+// useTranslations("categories")), so a validation error key must resolve
+// inside messages/nl/categories.json without any "categories." prefix of
+// its own. Reads the real message file rather than asserting a literal
+// key string, so a renamed key still passes as long as both sides move
+// together.
+const nlCategoriesMessages: unknown = JSON.parse(
+  readFileSync(join(process.cwd(), "messages", "nl", "categories.json"), "utf8"),
+);
+
+function messageKeyExists(key: string): boolean {
+  const parts = key.split(".");
+  let node: unknown = nlCategoriesMessages;
+  for (const part of parts) {
+    if (typeof node !== "object" || node === null || !(part in node)) return false;
+    node = (node as Record<string, unknown>)[part];
+  }
+  return typeof node === "string";
+}
 
 const stubOperator: OperatorSession = { email: "operator@example.com" };
 async function assertOperator(): Promise<OperatorSession> {
@@ -136,7 +160,19 @@ describe("addNode", () => {
       deps(),
     );
 
-    expect(result).toEqual({ ok: false, errors: { nameNl: "categories.errors.nameRequired" } });
+    expect(result).toEqual({ ok: false, errors: { nameNl: "errors.nameRequired" } });
+    if (!result.ok) {
+      for (const key of Object.values(result.errors)) {
+        expect(messageKeyExists(key), `message key "${key}" is missing from messages/nl/categories.json`).toBe(true);
+      }
+      // The exact Dutch text the operator would see under the nl-locale
+      // scoped translator (useTranslations("categories")) -- proves the
+      // "categories.categories.errors..." double-prefix bug is fixed, since
+      // that bug renders the raw key instead of this text.
+      expect((nlCategoriesMessages as { errors: { nameRequired: string } }).errors.nameRequired).toBe(
+        "Vul een naam in.",
+      );
+    }
 
     const after = await repository.loadCategoryTree();
     // Nothing written: same Category ids as before the rejected call (a

@@ -76,10 +76,10 @@ function parseId(value: unknown): number | null {
 }
 
 function validateName(value: unknown): { ok: true; value: string } | { ok: false; error: string } {
-  if (typeof value !== "string") return { ok: false, error: "categories.errors.nameRequired" };
+  if (typeof value !== "string") return { ok: false, error: "errors.nameRequired" };
   const trimmed = value.trim();
-  if (trimmed.length === 0) return { ok: false, error: "categories.errors.nameRequired" };
-  if (trimmed.length > MAX_NAME_LENGTH) return { ok: false, error: "categories.errors.nameTooLong" };
+  if (trimmed.length === 0) return { ok: false, error: "errors.nameRequired" };
+  if (trimmed.length > MAX_NAME_LENGTH) return { ok: false, error: "errors.nameTooLong" };
   return { ok: true, value: trimmed };
 }
 
@@ -87,14 +87,14 @@ export function validateAddNode(input: AddNodeInput): ValidationResult<ValidAddN
   const errors: FieldErrors = {};
 
   if (!isCategoryLevel(input.level)) {
-    errors.level = "categories.errors.invalidLevel";
+    errors.level = "errors.invalidLevel";
   }
 
   let parentId: number | null = null;
   const needsParent = input.level === "subcategory" || input.level === "subsubcategory";
   if (needsParent) {
     parentId = parseId(input.parentId);
-    if (parentId === null) errors.parentId = "categories.errors.invalidParent";
+    if (parentId === null) errors.parentId = "errors.invalidParent";
   }
 
   const nlResult = validateName(input.nameNl);
@@ -118,11 +118,11 @@ export function validateAddNode(input: AddNodeInput): ValidationResult<ValidAddN
 export function validateRenameNode(input: RenameNodeInput): ValidationResult<ValidRenameNode> {
   const errors: FieldErrors = {};
 
-  if (!isCategoryLevel(input.level)) errors.level = "categories.errors.invalidLevel";
-  if (!isLocale(input.locale)) errors.locale = "categories.errors.invalidLocale";
+  if (!isCategoryLevel(input.level)) errors.level = "errors.invalidLevel";
+  if (!isLocale(input.locale)) errors.locale = "errors.invalidLocale";
 
   const id = parseId(input.id);
-  if (id === null) errors.id = "categories.errors.invalidId";
+  if (id === null) errors.id = "errors.invalidId";
 
   const nameResult = validateName(input.name);
   if (!nameResult.ok) errors.name = nameResult.error;
@@ -143,10 +143,10 @@ export function validateRenameNode(input: RenameNodeInput): ValidationResult<Val
 export function validateDeleteNode(input: DeleteNodeInput): ValidationResult<ValidDeleteNode> {
   const errors: FieldErrors = {};
 
-  if (!isCategoryLevel(input.level)) errors.level = "categories.errors.invalidLevel";
+  if (!isCategoryLevel(input.level)) errors.level = "errors.invalidLevel";
 
   const id = parseId(input.id);
-  if (id === null) errors.id = "categories.errors.invalidId";
+  if (id === null) errors.id = "errors.invalidId";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
