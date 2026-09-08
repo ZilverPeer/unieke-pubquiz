@@ -1,21 +1,23 @@
 /**
  * The quiz-generation job handler (spec #36, ticket #40): moves one Quiz
  * from `pending` through `generating` to `delivered` or `failed`. Runs the
- * existing engine (generate-quiz.ts) unchanged, uploads the four
- * Deliverables, records the download token, and calls the pinned deliver
- * interface. See README.md for the full state machine and retry policy.
+ * existing engine (generate-quiz.ts) unchanged, zips its four rendered files
+ * into one Deliverable (ticket #73, src/render/quiz-zip.ts), uploads it,
+ * records the download token, and calls the pinned deliver interface. See
+ * README.md for the full state machine and retry policy.
  *
- * Imports from domain, repository, scripts/generate-quiz and deliver's
- * interface only -- this is the one module allowed to cross those
- * boundaries (CLAUDE.md "Orthogonal pipeline"). No WooCommerce knowledge.
+ * Imports from domain, repository, scripts/generate-quiz, render's
+ * buildQuizZip and deliver's interface only -- this is the one module
+ * allowed to cross those boundaries (CLAUDE.md "Orthogonal pipeline"). No
+ * WooCommerce knowledge.
  */
 import { randomBytes } from "node:crypto";
-import type { DeliverableFile } from "@/domain";
-import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath, SLOT_COUNT } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, downloadPath, SLOT_COUNT } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
 import { QuizStatusChangedConcurrentlyError } from "@/repository";
 import type { QuizRecord } from "@/domain";
+import { buildQuizZip } from "@/render";
 import { generateQuiz as generateQuizImpl, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import type { GenerateOptions } from "@/scripts/cli-args";
 
@@ -79,8 +81,8 @@ function generateDownloadToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-function buildDownloadUrl(appBaseUrl: string, token: string, file: DeliverableFile): string {
-  return `${appBaseUrl}${downloadPath(token, file)}`;
+function buildDownloadUrl(appBaseUrl: string, token: string): string {
+  return `${appBaseUrl}${downloadPath(token, "quiz.zip")}`;
 }
 
 /**
@@ -159,22 +161,22 @@ async function failQuiz(deps: QuizJobDeps, quizId: string, reason: string): Prom
 }
 
 /**
- * Runs the engine and uploads its output, without touching Quiz status --
- * the caller (handleQuizJob) decides what a thrown error here means for the
- * Quiz's status. Returns the download token and the file list deliverQuiz
- * needs once generation and recording have both succeeded.
+ * Runs the engine, zips its four rendered files into one Deliverable
+ * (ticket #73, buildQuizZip), and uploads it, without touching Quiz status
+ * -- the caller (handleQuizJob) decides what a thrown error here means for
+ * the Quiz's status. Returns the download URL deliverQuiz needs once
+ * generation and recording have both succeeded.
  */
 async function generateAndRecord(
   deps: QuizJobDeps,
   quiz: QuizRecord,
   billingEmail: string,
-): Promise<{ files: readonly { file: DeliverableFile; url: string }[] }> {
+): Promise<{ url: string }> {
   const generateOptions = buildGenerateOptions(quiz, billingEmail);
 
   const writeDeliverables = async (files: GeneratedQuizFiles): Promise<void> => {
-    for (const file of DELIVERABLE_FILES) {
-      await deps.uploadDeliverable(`${quiz.id}/${file}`, files[file], DELIVERABLE_CONTENT_TYPES[file]);
-    }
+    const zip = buildQuizZip(files);
+    await deps.uploadDeliverable(`${quiz.id}/quiz.zip`, zip, DELIVERABLE_CONTENT_TYPES["quiz.zip"]);
   };
 
   const result = await deps.generateQuiz(generateOptions, deps.contentRepository, writeDeliverables);
@@ -190,16 +192,11 @@ async function generateAndRecord(
     downloadToken: token,
   });
 
-  const files = DELIVERABLE_FILES.map((file) => ({
-    file,
-    url: buildDownloadUrl(deps.appBaseUrl, token, file),
-  }));
-
-  return { files };
+  return { url: buildDownloadUrl(deps.appBaseUrl, token) };
 }
 
-function filesFromDelivered(appBaseUrl: string, token: string): { file: DeliverableFile; url: string }[] {
-  return DELIVERABLE_FILES.map((file) => ({ file, url: buildDownloadUrl(appBaseUrl, token, file) }));
+function urlFromDelivered(appBaseUrl: string, token: string): string {
+  return buildDownloadUrl(appBaseUrl, token);
 }
 
 /**
@@ -228,7 +225,7 @@ export async function handleQuizJob(job: QuizJobLike, deps: QuizJobDeps): Promis
   const { quizId } = job.data;
   const isLastAttempt = job.retryCount >= job.retryLimit;
 
-  let files: readonly { file: DeliverableFile; url: string }[];
+  let url: string;
   // Only true once this attempt has itself moved the Quiz to "generating" --
   // guards the retry path below from attempting a transition that either
   // never applies (nothing was transitioned yet) or is no longer legal.
@@ -244,7 +241,7 @@ export async function handleQuizJob(job: QuizJobLike, deps: QuizJobDeps): Promis
       if (!current.downloadToken) {
         throw new Error(`Quiz ${quizId} is "delivered" without a download token`);
       }
-      files = filesFromDelivered(deps.appBaseUrl, current.downloadToken);
+      url = urlFromDelivered(deps.appBaseUrl, current.downloadToken);
     } else {
       const quiz = await deps.orderRepository.transitionQuizStatus(quizId, "generating");
       transitionedToGenerating = true;
@@ -254,7 +251,7 @@ export async function handleQuizJob(job: QuizJobLike, deps: QuizJobDeps): Promis
         throw new Error(`Quiz ${quizId} references missing order ${quiz.orderId}`);
       }
 
-      files = (await generateAndRecord(deps, quiz, order.billingEmail)).files;
+      url = (await generateAndRecord(deps, quiz, order.billingEmail)).url;
     }
   } catch (error) {
     if (error instanceof InvalidQuizConfigError || error instanceof QuizShortfallError) {
@@ -280,7 +277,7 @@ export async function handleQuizJob(job: QuizJobLike, deps: QuizJobDeps): Promis
   }
 
   try {
-    await deps.deliverer.deliverQuiz({ quizId, files });
+    await deps.deliverer.deliverQuiz({ quizId, url });
   } catch (error) {
     if (isLastAttempt) {
       console.error(

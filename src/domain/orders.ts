@@ -59,16 +59,21 @@ export interface QuizRecord {
 }
 
 /** The four Deliverables of a Quiz, by fixed file name. */
-export const DELIVERABLE_FILES = [
-  "quizmaster.pdf",
-  "picture-handout.pdf",
-  "answer-sheet.pdf",
-  "music-round.mp3",
-] as const;
+/**
+ * The single Deliverable stored/served per Quiz (ticket #73): a zip
+ * containing the four rendered files (see src/render/quiz-zip.ts's
+ * buildQuizZip, which keeps their own names -- quizmaster.pdf,
+ * picture-handout.pdf, answer-sheet.pdf, music-round.mp3 -- unchanged
+ * inside the archive). A tuple of one, not a bare string constant, so every
+ * caller that already iterates DELIVERABLE_FILES (the worker's upload, the
+ * pruning job's object-path list, the download route's file-name check)
+ * keeps working unchanged.
+ */
+export const DELIVERABLE_FILES = ["quiz.zip"] as const;
 
 export type DeliverableFile = (typeof DELIVERABLE_FILES)[number];
 
-/** Path of the app download route for one Deliverable (ticket #42 serves it). */
+/** Path of the app download route for a Quiz's Deliverable (ticket #42 serves it). */
 export function downloadPath(token: string, file: DeliverableFile): string {
   return `/download/${token}/${file}`;
 }
@@ -87,8 +92,54 @@ export const DOWNLOAD_VALIDITY_DAYS = 30;
  * never drift apart.
  */
 export const DELIVERABLE_CONTENT_TYPES: Record<DeliverableFile, string> = {
-  "quizmaster.pdf": "application/pdf",
-  "picture-handout.pdf": "application/pdf",
-  "answer-sheet.pdf": "application/pdf",
-  "music-round.mp3": "audio/mpeg",
+  "quiz.zip": "application/zip",
 };
+
+/**
+ * The one place that builds a Quiz's zip file name (ticket #73):
+ * `pubquiz-<WooCommerce order number>-<quiz sequence, 1-based>-<locale>.zip`.
+ * `orderNumber` is the Quiz's order's `wooOrderId`; `sequence` is 0-based
+ * internally (same convention as `CHECKOUT_META_KEYS.categoryPick` and
+ * `downloadMetaKey`), 1-based in the name. The download route
+ * (src/app/download) sends this as the `Content-Disposition` filename; the
+ * shop's `pubquiz-downloads.php` mu-plugin builds the identical string in
+ * PHP (it cannot import this function) -- `src/domain/shop-fixture.test.ts`
+ * pins the pattern literal so the two can't silently drift apart.
+ */
+export function quizZipFilename(orderNumber: number, sequence: number, locale: Locale): string {
+  return `pubquiz-${orderNumber}-${sequence + 1}-${locale}.zip`;
+}
+
+/**
+ * A Quiz's 0-based position among every Quiz belonging to its order --
+ * *not* `QuizRecord.sequence` (which restarts at 0 on every line item, for
+ * Quizzes sharing one quantity-above-one line item). This is the number
+ * `quizZipFilename`'s `sequence` argument and `downloadMetaKey`'s key both
+ * need, and the single place that computes it (ticket #73, PR review round
+ * 2): two different call sites computing it independently -- the deliverer
+ * from a Supabase read, the download route from another -- let a stale row
+ * on one side disagree with a fresh one on the other (reproduced: the mail
+ * said "...-1-nl.zip", the download served "...-2-nl.zip" for the same
+ * Quiz). The deliverer is now the only writer -- it bakes this number into
+ * the `pubquiz_download_<n>` meta key at delivery time
+ * (`downloadMetaKey(orderWideQuizSequence(...))`, `src/deliver/index.ts`
+ * via `order-lookup.ts`), and every other reader (the download route, the
+ * shop's PHP plugin) reads `<n>` back out of that key instead of
+ * recomputing it from a second source.
+ *
+ * `orderedQuizIds` must be every Quiz id belonging to the order, in a
+ * stable order shared by every caller -- `OrderRepository.listQuizzesByOrderId`'s
+ * `(woo_line_item_id, sequence)` ordering, which matches WooCommerce's own
+ * `$order->get_items()` (ascending item id, i.e. checkout/creation order).
+ *
+ * @throws RangeError if `quizId` isn't in `orderedQuizIds` -- a caller bug
+ * (the Quiz must be one of its own order's Quizzes), not a runtime state to
+ * recover from.
+ */
+export function orderWideQuizSequence(quizId: string, orderedQuizIds: readonly string[]): number {
+  const index = orderedQuizIds.indexOf(quizId);
+  if (index === -1) {
+    throw new RangeError(`orderWideQuizSequence: Quiz ${quizId} not found among its order's ${orderedQuizIds.length} Quiz id(s)`);
+  }
+  return index;
+}

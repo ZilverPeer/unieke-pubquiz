@@ -93,10 +93,10 @@ docker exec supabase_db_unieke-pubquiz psql -U postgres -d postgres -c \
 
 ## Downloading a Deliverable directly
 
-Every download link is `http://localhost:3000/download/<token>/<file>` (`downloadPath`, `src/domain/orders.ts`) -- reachable straight from a browser or `curl` once `next dev` is running, since it's the same host/port the link's own base URL (`APP_BASE_URL`, defaults to `http://localhost:3000`) points at:
+Every download link is `http://localhost:3000/download/<token>/quiz.zip` (`downloadPath`, `src/domain/orders.ts` -- `<file>` is always the literal `quiz.zip` since ticket #73) -- reachable straight from a browser or `curl` once `next dev` is running, since it's the same host/port the link's own base URL (`APP_BASE_URL`, defaults to `http://localhost:3000`) points at. The response's `Content-Disposition` names the file `pubquiz-<order number>-<quiz number>-<locale>.zip` (`quizZipFilename`, `src/domain/orders.ts`); unzipping it produces the four Deliverables (`quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3`):
 
 ```sh
-curl -o quizmaster.pdf "http://localhost:3000/download/<token>/quizmaster.pdf"
+curl -o quiz.zip "http://localhost:3000/download/<token>/quiz.zip"
 ```
 
 ## Webhook redelivery (proving idempotency)
@@ -107,7 +107,7 @@ The WooCommerce admin's Webhooks screen has a per-delivery "Redeliver" button (M
 npx wp-env run cli -- wp eval '$w = new WC_Webhook(1); $o = wc_get_order(<order id>); $w->deliver($o); echo "ok";' --user=admin
 ```
 
-(webhook id `1` is `pubquiz-order-updated`, created by `shop:up`; confirm with `npx wp-env run cli -- wp wc webhook list --user=admin --format=json`.) Redelivering a `completed` order's webhook is a fast no-op (`status !== "processing"` gate, `handle-webhook.ts`) -- verified empirically: same order id, same two Quiz ids/composition ids/download tokens, same four Storage objects per Quiz, before and after.
+(webhook id `1` is `pubquiz-order-updated`, created by `shop:up`; confirm with `npx wp-env run cli -- wp wc webhook list --user=admin --format=json`.) Redelivering a `completed` order's webhook is a fast no-op (`status !== "processing"` gate, `handle-webhook.ts`) -- verified empirically: same order id, same two Quiz ids/composition ids/download tokens, same zip Storage object per Quiz, before and after.
 
 Note: WooCommerce also sends its own unsigned connectivity **ping** (`webhook_id=<n>`, form-urlencoded, no `X-WC-Webhook-Signature`) whenever `wp wc webhook update --status=active` runs (i.e. every `npm run shop:up`), queued and delivered the same way as real deliveries. Our route correctly answers it `401` (no valid signature) -- this is expected WooCommerce core behaviour (`class-wc-webhook.php`), not a defect; it does not increment the webhook's `failure_count` and has no effect on order processing.
 

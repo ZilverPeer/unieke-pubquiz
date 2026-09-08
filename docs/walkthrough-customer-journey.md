@@ -98,31 +98,27 @@ Do nothing else. `npm run shop:up`'s cron ticker keeps WordPress's cron ticking 
 
 ## The completed mail
 
-A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling bij Pubquiz-wt-shop is nu afgerond"**. It repeats the order summary and adds four download links, one per Deliverable, each with a Dutch label:
+A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling bij Pubquiz-wt-shop is nu afgerond"**. It repeats the order summary and adds one row per Quiz (ticket #73): a plain link (no `target`) named after that Quiz's zip, with the picked Category names underneath as "Categorieën: ...":
 
-- **Quizmaster-script** (`quizmaster.pdf`)
-- **Beeldronde hand-out** (`picture-handout.pdf`)
-- **Antwoordenblad** (`answer-sheet.pdf`)
-- **Muziekronde** (`music-round.mp3`)
+- `pubquiz-<order number>-1-nl.zip` -- Categorieën: ...
+- `pubquiz-<order number>-2-nl.zip` -- Categorieën: ... (only on a multi-Quiz order)
 
-Each link is `http://localhost:3000/download/<token>/<file>`.
+Each link is `http://localhost:3000/download/<token>/quiz.zip`, one distinct token per Quiz; the zip filename in the link text and in the download's `Content-Disposition` always matches (`quizZipFilename`, `src/domain/orders.ts`).
 
 ## Downloading the files
 
 Click each link in your browser, or:
 
 ```powershell
-curl.exe -o quizmaster.pdf "http://localhost:3000/download/<token>/quizmaster.pdf"
-curl.exe -o picture-handout.pdf "http://localhost:3000/download/<token>/picture-handout.pdf"
-curl.exe -o answer-sheet.pdf "http://localhost:3000/download/<token>/answer-sheet.pdf"
-curl.exe -o music-round.mp3 "http://localhost:3000/download/<token>/music-round.mp3"
+curl.exe -o quiz-1.zip "http://localhost:3000/download/<token 1>/quiz.zip"
+curl.exe -o quiz-2.zip "http://localhost:3000/download/<token 2>/quiz.zip"
 ```
 
-All four are real files (a script and answer-sheet PDF around 15-30 KB, a picture hand-out PDF a few hundred KB depending on the images sampled, an MP3 under a megabyte).
+Each zip unpacks to the four Deliverables (`quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3`; a script and answer-sheet PDF around 15-30 KB, a picture hand-out PDF a few hundred KB depending on the images sampled, an MP3 under a megabyte).
 
 ## My Account downloads (an account created at checkout)
 
-If you ticked **Een account aanmaken?**, the same download links also show up under **Mijn account -> Downloads** (http://localhost:45330/mijn-account/downloads/) for as long as your browser session (or cookie jar) stays logged in from checkout -- no separate login step needed right after placing the order. The page lists, per product: **Product / Resterende downloads / Vervalt / Download** -- each of the four files with **&infin;** (unlimited) and **Nooit** (never expires).
+If you ticked **Een account aanmaken?**, the same download links also show up under **Mijn account -> Downloads** (http://localhost:45330/mijn-account/downloads/) for as long as your browser session (or cookie jar) stays logged in from checkout -- no separate login step needed right after placing the order. The page lists, per product: **Product / Resterende downloads / Vervalt / Download** -- one row per Quiz zip, each with **&infin;** (unlimited) and **Nooit** (never expires).
 
 **Curl equivalent**, same cookie jar as the checkout call that had `-d "createaccount=1"`:
 

@@ -1,9 +1,10 @@
 /**
  * `--composition <id>` (ticket #42): re-renders an existing Composition's
- * four Deliverables without re-sampling (no new `compositions` row) and
- * re-attaches them to the Quiz that owns it. Mirrors the worker's own
- * upload-then-deliver shape (src/worker/quiz-job.ts) but skips sampling and
- * persisting entirely -- the Composition already exists.
+ * four files, zips them into one Deliverable (ticket #73, buildQuizZip)
+ * without re-sampling (no new `compositions` row), and re-attaches the zip
+ * to the Quiz that owns it. Mirrors the worker's own upload-then-deliver
+ * shape (src/worker/quiz-job.ts) but skips sampling and persisting entirely
+ * -- the Composition already exists.
  *
  * `createDeliverer` (src/deliver, implemented in ticket #41) is real now;
  * deps still take a zero-arg `createDeliverer` factory (called lazily, after
@@ -17,9 +18,10 @@
  * to), and the pre-#41 "deliver module not implemented yet" message, kept
  * as a harmless safety net.
  */
-import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, downloadPath } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
+import { buildQuizZip } from "@/render";
 import { assembleQuizContent } from "./assemble-quiz-content";
 import { renderQuizFiles } from "./generate-quiz";
 
@@ -78,24 +80,19 @@ export async function recomposeQuiz(compositionId: string, deps: RecomposeQuizDe
   );
 
   const files = await renderQuizFiles(quizContent);
+  const zip = buildQuizZip(files);
+  await deps.uploadDeliverable(`${quiz.id}/quiz.zip`, zip, DELIVERABLE_CONTENT_TYPES["quiz.zip"]);
 
-  for (const file of DELIVERABLE_FILES) {
-    await deps.uploadDeliverable(`${quiz.id}/${file}`, files[file], DELIVERABLE_CONTENT_TYPES[file]);
-  }
-
-  // Re-attach: now that the objects exist again, un-prune the Quiz so its
+  // Re-attach: now that the object exists again, un-prune the Quiz so its
   // existing download link (the token itself was never cleared -- see
   // prune.ts) works again, whether or not this Quiz was pruned at all.
   await deps.orderRepository.clearPruned(quiz.id);
 
-  const deliveredFiles = DELIVERABLE_FILES.map((file) => ({
-    file,
-    url: `${deps.appBaseUrl}${downloadPath(quiz.downloadToken!, file)}`,
-  }));
+  const url = `${deps.appBaseUrl}${downloadPath(quiz.downloadToken!, "quiz.zip")}`;
 
   try {
     const deliverer = deps.createDeliverer();
-    await deliverer.deliverQuiz({ quizId: quiz.id, files: deliveredFiles });
+    await deliverer.deliverQuiz({ quizId: quiz.id, url });
   } catch (error) {
     if (isDeliverUnavailableError(error)) {
       return {
