@@ -31,14 +31,22 @@ function killProcessTree(pid: number): void {
   }
 }
 
-/** The pid currently listening on `port`, or null -- Windows via `netstat`, POSIX via `lsof`. */
+/**
+ * The pid currently listening on `port`, or null -- Windows via `netstat`,
+ * POSIX via `lsof`.
+ *
+ * Fix round 2: no longer pipes Windows' `netstat` through `findstr :PORT`
+ * (a substring match that a port like 30000 also passes for port 3000) --
+ * only `findstr LISTENING` narrows the rows here; the exact port match is
+ * `parsePortOwnerFromNetstat`'s job, done on the real local-address column.
+ */
 function findPortOwnerPid(port: number): number | null {
   if (process.platform === "win32") {
-    const result = spawnSync(`netstat -ano | findstr :${port} | findstr LISTENING`, {
+    const result = spawnSync(`netstat -ano | findstr LISTENING`, {
       encoding: "utf8",
       shell: true,
     });
-    return parsePortOwnerFromNetstat(result.stdout ?? "");
+    return parsePortOwnerFromNetstat(result.stdout ?? "", port);
   }
   const result = spawnSync(`lsof -ti:${port}`, { encoding: "utf8", shell: true });
   return parsePortOwnerFromLsof(result.stdout ?? "");

@@ -10,14 +10,34 @@ import { parsePortOwnerFromLsof, parsePortOwnerFromNetstat } from "./port-owner"
  * Never imports up.ts/down.ts.
  */
 describe("parsePortOwnerFromNetstat", () => {
-  test("parses the pid from a `netstat -ano | findstr :PORT | findstr LISTENING` line", () => {
+  test("parses the pid from a `netstat -ano | findstr LISTENING` line for the wanted port", () => {
     const output = "  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       6789\n";
 
-    expect(parsePortOwnerFromNetstat(output)).toBe(6789);
+    expect(parsePortOwnerFromNetstat(output, 3000)).toBe(6789);
   });
 
   test("returns null when there is no listening line", () => {
-    expect(parsePortOwnerFromNetstat("")).toBeNull();
+    expect(parsePortOwnerFromNetstat("", 3000)).toBeNull();
+  });
+
+  // Fix round 2: findstr `:3000` is a substring match, so a line for port
+  // 30000 (or 3000x) also passed the old grep-in-a-string parser and could
+  // be returned as the port-3000 owner -- a real reviewer scenario where
+  // `taskkill /T` would then kill an unrelated tree while the real port
+  // 3000 listener went unnoticed. This exercises the fix: the local-address
+  // column's port (after the last `:`) must equal the wanted port exactly.
+  test("a same-prefix port (30000) before the real port-3000 line is not mistaken for it", () => {
+    const output =
+      "  TCP    0.0.0.0:30000          0.0.0.0:0              LISTENING       1111\n" +
+      "  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       6789\n";
+
+    expect(parsePortOwnerFromNetstat(output, 3000)).toBe(6789);
+  });
+
+  test("only a same-prefix port (30000) present, with no exact match, returns null", () => {
+    const output = "  TCP    0.0.0.0:30000          0.0.0.0:0              LISTENING       1111\n";
+
+    expect(parsePortOwnerFromNetstat(output, 3000)).toBeNull();
   });
 });
 
