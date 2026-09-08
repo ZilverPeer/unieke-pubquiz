@@ -9,6 +9,8 @@ import type { RandomSource } from "./random";
 
 export type { RandomSource } from "./random";
 export { createSeededRandom } from "./random";
+export type { CoverageCell, DryRunShortfall } from "./coverage";
+export { computeCoverage, dryRunRequest } from "./coverage";
 
 export interface SampleInput {
   request: QuizRequest;
@@ -22,7 +24,7 @@ export type SampleResult =
   | { ok: true; composition: Composition }
   | { ok: false; failure: GenerationFailure };
 
-type ResolveSlotCategoriesResult =
+export type ResolveSlotCategoriesResult =
   | { ok: true; slotCategories: string[] }
   | { ok: false; failure: GenerationFailure };
 
@@ -35,8 +37,12 @@ type ResolveSlotCategoriesResult =
  * Category, distinct across slots (a content shortfall - returned as a
  * GenerationFailure with categoryId null - when the pool doesn't have 8
  * distinct Categories to give).
+ *
+ * Exported (not just used by `sampleComposition` below) so `dryRunRequest`
+ * (`coverage.ts`) walks slots the same way instead of re-implementing the
+ * cycle rule.
  */
-function resolveSlotCategories(
+export function resolveSlotCategories(
   request: QuizRequest,
   pool: readonly PoolItem[],
   random: RandomSource,
