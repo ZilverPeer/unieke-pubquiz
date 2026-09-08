@@ -401,7 +401,7 @@ describe.skipIf(resolveFfmpeg() === null)("retry policy, through a real pg-boss 
       expect(getGenerateCallCount()).toBe(1);
 
       const objectNames = await listDeliverableObjectNames(quizId);
-      expect(objectNames).toHaveLength(4);
+      expect(objectNames).toEqual(["quiz.zip"]);
     },
     20_000,
   );
