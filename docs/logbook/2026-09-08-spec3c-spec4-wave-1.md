@@ -125,6 +125,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 - 18:46 PR 106 Spec reviewer dumped raw login headers with the session cookie JWT into its own output before filtering (self-caught, not in the report). Reminded of the filter-first rule.
 - 18:47 PR 106 Standards: HARD, red evidence manufactured by hardcoding `fits: true` after the code; the fits-for-all case has no red at all. Fix round 1: real red by moving `data.ts` out. Same pattern in PR 108 (stubbing): implement skill needs a sharper sentence on what counts as red; retro item.
 - 19:52 #88 let `npm run check` go to the background once more (a `timeout 180` wrapper without the tool timeout), then reran it in the foreground itself. Self-corrected; no message.
+- 20:05 Erik: near the usage limit; finish the running PR 110 review, then hold until the reset. Check-in cron d6a19e21 deleted. #103 not dispatched; branch `ticket-103-checkout-feasibility` created from master in wt-3b (no commits) for when the wave resumes.
 
 ## Observations for the retro
 
