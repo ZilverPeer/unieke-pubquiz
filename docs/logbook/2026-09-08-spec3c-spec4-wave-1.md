@@ -86,6 +86,9 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - 18:05 orchestrator drift: the PR 99 Spec reviewer and the #84 fix round both ran `quiz-job.integration.test.ts` (real pg-boss on the shared queue) at the same time; the reviewer saw a cleanup FK error and a retry timeout. Told the reviewer to wait and rerun in isolation. Rule for later briefs: a pg-boss suite runs alone; sequence the reviewer's run after the fix round.
 - 18:09 PR 99 Spec reviewer ended its turn to wait on a background 4-minute sleep (brief and playbook: wait with one blocking foreground command). Messaged to rerun in the foreground and finish.
+- 18:34 #87 ran `setval` on the three category sequences on the shared stack (writes outside scoped rows are orchestrator-only). Harmless, kept; told the agent not to repeat it and to report the root cause in the PR body: the seed inserts explicit ids without resyncing sequences (master-level defect, orchestrator files the issue).
+- 18:34 #88 let a hanging `tsx -e` probe go to the background and polled its output file in sleep loops (rule: foreground with timeout, never poll). Told it to stop and use one psql call for the seeded id.
+- 18:35 PR 105 Standards: HARD, the dropdown plugin re-types the cap literal and message as fallbacks; JUDGEMENT `esc_html__` with a constant. Fix round 1 sent to the implementer with "more may follow" while the Spec review runs.
 
 ## Observations for the retro
 
