@@ -66,11 +66,27 @@ if ( empty( $pubquiz_categories ) || ! is_array( $pubquiz_categories ) ) {
     WP_CLI::error( 'setup-field-group.php requires $pubquiz_categories (an array of ["id" => ..., "name" => ...]), set by setup-shop.php from the Supabase stack -- see scripts/shop/lib/categories.ts.' );
 }
 
+/**
+ * `pricing_type` => 'none' is required, not just documentation: the
+ * checkboxes template (views/frontend/fields/checkboxes.php) only skips
+ * its pricing-hint span (and the `Helper::format_pricing_hint()` call that
+ * reads `$option['pricing_type']`/`$option['pricing_amount']` directly,
+ * with no `isset()` guard) when `$option['pricing_type'] === 'none'`;
+ * leaving the key unset makes every choice trigger a PHP "Undefined array
+ * key" warning per render and show a spurious "(+€0.00)" hint next to
+ * every checkbox on the product page. `raw_json_to_field_group()` only
+ * ever sets `$choice['pricing_type']` when the raw choice array has one
+ * (includes/classes/class-field-groups.php), so it has to be supplied
+ * explicitly here for every field, not just `categories` -- `select`
+ * fields render through a different template that doesn't read these
+ * keys, but setting them is harmless and keeps every choice consistent.
+ */
 function pubquiz_choice( $slug, $label, $selected = false ) {
     return [
-        'slug'     => (string) $slug,
-        'label'    => (string) $label,
-        'selected' => $selected ? 'true' : 'false',
+        'slug'         => (string) $slug,
+        'label'        => (string) $label,
+        'selected'     => $selected ? 'true' : 'false',
+        'pricing_type' => 'none',
     ];
 }
 

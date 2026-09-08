@@ -146,6 +146,13 @@ describe("shop/mu-plugins/wp-cli-scripts/setup-field-group.php", () => {
     expect(php).toContain(
       "Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.",
     );
+
+    // Isolate the categories field's own array literal (from its 'id' key
+    // to the closing '];') so the required check can't accidentally match
+    // the locale/difficulty fields' required-true declarations instead.
+    const categoriesFieldMatch = php.match(/'id'\s*=>\s*'categories',[\s\S]*?\n\];/);
+    expect(categoriesFieldMatch).not.toBeNull();
+    expect(categoriesFieldMatch![0]).toContain("'required'     => 'false'");
   });
 
   test("no longer hardcodes a Category id list", () => {
@@ -185,9 +192,10 @@ describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
     expect(php).toContain("'categories'");
   });
 
-  test("caps picks at 8 with the Dutch notice on add-to-cart", () => {
+  test("caps picks at SLOT_COUNT with the Dutch notice on add-to-cart", () => {
     expect(php).toContain("woocommerce_add_to_cart_validation");
-    expect(php).toContain("Kies maximaal 8 categorieën.");
+    expect(php).toContain(`PUBQUIZ_MAX_CATEGORY_PICKS = ${SLOT_COUNT};`);
+    expect(php).toContain(`Kies maximaal ${SLOT_COUNT} categorieën.`);
   });
 });
 

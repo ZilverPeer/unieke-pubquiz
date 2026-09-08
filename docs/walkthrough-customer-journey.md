@@ -128,7 +128,7 @@ curl.exe -s -c cookies.txt -b cookies.txt "http://localhost:45330/mijn-account/d
 
 ## Placing a failing order on purpose
 
-Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a single pick (which cycles onto all 8 slots) whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's dropdown, which only ever offers real Category ids):
+Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a single pick (which cycles onto all 8 slots) whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's Categorieën checkboxes, which only ever offer real Category ids):
 
 ```powershell
 npx tsx scripts/shop/place-order.ts --email failing-order@example.com --locale nl --difficulty easy --pick 999999
