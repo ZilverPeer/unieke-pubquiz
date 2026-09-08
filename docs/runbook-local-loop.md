@@ -96,7 +96,7 @@ docker exec supabase_db_unieke-pubquiz psql -U postgres -d postgres -c \
 Every download link is `http://localhost:3000/download/<token>/quiz.zip` (`downloadPath`, `src/domain/orders.ts` -- `<file>` is always the literal `quiz.zip` since ticket #73) -- reachable straight from a browser or `curl` once `next dev` is running, since it's the same host/port the link's own base URL (`APP_BASE_URL`, defaults to `http://localhost:3000`) points at. The response's `Content-Disposition` names the file `pubquiz-<order number>-<quiz number>-<locale>.zip` (`quizZipFilename`, `src/domain/orders.ts`); unzipping it produces the four Deliverables (`quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3`):
 
 ```sh
-curl -o quiz.zip "http://localhost:3000/download/<token>/quiz.zip"
+curl -o pubquiz-<order number>-<quiz number>-<locale>.zip "http://localhost:3000/download/<token>/quiz.zip"
 ```
 
 ## Webhook redelivery (proving idempotency)
