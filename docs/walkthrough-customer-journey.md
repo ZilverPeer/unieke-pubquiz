@@ -19,22 +19,22 @@ When you're done: `npm run loop:down` (see the end of this document).
 
 ## The product page
 
-Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three required dropdowns above the price:
+Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three always-visible fields above the price (ticket #72):
 
-- **Taal** -- Nederlands / Engels
-- **Moeilijkheid** -- Makkelijk / Gemiddeld / Moeilijk / Gemengd
-- **Soort quiz** -- Gemengd / Eén categorie
+- **Taal** -- Nederlands (preselected) / Engels
+- **Moeilijkheid** -- Makkelijk / Gemiddeld / Moeilijk / Gemengd (preselected)
+- **Categorieën** -- a group of checkboxes, one per seeded Category's Dutch name (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has), none preselected, capped at 8 -- checking a 9th shows "Kies maximaal 8 categorieën." and the item is not added. Below it: "Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt." -- picking nothing is a valid, explained choice (the sampler then gives every round a random, distinct Category, per CONTEXT.md "Quiz"); picking *k* Categories cycles those *k* picks evenly over the 8 rounds, in the order you checked them.
 
-Picking **Eén categorie** reveals **Categorie 1**, a dropdown of the seeded Categories' Dutch names (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has). Pick a value for each visible dropdown, then click **Toevoegen aan winkelwagen**.
+Check zero to eight boxes, then click **Toevoegen aan winkelwagen**.
 
-**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads):
+**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` may repeat, once per pick, in pick order):
 
 ```powershell
 $productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
 curl.exe -s -c cookies.txt -b cookies.txt `
   -d "quantity=1" -d "add-to-cart=$productId" -d "wapf_field_groups=$productId" `
   -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
-  -d "wapf[field_mode]=single_category" -d "wapf[field_category_1]=1" `
+  -d "wapf[field_categories][]=1" `
   "http://localhost:45330/product/pubquiz/"
 ```
 
@@ -87,7 +87,7 @@ to list messages and get an `ID`, then:
 curl.exe -s "http://127.0.0.1:45332/api/v1/message/<message id>"
 ```
 
-for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij Pubquiz-wt-shop is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Soort quiz/Categorie N, in Dutch, matching what you picked).
+for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij Pubquiz-wt-shop is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Categorieën, in Dutch, matching what you picked).
 
 If you ticked **Een account aanmaken?**, a second mail arrives: **"Je account bij Pubquiz-wt-shop is aangemaakt!"**, naming your username and a password-reset link (WooCommerce never mails a plaintext password) -- you don't need it for this walkthrough, since checkout already logs the new account in for the rest of your browser session.
 
@@ -129,7 +129,7 @@ curl.exe -s -c cookies.txt -b cookies.txt "http://localhost:45330/mijn-account/d
 
 ## Placing a failing order on purpose
 
-Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a single pick (which cycles onto all 8 slots) whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's dropdown, which only ever offers real Category ids):
+Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a single pick (which cycles onto all 8 slots) whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's Categorieën checkboxes, which only ever offer real Category ids):
 
 ```powershell
 npx tsx scripts/shop/place-order.ts --email failing-order@example.com --locale nl --difficulty easy --pick 999999
