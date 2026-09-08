@@ -115,21 +115,30 @@ add_filter(
 /**
  * The account icon link, right after the cart (`storefront_header_cart` is
  * hooked at priority 60 -- see storefront-woocommerce-template-hooks.php).
- * A person-outline SVG plus visually-hidden "Mijn account" text, same
+ * A person-outline SVG plus visually-hidden account-page-title text, same
  * accessible-icon-link shape as the cart link it sits next to.
  */
 add_action(
     'storefront_header',
     function () {
-        // The shop is Dutch-only by decision (spec #55) -- see
-        // pubquiz-customer-notice.php's docblock -- so the label is a
-        // literal Dutch string, same as that plugin, not run through
-        // WordPress's own gettext (there is no "Mijn account" msgid to
-        // translate; Storefront's own string is the English "My account").
+        $pubquiz_myaccount_page_id = wc_get_page_id( 'myaccount' );
+        // Reads the My account page's own title -- setup-shop.php's single
+        // source for it ("Mijn account", see its `$pubquiz_dutch_pages`
+        // array) -- rather than a second hardcoded copy of that string here
+        // (fix round on #70, Standards review). Falls back to the literal
+        // only if the page itself is missing (`wc_get_page_id()` returns -1
+        // when unset, 0 or a stale id otherwise), which setup-shop.php's own
+        // section 4 already treats as an error state for `shop:up`, so this
+        // fallback only matters for a page deleted after setup ran.
+        $pubquiz_myaccount_title = $pubquiz_myaccount_page_id > 0 ? get_the_title( $pubquiz_myaccount_page_id ) : '';
+        if ( '' === $pubquiz_myaccount_title ) {
+            $pubquiz_myaccount_title = 'Mijn account';
+        }
+
         printf(
             '<a href="%1$s" class="pubquiz-account-link" aria-label="%2$s"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v3h20v-3c0-3.33-6.67-5-10-5z"/></svg><span class="screen-reader-text">%2$s</span></a>',
             esc_url( wc_get_page_permalink( 'myaccount' ) ),
-            esc_html( 'Mijn account' )
+            esc_html( $pubquiz_myaccount_title )
         );
     },
     61

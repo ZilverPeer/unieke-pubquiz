@@ -261,17 +261,40 @@ if ( $pubquiz_sample_page ) {
 //    blog post (tickets #68/#70). Idempotent like every other option write
 //    above; folds into every `shop:up` run, so a re-run converges an
 //    existing instance too, not just a fresh one.
+//
+//    `page_on_front` is written before `show_on_front` (fix round on #70,
+//    Standards review): if the run dies between the two writes, a re-run
+//    still has a `show_on_front=posts` site pointing an already-correct
+//    `page_on_front` at Winkel -- it degrades to "still shows the blog",
+//    not to `show_on_front=page` with `page_on_front` still 0, which is a
+//    blank front page.
 // -----------------------------------------------------------------------
 pubquiz_ensure_option( 'woocommerce_coming_soon', 'no' );
-pubquiz_ensure_option( 'show_on_front', 'page' );
 pubquiz_ensure_option( 'page_on_front', (string) wc_get_page_id( 'shop' ) );
+pubquiz_ensure_option( 'show_on_front', 'page' );
+
+// Only ever trash the specific default "Hello world!" post WordPress's own
+// install creates at post id 1 -- never post id 1 on its identity alone,
+// which on a re-purposed or hand-edited instance could be anything (fix
+// round on #70, Standards review). Matched by post_type plus slug or
+// title, either match sufficient (a renamed-but-not-re-slugged post, or a
+// re-slugged-but-not-renamed one, is still the default post).
+define( 'PUBQUIZ_HELLO_WORLD_POST_TYPE', 'post' );
+define( 'PUBQUIZ_HELLO_WORLD_SLUG', 'hello-world' );
+define( 'PUBQUIZ_HELLO_WORLD_TITLE', 'Hello world!' );
 
 $pubquiz_hello_world = get_post( 1 );
-if ( $pubquiz_hello_world && 'trash' !== $pubquiz_hello_world->post_status ) {
+if ( ! $pubquiz_hello_world ) {
+    pubquiz_log( 'Post #1 does not exist.' );
+} elseif ( PUBQUIZ_HELLO_WORLD_POST_TYPE !== $pubquiz_hello_world->post_type
+    || ( PUBQUIZ_HELLO_WORLD_SLUG !== $pubquiz_hello_world->post_name && PUBQUIZ_HELLO_WORLD_TITLE !== $pubquiz_hello_world->post_title )
+) {
+    pubquiz_log( 'Post #1 exists but is not the default "Hello world!" post (post_type=' . $pubquiz_hello_world->post_type . ', slug=' . $pubquiz_hello_world->post_name . ', title=' . $pubquiz_hello_world->post_title . '); leaving it alone.' );
+} elseif ( 'trash' !== $pubquiz_hello_world->post_status ) {
     pubquiz_log( 'Trashing post #1 ("Hello world!").' );
     wp_trash_post( 1 );
 } else {
-    pubquiz_log( 'Post #1 already gone or already trashed.' );
+    pubquiz_log( 'Post #1 ("Hello world!") already trashed.' );
 }
 
 // -----------------------------------------------------------------------

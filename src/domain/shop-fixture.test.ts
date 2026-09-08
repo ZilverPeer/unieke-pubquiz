@@ -229,6 +229,27 @@ describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
     expect(php).toContain("'show_on_front', 'page'");
     expect(php).toContain("'page_on_front', (string) wc_get_page_id( 'shop' )");
   });
+
+  /**
+   * Fix round on #70 (Standards review): writes `page_on_front` before
+   * `show_on_front`, so a run that dies between the two writes degrades to
+   * "still shows the blog" rather than a blank front page.
+   */
+  test("writes page_on_front before show_on_front", () => {
+    expect(php.indexOf("'page_on_front'")).toBeLessThan(php.indexOf("'show_on_front'"));
+  });
+
+  /**
+   * Fix round on #70 (Standards review): post id 1 is only ever trashed
+   * when it matches the default "Hello world!" post's identity (post_type
+   * plus slug or title), never on id alone.
+   */
+  test("only trashes post #1 when it matches the default Hello world! post's identity", () => {
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_POST_TYPE', 'post'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_SLUG', 'hello-world'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_TITLE', 'Hello world!'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_POST_TYPE !== $pubquiz_hello_world->post_type");
+  });
 });
 
 describe("shop/mu-plugins/pubquiz-storefront-chrome.php", () => {
