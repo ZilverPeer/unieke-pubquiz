@@ -184,6 +184,21 @@ describe("loadExcludedItemIds", () => {
     expect(afterSecond).toEqual(new Set([...firstIds, ...secondIds]));
   });
 
+  it("excludes archived Items (archived_at set) from the pool", async () => {
+    const before = await repository.loadPool("nl");
+    const victim = before[0].item.id;
+    const { error } = await db.from("items").update({ archived_at: new Date().toISOString() }).eq("id", victim);
+    if (error) throw error;
+    try {
+      const after = await repository.loadPool("nl");
+      expect(after).toHaveLength(before.length - 1);
+      expect(after.some((entry) => entry.item.id === victim)).toBe(false);
+    } finally {
+      const { error: restoreError } = await db.from("items").update({ archived_at: null }).eq("id", victim);
+      if (restoreError) throw restoreError;
+    }
+  });
+
   it("compares billing emails trimmed and case-insensitively", async () => {
     const pool = await repository.loadPool("nl");
     const ids = pool.slice(0, 80).map((e) => e.item.id);

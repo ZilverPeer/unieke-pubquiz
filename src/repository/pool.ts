@@ -80,6 +80,8 @@ export async function loadPool(
           `,
         )
         .eq("item_translations.locale", locale)
+        // Archived Items (spec 4, migration 00012) are never sampled.
+        .is("archived_at", null)
         .order("id")
         .range(from, to),
     ),

@@ -4,7 +4,7 @@ Repository: the only module that talks to Postgres (via Supabase). Loads the sam
 
 `src/repository/index.ts` exports `createRepository(config): ContentRepository`, with:
 
-- `loadPool(locale)` -- every Item that has a translation for `locale`, joined to its Category chain (names in `locale`) and, for Picture/Music Items, their detail row.
+- `loadPool(locale)` -- every live Item (`archived_at` null; spec 4 archives Items that a Composition references instead of deleting them, migration 00012) that has a translation for `locale`, joined to its Category chain (names in `locale`) and, for Picture/Music Items, their detail row.
 - `loadExcludedItemIds(billingEmail)` -- the union of Item ids across every Composition ever persisted for that billing email (the no-repeat rule's source).
 - `persistComposition(record)` -- writes one `compositions` row plus its `composition_items` rows (`slot_index`, `position`).
 - `getCompositionById(compositionId)` -- `null` when not found, otherwise the same `CompositionRecord` shape `persistComposition` writes (slots rebuilt from `composition_items`, ordered by `slot_index`/`position`). Added for the `--composition` dev script flag (ticket #42): re-rendering an existing Composition without a new `compositions` row needs to read one back by id.
