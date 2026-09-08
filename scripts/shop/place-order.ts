@@ -1,8 +1,8 @@
 /**
  * `npm run shop:order -- --email x@example.com --locale nl --difficulty easy
- *   --mode mixed --pick 0=<categoryId>` creates a paid order for the Pubquiz
- * product through WP-CLI, one line item per `--quiz` group (or a single
- * implicit group if `--quiz` is never given), with meta_data set exactly per
+ *   --pick <categoryId>` creates a paid order for the Pubquiz product through
+ * WP-CLI, one line item per `--quiz` group (or a single implicit group if
+ * `--quiz` is never given), with meta_data set exactly per
  * CHECKOUT_META_KEYS (src/domain/checkout.ts). The order is created directly
  * in status `processing` (WooCommerce's REST/WP-CLI order creation accepts a
  * status outright; no browser or gateway round trip is needed for this
@@ -12,12 +12,13 @@
  *
  * Multiple quizzes in one order:
  *   npm run shop:order -- --email a@b.com \
- *     --locale nl --difficulty easy --mode mixed --pick 0=1 \
- *     --quiz --locale en --difficulty hard --mode single_category --pick 0=2 --quantity 2
+ *     --locale nl --difficulty easy --pick 1 \
+ *     --quiz --locale en --difficulty hard --pick 2 --quantity 2
  *
- * `--pick <slot>=<categoryId>` may repeat (slot 0-7). `--quantity <n>`
- * defaults to 1 and creates one line item with that quantity (n identical
- * Quizzes, per the spec).
+ * `--pick <categoryId>` may repeat, order preserved, up to 8 times, ids must
+ * be distinct (ticket #71's cycle rule -- see src/sample/README.md).
+ * `--quantity <n>` defaults to 1 and creates one line item with that
+ * quantity (n identical Quizzes, per the spec).
  */
 import { CHECKOUT_META_KEYS } from "../../src/domain/checkout";
 import { SLOT_COUNT } from "../../src/domain/types";
@@ -27,13 +28,12 @@ import { getProductId } from "./lib/product";
 interface QuizArg {
   locale: string;
   difficulty: string;
-  mode: string;
-  picks: Map<number, string>;
+  picks: string[];
   quantity: number;
 }
 
 function newQuiz(): QuizArg {
-  return { locale: "nl", difficulty: "mixed", mode: "mixed", picks: new Map(), quantity: 1 };
+  return { locale: "nl", difficulty: "mixed", picks: [], quantity: 1 };
 }
 
 function parseArgs(argv: string[]): { email: string; quizzes: QuizArg[] } {
@@ -56,15 +56,18 @@ function parseArgs(argv: string[]): { email: string; quizzes: QuizArg[] } {
       case "--difficulty":
         current.difficulty = argv[++i];
         break;
-      case "--mode":
-        current.mode = argv[++i];
-        break;
       case "--quantity":
         current.quantity = Number(argv[++i]);
         break;
       case "--pick": {
-        const [slotStr, categoryId] = argv[++i].split("=");
-        current.picks.set(Number(slotStr), categoryId);
+        const categoryId = argv[++i];
+        if (current.picks.length >= SLOT_COUNT) {
+          throw new Error(`--pick may be given at most ${SLOT_COUNT} times`);
+        }
+        if (current.picks.includes(categoryId)) {
+          throw new Error(`--pick category ids must be distinct, got "${categoryId}" twice`);
+        }
+        current.picks.push(categoryId);
         break;
       }
       default:
@@ -83,14 +86,10 @@ function toMetaData(quiz: QuizArg): Array<{ key: string; value: string }> {
   const meta: Array<{ key: string; value: string }> = [
     { key: CHECKOUT_META_KEYS.locale, value: quiz.locale },
     { key: CHECKOUT_META_KEYS.requestedDifficulty, value: quiz.difficulty },
-    { key: CHECKOUT_META_KEYS.quizMode, value: quiz.mode },
   ];
-  for (let slot = 0; slot < SLOT_COUNT; slot++) {
-    const pick = quiz.picks.get(slot);
-    if (pick !== undefined) {
-      meta.push({ key: CHECKOUT_META_KEYS.categoryPick(slot), value: pick });
-    }
-  }
+  quiz.picks.forEach((pick, index) => {
+    meta.push({ key: CHECKOUT_META_KEYS.categoryPick(index), value: pick });
+  });
   return meta;
 }
 

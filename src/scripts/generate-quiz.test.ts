@@ -68,8 +68,7 @@ async function buildFakeRepository(): Promise<ContentRepository> {
 function baseOptions(): GenerateOptions {
   return {
     locale: "nl",
-    quizMode: "single_category",
-    categoryPicks: ["category-0", undefined, undefined, undefined, undefined, undefined, undefined, undefined],
+    categoryPicks: ["category-0"],
     requestedDifficulty: "easy",
     billingEmail: "generate-quiz-test@example.com",
     seed: 1,

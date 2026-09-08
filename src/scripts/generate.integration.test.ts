@@ -75,17 +75,11 @@ function freshEmail(prefix: string): string {
   return email;
 }
 
-function fullyRandomCategoryPicks(): GenerateOptions["categoryPicks"] {
-  return new Array(SLOT_COUNT).fill(undefined);
-}
-
 function singleCategoryPick(categoryId: string): GenerateOptions["categoryPicks"] {
-  // single_category mode uses the first defined entry for every slot (see
+  // A single pick cycles onto every slot (ticket #71's cycle rule -- see
   // src/sample/README.md) -- one pick is enough, matching the CLI's own
-  // `--pick 0=<id>` convention.
-  const picks = fullyRandomCategoryPicks();
-  picks[0] = categoryId;
-  return picks;
+  // `--pick <id>` convention.
+  return [categoryId];
 }
 
 async function makeTmpDir(): Promise<string> {
@@ -130,8 +124,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
         const { status, stderr } = runCli([
           "--locale",
           locale,
-          "--mode",
-          "mixed",
           "--difficulty",
           "mixed",
           "--email",
@@ -204,7 +196,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
       const result1 = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick("1"),
           requestedDifficulty: "mixed",
           billingEmail: email,
@@ -217,7 +208,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
       const result2 = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick("2"),
           requestedDifficulty: "mixed",
           billingEmail: email,
@@ -249,7 +239,6 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
       const firstResult = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick(HARD_TEXT_CATEGORY_ID),
           requestedDifficulty: "hard",
           billingEmail: email,
@@ -267,14 +256,12 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
       const { status, stdout, stderr } = runCli([
         "--locale",
         "nl",
-        "--mode",
-        "single_category",
         "--difficulty",
         "hard",
         "--email",
         email,
         "--pick",
-        `0=${HARD_TEXT_CATEGORY_ID}`,
+        HARD_TEXT_CATEGORY_ID,
         "--seed",
         "201",
         "--out",

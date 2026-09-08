@@ -4,7 +4,7 @@
  * documented command.
  */
 import { join } from "node:path";
-import type { CategoryPick, Locale, QuizMode, QuizRequest, RequestedDifficulty } from "@/domain";
+import type { Locale, QuizRequest, RequestedDifficulty } from "@/domain";
 import { SLOT_COUNT } from "@/domain";
 
 /** A QuizRequest plus the two dev-script-only knobs: seed and output folder. */
@@ -14,7 +14,6 @@ export interface GenerateOptions extends QuizRequest {
 }
 
 const LOCALES: readonly Locale[] = ["nl", "en"];
-const MODES: readonly QuizMode[] = ["mixed", "single_category"];
 const DIFFICULTIES: readonly RequestedDifficulty[] = ["easy", "medium", "hard", "mixed"];
 
 function requireValue(argv: readonly string[], index: number, flag: string): string {
@@ -44,15 +43,20 @@ function defaultOutDir(locale: Locale, now: Date): string {
  * Parses `npm run generate --` arguments into a GenerateOptions. Throws a
  * clear message on bad input. `--seed` defaults to a random 32-bit integer;
  * `--out` defaults to `content/generated/<yyyymmdd-hhmmss>-<locale>/`.
+ *
+ * `--pick <categoryId>` may repeat (up to 8 times); the customer's picks are
+ * collected in the order given (ticket #71: slot i gets pick `i mod k` for k
+ * picks, 0 picks fills every slot with a random Category -- see
+ * `resolveSlotCategories`, src/sample/index.ts). Duplicate picks are
+ * rejected here as well, matching the sampler's own check.
  */
 export function parseGenerateArgs(argv: readonly string[]): GenerateOptions {
   let locale: Locale | undefined;
-  let quizMode: QuizMode | undefined;
   let requestedDifficulty: RequestedDifficulty | undefined;
   let billingEmail: string | undefined;
   let seed: number | undefined;
   let out: string | undefined;
-  const categoryPicks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
+  const categoryPicks: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -63,14 +67,6 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions {
           throw new Error(`--locale must be one of ${LOCALES.join("|")}, got "${value}"`);
         }
         locale = value as Locale;
-        break;
-      }
-      case "--mode": {
-        const value = requireValue(argv, ++i, flag);
-        if (!MODES.includes(value as QuizMode)) {
-          throw new Error(`--mode must be one of ${MODES.join("|")}, got "${value}"`);
-        }
-        quizMode = value as QuizMode;
         break;
       }
       case "--difficulty": {
@@ -87,18 +83,13 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions {
       }
       case "--pick": {
         const value = requireValue(argv, ++i, flag);
-        const match = /^(\d+)=(.+)$/.exec(value);
-        if (!match) {
-          throw new Error(`--pick must be formatted <slot>=<categoryId>, got "${value}"`);
+        if (categoryPicks.length >= SLOT_COUNT) {
+          throw new Error(`--pick may be given at most ${SLOT_COUNT} times`);
         }
-        const slot = Number(match[1]);
-        if (slot < 0 || slot >= SLOT_COUNT) {
-          throw new Error(`--pick slot must be between 0 and ${SLOT_COUNT - 1}, got ${slot}`);
+        if (categoryPicks.includes(value)) {
+          throw new Error(`--pick category ids must be distinct, got "${value}" twice`);
         }
-        if (categoryPicks[slot] !== undefined) {
-          throw new Error(`--pick specified more than once for slot ${slot}`);
-        }
-        categoryPicks[slot] = match[2];
+        categoryPicks.push(value);
         break;
       }
       case "--seed": {
@@ -120,21 +111,11 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions {
   }
 
   if (!locale) throw new Error("--locale is required");
-  if (!quizMode) throw new Error("--mode is required");
   if (!requestedDifficulty) throw new Error("--difficulty is required");
   if (!billingEmail) throw new Error("--email is required");
 
-  const pickCount = categoryPicks.filter((pick) => pick !== undefined).length;
-  if (quizMode === "single_category" && pickCount === 0) {
-    throw new Error("--mode single_category requires exactly one --pick");
-  }
-  if (quizMode === "single_category" && pickCount > 1) {
-    throw new Error("--mode single_category accepts only one --pick");
-  }
-
   return {
     locale,
-    quizMode,
     categoryPicks,
     requestedDifficulty,
     billingEmail,

@@ -21,7 +21,7 @@ them.
 
 Versioned migrations under `supabase/migrations/`, one concern per file:
 
-1. `00001_enums.sql` — `locale`, `item_kind`, `difficulty`, `quiz_mode`,
+1. `00001_enums.sql` — `locale`, `item_kind`, `difficulty`,
    `requested_difficulty`.
 2. `00002_categories.sql` — the 3-level `categories` -> `subcategories` ->
    `subsubcategories` hierarchy, each with a `*_translations` table keyed
@@ -80,20 +80,19 @@ draws 6 distinct Text Rounds — 60 Items, none repeated — from one Category,
 leaving 10 Items of slack over that floor. Per Locale and per Difficulty
 this yields 560 text Items and 160 picture / 160 music Items (8 Categories x
 10 Subsubcategories, x7 for text and x2 for picture/music), well over the
-"at least 60 text + 10 picture + 10 music" floor for a mixed-mode Quiz, and
-spread across all 8 Categories rather than concentrated in one. That covers
-both Quiz modes:
+"at least 60 text + 10 picture + 10 music" floor for a request with several
+picks, and spread across all 8 Categories rather than concentrated in one.
+That covers both ends of the pick-count cycle rule:
 
-- **Mixed mode** (up to 8 distinct Categories, one Round per Category): each
-  of the 8 Categories independently has enough Items and Subsubcategories to
-  fill whichever Round type lands on it.
-- **Single-category mode** (one Category fills all 8 Rounds): a Category
-  supplies 60 *distinct* Text Items for its 6 Text Rounds — `sampleComposition`
-  excludes every Item already placed earlier in the same Quiz, so Rounds
-  cannot reuse each other's Items even though they may reuse a
-  Subsubcategory (the no-duplicate-Subsubcategory rule only applies within a
-  single Round). 70 Items per Category/Difficulty covers the 60 needed with
-  10 to spare.
+- **Several picks** (up to 8 distinct Categories, cycled one Round per pick
+  or more): each of the 8 Categories independently has enough Items and
+  Subsubcategories to fill whichever Round type lands on it.
+- **One pick** (cycled onto all 8 Rounds): a Category supplies 60 *distinct*
+  Text Items for its 6 Text Rounds — `sampleComposition` excludes every Item
+  already placed earlier in the same Quiz, so Rounds cannot reuse each
+  other's Items even though they may reuse a Subsubcategory (the
+  no-duplicate-Subsubcategory rule only applies within a single Round). 70
+  Items per Category/Difficulty covers the 60 needed with 10 to spare.
 
 A documented handful of Items (6, listed in `supabase/seed.sql` section 5) get
 a translation in only one Locale, so ticket #6's repository tests can prove

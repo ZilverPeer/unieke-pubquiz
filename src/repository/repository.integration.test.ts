@@ -254,7 +254,6 @@ function buildRecord(billingEmail: string, itemIds: string[]): CompositionRecord
   return {
     billingEmail,
     locale: "nl",
-    quizMode: "mixed",
     requestedDifficulty: "mixed",
     seed: 1,
     composition: { slots },

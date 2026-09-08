@@ -41,16 +41,16 @@ Start a second line item with `--quiz`:
 
 ```sh
 npx tsx scripts/shop/place-order.ts --email you@example.com \
-  --locale nl --difficulty easy --mode mixed --pick 0=1 \
-  --quiz --locale en --difficulty hard --mode single_category --pick 0=2
+  --locale nl --difficulty easy --pick 1 \
+  --quiz --locale en --difficulty hard --pick 2
 ```
 
 ### A failing order (impossible configuration)
 
-Either an unknown Category id (fails at webhook parse time, before any generation attempt) or a `single_category` pick with too few Items for that Category (fails during generation, a `QuizShortfallError`). The unknown-id form is the simplest to reproduce on demand:
+Either an unknown Category id (fails at webhook parse time, before any generation attempt) or a single pick with too few Items for that Category, which cycles onto all 8 slots (fails during generation, a `QuizShortfallError`). The unknown-id form is the simplest to reproduce on demand:
 
 ```sh
-npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --mode single_category --pick 0=999999
+npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --pick 999999
 ```
 
 The order stays `processing`; check the order note and the operator alert mail (see "Inspecting mail" below).

@@ -39,7 +39,6 @@ export async function persistComposition(
     .insert({
       billing_email: normalizeBillingEmail(record.billingEmail),
       locale: record.locale,
-      quiz_mode: record.quizMode,
       requested_difficulty: record.requestedDifficulty,
       seed: record.seed,
     })
@@ -97,7 +96,6 @@ export async function getCompositionById(
   return {
     billingEmail: compositionRow.billing_email,
     locale: compositionRow.locale,
-    quizMode: compositionRow.quiz_mode,
     requestedDifficulty: compositionRow.requested_difficulty,
     seed: compositionRow.seed,
     composition: { slots },

@@ -52,9 +52,8 @@ async function insertQuiz(orderId: string): Promise<string> {
       sequence: 0,
       status: "pending",
       locale: "nl",
-      quiz_mode: "mixed",
       requested_difficulty: "mixed",
-      category_picks: new Array(8).fill(null),
+      category_picks: [],
     })
     .select("id")
     .single();
@@ -68,7 +67,6 @@ async function insertComposition(billingEmail: string): Promise<string> {
     .insert({
       billing_email: billingEmail,
       locale: "nl",
-      quiz_mode: "mixed",
       requested_difficulty: "mixed",
       seed: 1,
     })

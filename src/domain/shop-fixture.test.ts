@@ -29,7 +29,6 @@ describe("shop/fixtures/order-updated-processing.json", () => {
   const allowedKeys = new Set<string>([
     CHECKOUT_META_KEYS.locale,
     CHECKOUT_META_KEYS.requestedDifficulty,
-    CHECKOUT_META_KEYS.quizMode,
     ...Array.from({ length: SLOT_COUNT }, (_, slot) => CHECKOUT_META_KEYS.categoryPick(slot)),
     "_wapf_meta",
   ]);
@@ -41,10 +40,10 @@ describe("shop/fixtures/order-updated-processing.json", () => {
     }
   });
 
-  test("the four required keys are all present", () => {
+  test("the required keys are all present", () => {
     const keys = readFixture().map((m) => m.key);
     expect(keys).toEqual(
-      expect.arrayContaining([CHECKOUT_META_KEYS.locale, CHECKOUT_META_KEYS.requestedDifficulty, CHECKOUT_META_KEYS.quizMode]),
+      expect.arrayContaining([CHECKOUT_META_KEYS.locale, CHECKOUT_META_KEYS.requestedDifficulty]),
     );
     expect(keys.some((key) => key === CHECKOUT_META_KEYS.categoryPick(0))).toBe(true);
   });
@@ -126,8 +125,10 @@ describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.locale}'`);
     expect(php).toContain("'difficulty'");
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.requestedDifficulty}'`);
-    expect(php).toContain("'mode'");
-    expect(php).toContain(`=> '${CHECKOUT_META_KEYS.quizMode}'`);
+    // 'mode' -> pubquiz_mode is no longer pinned here: ticket #71 removed
+    // CHECKOUT_META_KEYS.quizMode from the domain, but this PHP bridge (and
+    // setup-field-group.php's 'mode' field) is left untouched -- that's
+    // ticket #72's product page field group. See PR body.
   });
 
   test("maps category_N field ids to the pubquiz_category_ stem", () => {

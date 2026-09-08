@@ -102,13 +102,6 @@
             "display_value": "mixed"
           },
           {
-            "id": 53,
-            "key": "pubquiz_mode",
-            "value": "single_category",
-            "display_key": "pubquiz_mode",
-            "display_value": "single_category"
-          },
-          {
             "id": 54,
             "key": "pubquiz_category_1",
             "value": "1",

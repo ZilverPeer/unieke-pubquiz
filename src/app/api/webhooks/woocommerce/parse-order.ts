@@ -11,18 +11,18 @@
  * (src/repository/index.ts) -- this module only maps and validates, it
  * never reaches the repository or pg-boss itself (see route.ts / README.md).
  *
- * A line item whose configuration can't be fully trusted (unknown Category
- * id, missing/invalid Locale, mode or difficulty) is still mapped to a
- * best-effort `QuizConfig` -- every column in `quizzes` this maps onto is
- * `not null` (migration 00008_orders_quizzes.sql), so there is no way to
- * insert a Quiz row without *some* value for locale/quizMode/
- * requestedDifficulty. The caller (route.ts) inserts it as usual (default
- * status `pending`) and then transitions it straight to `failed` with the
- * recorded reason -- see README.md "Interface gap: parse failures and
- * UpsertOrderInput" for why this is the chosen shape over changing the
- * repository.
+ * A line item whose configuration can't be fully trusted (unknown or
+ * duplicate Category id, missing/invalid Locale or difficulty) is still
+ * mapped to a best-effort `QuizConfig` -- every column in `quizzes` this
+ * maps onto except `category_picks` is `not null` (migration
+ * 00008_orders_quizzes.sql), so there is no way to insert a Quiz row without
+ * *some* value for locale/requestedDifficulty. The caller (route.ts) inserts
+ * it as usual (default status `pending`) and then transitions it straight to
+ * `failed` with the recorded reason -- see README.md "Interface gap: parse
+ * failures and UpsertOrderInput" for why this is the chosen shape over
+ * changing the repository.
  */
-import type { CategoryPick, Locale, QuizConfig, QuizMode, RequestedDifficulty } from "@/domain";
+import type { Locale, QuizConfig, RequestedDifficulty } from "@/domain";
 import { CHECKOUT_META_KEYS, SLOT_COUNT } from "@/domain";
 import type { OrderLineItem, UpsertOrderInput } from "@/repository";
 
@@ -51,7 +51,6 @@ export interface ParseOrderResult {
 }
 
 const VALID_LOCALES: readonly Locale[] = ["nl", "en"];
-const VALID_QUIZ_MODES: readonly QuizMode[] = ["mixed", "single_category"];
 const VALID_REQUESTED_DIFFICULTIES: readonly RequestedDifficulty[] = ["easy", "medium", "hard", "mixed"];
 
 function metaMap(lineItem: WooLineItem): Map<string, unknown> {
@@ -73,21 +72,32 @@ function parseEnum<T extends string>(
   return fallback;
 }
 
-function parseCategoryPicks(meta: Map<string, unknown>, categoryIds: ReadonlySet<string>, errors: string[]): CategoryPick[] {
-  const picks: CategoryPick[] = [];
-  for (let slot = 0; slot < SLOT_COUNT; slot++) {
-    const raw = meta.get(CHECKOUT_META_KEYS.categoryPick(slot));
-    if (raw === undefined) {
-      picks.push(undefined);
+/**
+ * Reads `pubquiz_category_1..8` in pick order, stopping at the first
+ * missing key (a later key, even if present, is never read -- the customer
+ * never leaves a gap, see shop/mu-plugins/pubquiz-checkout-meta.php). An
+ * unknown or duplicate Category id is dropped from the picks and recorded
+ * as a parse error, same as an invalid Locale/difficulty value; reading
+ * continues at the next key regardless.
+ */
+function parseCategoryPicks(meta: Map<string, unknown>, categoryIds: ReadonlySet<string>, errors: string[]): string[] {
+  const picks: string[] = [];
+  const seen = new Set<string>();
+  for (let position = 0; position < SLOT_COUNT; position++) {
+    const raw = meta.get(CHECKOUT_META_KEYS.categoryPick(position));
+    if (raw === undefined) break;
+
+    const id = String(raw);
+    if (!categoryIds.has(id)) {
+      errors.push(`unknown Category id "${id}" at pick ${position + 1}`);
       continue;
     }
-    const id = String(raw);
-    if (categoryIds.has(id)) {
-      picks.push(id);
-    } else {
-      errors.push(`unknown Category id "${id}" at slot ${slot}`);
-      picks.push(undefined);
+    if (seen.has(id)) {
+      errors.push(`duplicate Category id "${id}" at pick ${position + 1}`);
+      continue;
     }
+    seen.add(id);
+    picks.push(id);
   }
   return picks;
 }
@@ -100,7 +110,6 @@ function parseLineItem(
   const errors: string[] = [];
 
   const locale = parseEnum(meta, CHECKOUT_META_KEYS.locale, VALID_LOCALES, "nl", errors);
-  const quizMode = parseEnum(meta, CHECKOUT_META_KEYS.quizMode, VALID_QUIZ_MODES, "mixed", errors);
   const requestedDifficulty = parseEnum(
     meta,
     CHECKOUT_META_KEYS.requestedDifficulty,
@@ -110,7 +119,7 @@ function parseLineItem(
   );
   const categoryPicks = parseCategoryPicks(meta, categoryIds, errors);
 
-  const config: QuizConfig = { locale, quizMode, requestedDifficulty, categoryPicks };
+  const config: QuizConfig = { locale, requestedDifficulty, categoryPicks };
   const quantity = Number.isInteger(raw.quantity) && raw.quantity > 0 ? raw.quantity : 1;
 
   return {

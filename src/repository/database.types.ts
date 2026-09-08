@@ -120,7 +120,6 @@ export type Database = {
           created_at: string
           id: string
           locale: Database["public"]["Enums"]["locale"]
-          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           seed: number
         }
@@ -129,7 +128,6 @@ export type Database = {
           created_at?: string
           id?: string
           locale: Database["public"]["Enums"]["locale"]
-          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           seed: number
         }
@@ -138,7 +136,6 @@ export type Database = {
           created_at?: string
           id?: string
           locale?: Database["public"]["Enums"]["locale"]
-          quiz_mode?: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty?: Database["public"]["Enums"]["requested_difficulty"]
           seed?: number
         }
@@ -305,7 +302,6 @@ export type Database = {
           locale: Database["public"]["Enums"]["locale"]
           order_id: string
           pruned_at: string | null
-          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           sequence: number
           status: Database["public"]["Enums"]["quiz_status"]
@@ -323,7 +319,6 @@ export type Database = {
           locale: Database["public"]["Enums"]["locale"]
           order_id: string
           pruned_at?: string | null
-          quiz_mode: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty: Database["public"]["Enums"]["requested_difficulty"]
           sequence: number
           status?: Database["public"]["Enums"]["quiz_status"]
@@ -341,7 +336,6 @@ export type Database = {
           locale?: Database["public"]["Enums"]["locale"]
           order_id?: string
           pruned_at?: string | null
-          quiz_mode?: Database["public"]["Enums"]["quiz_mode"]
           requested_difficulty?: Database["public"]["Enums"]["requested_difficulty"]
           sequence?: number
           status?: Database["public"]["Enums"]["quiz_status"]
@@ -480,7 +474,6 @@ export type Database = {
       difficulty: "easy" | "medium" | "hard"
       item_kind: "text" | "picture" | "music"
       locale: "nl" | "en"
-      quiz_mode: "mixed" | "single_category"
       quiz_status: "pending" | "generating" | "delivered" | "failed"
       requested_difficulty: "easy" | "medium" | "hard" | "mixed"
     }
@@ -616,7 +609,6 @@ export const Constants = {
       difficulty: ["easy", "medium", "hard"],
       item_kind: ["text", "picture", "music"],
       locale: ["nl", "en"],
-      quiz_mode: ["mixed", "single_category"],
       quiz_status: ["pending", "generating", "delivered", "failed"],
       requested_difficulty: ["easy", "medium", "hard", "mixed"],
     },

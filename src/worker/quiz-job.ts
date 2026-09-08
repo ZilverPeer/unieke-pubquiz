@@ -11,7 +11,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { DeliverableFile } from "@/domain";
-import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath } from "@/domain";
+import { DELIVERABLE_CONTENT_TYPES, DELIVERABLE_FILES, downloadPath, SLOT_COUNT } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import type { ContentRepository, OrderRepository, UploadDeliverable } from "@/repository";
 import { QuizStatusChangedConcurrentlyError } from "@/repository";
@@ -86,24 +86,28 @@ function buildDownloadUrl(appBaseUrl: string, token: string, file: DeliverableFi
 /**
  * Builds the engine's request from a Quiz's stored config. Throws
  * InvalidQuizConfigError for a combination the sampler could never satisfy
- * regardless of pool contents (mirrors src/scripts/cli-args.ts's own
- * single_category validation) -- a malformed or incomplete checkout
- * configuration is a terminal failure (spec #36 user story 27), not a
- * retryable one.
+ * regardless of pool contents (mirrors resolveSlotCategories's own
+ * distinct/at-most-8 checks, src/sample/index.ts, as defense in depth: a
+ * stored Quiz row should never actually fail this, but if one somehow does,
+ * this must fail terminally rather than let the sampler's own throw get
+ * treated as retryable) -- a malformed or incomplete checkout configuration
+ * is a terminal failure (spec #36 user story 27), not a retryable one.
  */
 function buildGenerateOptions(quiz: QuizRecord, billingEmail: string): GenerateOptions {
   const { config } = quiz;
-  const pickCount = config.categoryPicks.filter((pick) => pick !== undefined).length;
+  const { categoryPicks } = config;
 
-  if (config.quizMode === "single_category" && pickCount !== 1) {
+  if (categoryPicks.length > SLOT_COUNT) {
     throw new InvalidQuizConfigError(
-      `Quiz ${quiz.id}: mode "single_category" requires exactly one Category pick, got ${pickCount}`,
+      `Quiz ${quiz.id}: at most ${SLOT_COUNT} Category picks, got ${categoryPicks.length}`,
     );
+  }
+  if (new Set(categoryPicks).size !== categoryPicks.length) {
+    throw new InvalidQuizConfigError(`Quiz ${quiz.id}: Category picks must be distinct`);
   }
 
   return {
     locale: config.locale,
-    quizMode: config.quizMode,
     categoryPicks: config.categoryPicks,
     requestedDifficulty: config.requestedDifficulty,
     billingEmail,

@@ -45,7 +45,7 @@ Private helpers live alongside it: `client.ts` (Supabase client construction), `
 
 `src/repository/index.ts` also exports `createCategoryIdLookup(config): LoadCategoryIds` (spec #36, ticket #39) -- `() => Promise<Set<string>>`, every existing Category id as a string. A sibling factory, not a method on `ContentRepository` or `OrderRepository`: it's needed only by the webhook parser (`src/app/api/webhooks/woocommerce/parse-order.ts`), to reject a checkout Category pick that doesn't refer to a real Category. Neither repository had this query before ticket #39; it's the smallest read-only addition that closes the gap (`categories.ts`).
 
-`orders.ts` holds the implementation. `CategoryPick`'s `undefined` (an unassigned slot) has no jsonb equivalent, so it round-trips through `category_picks` as `null` and is converted back to `undefined` on read (`toCategoryPicks`), keeping `QuizRecord` exactly matching the pinned `src/domain/orders.ts` shapes.
+`orders.ts` holds the implementation. `category_picks` is a jsonb array of the customer's Category ids in pick order (`QuizConfig.categoryPicks`, 0 to 8 entries, distinct); `toCategoryPicks` round-trips it as-is, keeping `QuizRecord` exactly matching the pinned `src/domain/orders.ts` shapes.
 
 Deleting an `orders` row while any `quizzes` row references it fails (no cascade, migration `00008_orders_quizzes.sql`); the same is true for a `compositions` row referenced by a Quiz's `composition_id`. Deleting a Quiz never touches its Composition.
 

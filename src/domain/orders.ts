@@ -5,7 +5,7 @@
  * Pinned on master before the spec 2 wave so that the repository (#38), the
  * webhook (#39), the worker (#40) and the deliver module (#41) share one shape.
  */
-import type { CategoryPick, Locale, QuizMode, RequestedDifficulty } from "./types";
+import type { Locale, RequestedDifficulty } from "./types";
 
 /** Lifecycle of one Quiz line item. Legal edges are enforced by the repository. */
 export type QuizStatus = "pending" | "generating" | "delivered" | "failed";
@@ -20,9 +20,8 @@ export const QUIZ_STATUS_TRANSITIONS: Readonly<Record<QuizStatus, readonly QuizS
 /** The per-Quiz configuration captured at checkout (line item meta_data). */
 export interface QuizConfig {
   locale: Locale;
-  quizMode: QuizMode;
-  /** Category id per slot (index 0-7), undefined where the slot is unassigned. */
-  categoryPicks: CategoryPick[];
+  /** The customer's Category ids, in pick order, 0 to 8 entries, distinct. */
+  categoryPicks: string[];
   requestedDifficulty: RequestedDifficulty;
 }
 

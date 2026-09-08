@@ -38,9 +38,8 @@ function buildQuizRecord(overrides: Partial<QuizRecord> = {}): QuizRecord {
     sequence: 0,
     config: {
       locale: "nl",
-      quizMode: "single_category",
       requestedDifficulty: "mixed",
-      categoryPicks: ["1", "3", "5", undefined, undefined, undefined, undefined, undefined],
+      categoryPicks: ["1", "3", "5"],
     },
     status: "pending",
     failureReason: null,

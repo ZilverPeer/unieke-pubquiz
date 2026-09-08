@@ -20,7 +20,7 @@ that only asks for a name and an email. See "Dutch storefront" below.
 | --- | --- |
 | `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, starts the cron ticker container (see "The webhook" below), then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env, the Mailpit container, and the cron ticker container. Data is preserved (see "Reset"). |
-| `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--mode mixed] [--pick 0=<categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <slot>=<id>` may repeat for slots 0-7; `--quantity <n>` sets the current line item's quantity. |
+| `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--pick <categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <id>` may repeat, order preserved, up to 8 times, distinct ids; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
 
 **Windows/PowerShell note:** `npm run shop:order -- --email a@b.com ...` (and
@@ -53,7 +53,7 @@ to 3000, so stop one before starting the other, or pass `--port` to
 ```sh
 npm run shop:up
 npm run shop:capture -- --out shop/fixtures/order-updated-processing.json &
-npm run shop:order -- --email you@example.com --locale nl --difficulty easy --mode single_category --pick 0=1
+npm run shop:order -- --email you@example.com --locale nl --difficulty easy --pick 1
 # WooCommerce webhooks are delivered async via Action Scheduler/WP-Cron; the
 # cron ticker container shop:up started ticks it automatically within a few
 # seconds -- no manual step needed (see "The webhook" below).
