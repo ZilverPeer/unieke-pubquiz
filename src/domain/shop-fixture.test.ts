@@ -219,4 +219,69 @@ describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
     expect(php).toContain("'consumerKey'");
     expect(php).toContain("'consumerSecret'");
   });
+
+  /**
+   * Tickets #68/#70: Winkel must be the visible front page for a logged-out
+   * visitor -- no WooCommerce coming-soon placeholder, no default blog
+   * front page. Pins the three option names/values setup-shop.php writes.
+   */
+  test("declares the front-page option names and values from #68/#70", () => {
+    expect(php).toContain("'woocommerce_coming_soon', 'no'");
+    expect(php).toContain("'show_on_front', 'page'");
+    expect(php).toContain("'page_on_front', (string) wc_get_page_id( 'shop' )");
+  });
+
+  /**
+   * Fix round on #70 (Standards review): writes `page_on_front` before
+   * `show_on_front`, so a run that dies between the two writes degrades to
+   * "still shows the blog" rather than a blank front page.
+   */
+  test("writes page_on_front before show_on_front", () => {
+    expect(php.indexOf("'page_on_front'")).toBeLessThan(php.indexOf("'show_on_front'"));
+  });
+
+  /**
+   * Fix round on #70 (Standards review): post id 1 is only ever trashed
+   * when it matches the default "Hello world!" post's identity (post_type
+   * plus slug or title), never on id alone.
+   */
+  test("only trashes post #1 when it matches the default Hello world! post's identity", () => {
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_POST_TYPE', 'post'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_SLUG', 'hello-world'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_TITLE', 'Hello world!'");
+    expect(php).toContain("PUBQUIZ_HELLO_WORLD_POST_TYPE !== $pubquiz_hello_world->post_type");
+  });
+});
+
+describe("shop/mu-plugins/pubquiz-storefront-chrome.php", () => {
+  /**
+   * Ticket #70: bare Storefront chrome -- no primary menu, breadcrumb,
+   * sidebar or footer widgets. PHP cannot import a TS constant, and these
+   * are WordPress/Storefront hook names, not values this repo owns
+   * elsewhere, but pinning them here still catches a hook name typo or an
+   * accidental removal of the whole block, the same drift-check role every
+   * other describe block in this file plays.
+   */
+  const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-storefront-chrome.php"), "utf8");
+
+  test("removes the primary and secondary navigation from storefront_header", () => {
+    expect(php).toContain("remove_action( 'storefront_header', 'storefront_secondary_navigation', 30 )");
+    expect(php).toContain("remove_action( 'storefront_header', 'storefront_primary_navigation_wrapper', 42 )");
+    expect(php).toContain("remove_action( 'storefront_header', 'storefront_primary_navigation', 50 )");
+    expect(php).toContain("remove_action( 'storefront_header', 'storefront_primary_navigation_wrapper_close', 68 )");
+  });
+
+  test("removes the breadcrumb, sidebar and footer widgets", () => {
+    expect(php).toContain("remove_action( 'storefront_before_content', 'woocommerce_breadcrumb', 10 )");
+    expect(php).toContain("remove_action( 'storefront_sidebar', 'storefront_get_sidebar', 10 )");
+    expect(php).toContain("remove_action( 'storefront_footer', 'storefront_footer_widgets', 10 )");
+    expect(php).toContain("remove_action( 'storefront_footer', 'storefront_handheld_footer_bar', 999 )");
+  });
+
+  test("adds an account icon link right after the cart, on storefront_header priority 61", () => {
+    expect(php).toMatch(/'storefront_header',\s*function \(\) \{[\s\S]*wc_get_page_permalink\( 'myaccount' \)/);
+    expect(php).toContain("Mijn account");
+    expect(php).toContain("<svg");
+    expect(php).toMatch(/\},\s*61\s*\);/);
+  });
 });

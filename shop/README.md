@@ -166,6 +166,16 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
   remaining English entry in the fallback navigation). `setup-shop.php`
   applies the classic Cart/Checkout shortcodes under the new
   (`winkelwagen`/`afrekenen`) slugs right after, in the same run.
+- **Front page: Winkel visible, no coming-soon placeholder (tickets #68/#70).**
+  A fresh WooCommerce install turns on "coming soon" mode
+  (`woocommerce_coming_soon` = `yes`) and leaves the site's front page as
+  WordPress's own default blog listing, whose only post is the default
+  "Hello world!" one -- a logged-out visitor at `/` saw neither the shop nor
+  its product. `setup-shop.php` sets `woocommerce_coming_soon` = `no`,
+  `show_on_front` = `page` with `page_on_front` = Winkel's page id
+  (`wc_get_page_id( 'shop' )`, so it keeps tracking the Winkel page through
+  the rename above), and trashes post id 1 ("Hello world!") if it exists and
+  isn't already trashed -- idempotently, like every other option write here.
 - **Guest checkout, minimal fields.** `shop/mu-plugins/pubquiz-checkout-fields.php`
   filters `woocommerce_billing_fields` down to first name, last name and
   email at checkout (`is_checkout()`, true for both the checkout page and
@@ -187,6 +197,53 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
   Pubquiz-configured line item (same `pubquiz_locale` line-item-meta match
   as `pubquiz-hold-processing.php`). An order without a Pubquiz product
   gets neither.
+
+## Chrome (ticket #70)
+
+The shop is a single-product, one-page storefront: there is nothing for a
+primary navigation menu, a breadcrumb trail or a blog sidebar to point at,
+and the footer widget area and the mobile "handheld" footer bar just repeat
+shortcuts the header already has. `shop/mu-plugins/pubquiz-storefront-chrome.php`
+removes each of these Storefront/WooCommerce actions (by exact callback and
+priority, read from the installed theme's own `inc/storefront-template-hooks.php`
+and `inc/woocommerce/storefront-woocommerce-template-hooks.php`) on `init`,
+so a fresh instance and a re-run of an existing one both converge to the
+same bare header:
+
+- `storefront_secondary_navigation`, `storefront_primary_navigation_wrapper`,
+  `storefront_primary_navigation` and `storefront_primary_navigation_wrapper_close`
+  from `storefront_header` -- no primary menu.
+- `woocommerce_breadcrumb` (there is no `storefront_breadcrumb` function in
+  this theme -- WooCommerce's own breadcrumb callback is what
+  `storefront_before_content` actually runs) -- no breadcrumb trail.
+- `storefront_get_sidebar` from `storefront_sidebar` -- no sidebar
+  (`id="secondary"`).
+- `storefront_footer_widgets` and `storefront_handheld_footer_bar` from
+  `storefront_footer` -- no footer widgets, no mobile footer bar.
+
+What's left in the header: the logo/site branding, the cart icon
+(`storefront_header_cart`, unchanged), and one thing this plugin adds --a
+person-outline SVG link to `wc_get_page_permalink( 'myaccount' )` with
+visually-hidden "Mijn account" text, hooked onto `storefront_header` at
+priority 61 (right after the cart's 60).
+
+**Full-width content.** `.content-area` (`#primary`)'s own CSS
+(`style.css`) only spans 100% width with a `storefront-full-width-content`
+class on `<body>`; without it, it stays at 73.9%, leaving a blank gap where
+the (now unrendered) sidebar used to sit. Storefront's own `body_class`
+filter (`class-storefront.php`) adds that class automatically, but only
+when `is_active_sidebar( 'sidebar-1' )` is false -- checked empirically
+against a running instance (`wp widget list sidebar-1`) and it is *not*
+false: WordPress's own default widgets (Search, Recent Posts, Recent
+Comments, Archives, Categories) land in `sidebar-1` automatically on first
+theme activation and stay there, unused, even though the sidebar itself
+never renders. `pubquiz-storefront-chrome.php` therefore adds
+`storefront-full-width-content` to `body_class` itself, unconditionally,
+rather than relying on Storefront's own check or emptying the sidebar
+(which would only hold as long as those default widgets never came back,
+e.g. after a theme switch). Verified against a running `shop:up`:
+`curl http://localhost:45330/` shows `storefront-full-width-content` on
+`<body>` and no `id="secondary"` anywhere in the page.
 
 ### Key verification (ticket #56): guest checkout, Dutch chrome, the notice
 
