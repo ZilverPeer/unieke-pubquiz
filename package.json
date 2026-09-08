@@ -21,6 +21,7 @@
     "shop:capture": "tsx scripts/shop/capture-webhook.ts",
     "loop:up": "tsx scripts/loop/up.ts",
     "loop:down": "tsx scripts/loop/down.ts",
+    "admin:operator": "tsx scripts/admin/create-operator.ts",
     "check": "tsx scripts/check.ts"
   },
   "dependencies": {

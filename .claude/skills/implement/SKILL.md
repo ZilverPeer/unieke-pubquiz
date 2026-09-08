@@ -19,7 +19,7 @@ Implement the ticket the orchestrator's brief names. The brief carries the ticke
 
 ## Finish
 
-Merge `origin/master` into the branch, push, open the PR with `gh pr create` and `Closes #<n>`, do not merge. Commit messages and the PR body end with the trailers the brief gives. Report in the playbook's report template, nothing more:
+Merge `origin/master` into the branch, push, open the PR with `gh pr create` and `Closes #<n>`, do not merge. The PR body carries the same report as below, including the red evidence (the failing assertion text per new test): the Standards reviewer reads the PR, not your chat report, and a PR without red evidence is a HARD finding. Commit messages and the PR body end with the trailers the brief gives. Report in the playbook's report template, nothing more:
 
 ```
 PR: #<n>  Commits: <hashes>
