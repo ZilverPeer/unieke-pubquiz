@@ -45,18 +45,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 const PUBQUIZ_CATEGORY_DROPDOWN_FIELD_ID = 'categories';
 
 /**
- * Falls back to the literal defaults if `pubquiz-checkout-meta.php` were
- * ever missing or reordered in a way that skipped its top-level code --
- * doesn't happen today (WordPress's mu-plugin loader requires every top
- * level `.php` file it finds unconditionally), but this keeps the picker's
- * cap from silently becoming "no limit" instead of erroring loudly.
+ * Read straight from `pubquiz-checkout-meta.php`'s constants -- no
+ * fallback literal: the mu-plugin loader requires every top-level `.php`
+ * file it finds unconditionally, and both constants are only ever read
+ * from inside a hook callback (never at this file's top level, see the
+ * file docblock above), so they are guaranteed to exist by the time
+ * either function below runs. A missing constant is a real configuration
+ * error and should fail loudly rather than silently duplicate the number
+ * or the message a second place in the codebase.
  */
 function pubquiz_category_dropdown_max_picks() {
-    return defined( 'PUBQUIZ_MAX_CATEGORY_PICKS' ) ? PUBQUIZ_MAX_CATEGORY_PICKS : 8;
+    return PUBQUIZ_MAX_CATEGORY_PICKS;
 }
 
 function pubquiz_category_dropdown_max_picks_message() {
-    return defined( 'PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE' ) ? PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE : 'Kies maximaal 8 categorieën.';
+    return PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE;
 }
 
 /** The vendored Tom Select version, read from shop/assets/tom-select/VERSION -- used as both scripts' cache-busting version string. */

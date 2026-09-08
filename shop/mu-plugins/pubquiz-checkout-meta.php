@@ -182,7 +182,7 @@ add_filter(
         }
 
         if ( count( $picks ) > PUBQUIZ_MAX_CATEGORY_PICKS ) {
-            wc_add_notice( esc_html__( PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE, 'pubquiz' ), 'error' );
+            wc_add_notice( esc_html( PUBQUIZ_MAX_CATEGORY_PICKS_MESSAGE ), 'error' );
             return false;
         }
 
