@@ -1,0 +1,27 @@
+{
+  "admin": {
+    "nav": {
+      "categories": "Categorieën",
+      "items": "Items",
+      "coverage": "Dekking",
+      "orders": "Bestellingen",
+      "welcome": "Welkom in het beheergedeelte.",
+      "signOut": "Uitloggen"
+    },
+    "login": {
+      "title": "Inloggen",
+      "email": "E-mailadres",
+      "password": "Wachtwoord",
+      "submit": "Inloggen",
+      "error": "Ongeldig e-mailadres of wachtwoord."
+    },
+    "locale": {
+      "dutch": "Nederlands",
+      "english": "Engels"
+    },
+    "refused": {
+      "title": "Geen toegang",
+      "message": "Dit account heeft geen toegang tot het beheergedeelte."
+    }
+  }
+}

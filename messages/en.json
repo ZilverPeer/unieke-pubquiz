@@ -1,0 +1,27 @@
+{
+  "admin": {
+    "nav": {
+      "categories": "Categories",
+      "items": "Items",
+      "coverage": "Coverage",
+      "orders": "Orders",
+      "welcome": "Welcome to the admin area.",
+      "signOut": "Sign out"
+    },
+    "login": {
+      "title": "Log in",
+      "email": "Email address",
+      "password": "Password",
+      "submit": "Log in",
+      "error": "Invalid email address or password."
+    },
+    "locale": {
+      "dutch": "Dutch",
+      "english": "English"
+    },
+    "refused": {
+      "title": "No access",
+      "message": "This account does not have access to the admin area."
+    }
+  }
+}
