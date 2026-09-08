@@ -35,7 +35,7 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - PR 105 reviewers: standards a655e5efa29f259a7, spec a867a942693ce1e2c
 - PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
 - PR 108 reviewers: standards a72b201e32446197c, spec a75139b2aec7d6635
-- PR 109 reviewers: dispatched 18:55 (ids in the next logbook commit)
+- PR 109 reviewers: standards aa95fd34333ab92f1, spec a169ecfb1ee97ca76
 
 ## Spec 5 tickets (18:44)
 
@@ -80,6 +80,7 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 ### #93 (PR 108)
 
 - 18:45 PR opened (de31090) after 24 min. Integration 6/6 alone; red evidence again by stubbing after the fact (reviewers judge). `retry-quiz.ts` core was already injectable, no extraction. Adds `assertOperator()` to `src/admin/auth/session.ts`, which #87 also edits: conflict check at merge. Reviewers dispatched 18:50.
+- 19:00 Standards: HARD, `assertOperator()` conflicts with #87's version in `session.ts` (decision: #87's wins, PR 108 reconciles after PR 109 merges); HARD, red evidence by stubbing after the fact (fix round 1: real red by moving the modules out). JUDGEMENTs accepted: own `boss-client.ts` mirror, direct `WOOCOMMERCE_URL` read. Note: the reviewer misread branch commit 62027e2 as merged; PR 109 is still open.
 
 ### #87 (PR 109)
 
