@@ -4,7 +4,7 @@
  * this module talks only to WooCommerce and to this small OrderLookup seam,
  * so the module never sees Items or Compositions (README.md).
  */
-import type { QuizStatus } from "@/domain";
+import { orderWideQuizSequence, type QuizStatus } from "@/domain";
 import type { OrderRepository } from "@/repository";
 
 /** What deliverQuiz/noteFailure need to know about a Quiz's WooCommerce order. */
@@ -12,10 +12,17 @@ export interface QuizOrderContext {
   wooOrderId: number;
   wooLineItemId: number;
   /**
-   * This Quiz's 0-based position among the Quizzes sharing its line item
-   * (`quizzes.sequence`, src/repository/orders.ts) -- a line item's quantity
-   * can be above one, so this is what keeps each Quiz's downloadMetaKey
-   * distinct instead of siblings clobbering each other's links.
+   * This Quiz's 0-based position among every Quiz in its *order* (every
+   * line item, not just the ones sharing this Quiz's line item) --
+   * `orderWideQuizSequence` (src/domain/orders.ts), not `quizzes.sequence`
+   * (which restarts at 0 per line item, for Quizzes sharing one
+   * quantity-above-one line item -- using it directly here gave two
+   * Quizzes on two different line items of the same order the identical
+   * downloadMetaKey/zip file name, ticket #73 PR review round 2). This is
+   * the number `createDeliverer` bakes into the `pubquiz_download_<n>`
+   * meta key at delivery time -- the one write, read back everywhere else
+   * (the download route, the shop's PHP plugin) instead of being
+   * recomputed from a second source.
    */
   sequence: number;
   /** Status of every Quiz belonging to the order, this one included. */
@@ -45,7 +52,10 @@ export function createOrderLookup(repository: OrderRepository): OrderLookup {
       return {
         wooOrderId: order.wooOrderId,
         wooLineItemId: quiz.wooLineItemId,
-        sequence: quiz.sequence,
+        sequence: orderWideQuizSequence(
+          quizId,
+          siblings.map((sibling) => sibling.id),
+        ),
         siblingStatuses: siblings.map((sibling) => sibling.status),
       };
     },

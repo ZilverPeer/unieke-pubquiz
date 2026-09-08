@@ -2,17 +2,22 @@
 /**
  * Plugin Name: Pubquiz Downloads
  * Description: Renders the deliver module's line item meta_data
- *              (pubquiz_download_<sequence>, one per Quiz -- see
- *              downloadMetaKey() in src/domain/checkout.ts) as one labelled
- *              download link per Quiz, since WooCommerce has no supported
- *              REST way to attach per-order downloadable files to a line
- *              item (see src/deliver/README.md "How downloads are
- *              attached"). A line item's quantity can be above one, so
- *              several Quizzes can share one line item -- the key's
- *              1-based sequence keeps each Quiz's link distinct. Renders in
- *              the customer order view, the completed-order email (both use
- *              the same order-details-item template, hence one hook), and
- *              My Account -> Downloads. Hides the raw meta_data key/value
+ *              (pubquiz_download_<n>, one per Quiz -- see downloadMetaKey()
+ *              in src/domain/checkout.ts) as one labelled download link per
+ *              Quiz, since WooCommerce has no supported REST way to attach
+ *              per-order downloadable files to a line item (see
+ *              src/deliver/README.md "How downloads are attached"). `<n>`
+ *              is the Quiz's 1-based position across the *whole order*
+ *              (orderWideQuizSequence(), src/domain/orders.ts -- not a
+ *              per-line-item counter), baked into the key by the deliverer
+ *              at delivery time; this plugin only ever reads it back, never
+ *              recomputes it (see pubquiz_download_urls_for_item()'s doc
+ *              comment). A line item's quantity can be above one, so
+ *              several Quizzes can share one line item -- `<n>` keeps each
+ *              Quiz's link distinct there too. Renders in the customer
+ *              order view, the completed-order email (both use the same
+ *              order-details-item template, hence one hook), and My
+ *              Account -> Downloads. Hides the raw meta_data key/value
  *              pairs from the customer-facing item meta table.
  *
  * This is a must-use plugin: it ships with the wp-env setup and, unmodified,
@@ -41,13 +46,26 @@ function pubquiz_zip_filename( $order_id, $sequence, $locale ) {
 }
 
 /**
- * An order item's pubquiz_download_* meta_data, keyed by the 1-based Quiz
- * sequence baked into the key (downloadMetaKey(), src/domain/checkout.ts)
- * -- a line item's quantity can be above one, so more than one Quiz's zip
- * can live on the same item.
+ * An order item's pubquiz_download_* meta_data, keyed by the 1-based number
+ * baked into the key (downloadMetaKey(orderWideQuizSequence(...)),
+ * src/domain/checkout.ts + src/domain/orders.ts) -- the Quiz's position
+ * across the *whole order*, not just this line item. Read straight off the
+ * key and never recomputed here: this plugin used to also derive its own
+ * per-order numbering by walking `$order->get_items()`
+ * (`pubquiz_order_zip_numbers()`, removed), a second, independent source of
+ * truth that could disagree with the TypeScript side's Supabase-based
+ * numbering whenever the two saw a different Quiz/item set for the same
+ * order (reproduced: the mail named a Quiz's zip "...-1-nl.zip", the
+ * download route served "...-2-nl.zip" for that same Quiz, ticket #73 PR
+ * review round 2). The deliverer (`src/deliver/order-lookup.ts`) is now the
+ * only place that computes this number -- via the shared
+ * `orderWideQuizSequence` (src/domain/orders.ts) -- and bakes it into this
+ * key at delivery time; every reader, including this one, just parses it
+ * back out. A line item's quantity can be above one, so more than one
+ * Quiz's zip can live on the same item.
  *
  * @param WC_Order_Item $item
- * @return array<int,string> 1-based sequence => absolute zip download URL, ordered by sequence.
+ * @return array<int,string> 1-based order-wide number => absolute zip download URL, ordered by that number.
  */
 function pubquiz_download_urls_for_item( $item ) {
     $urls = array();
@@ -58,47 +76,6 @@ function pubquiz_download_urls_for_item( $item ) {
     }
     ksort( $urls );
     return $urls;
-}
-
-/**
- * Every Quiz-zip in an order, numbered 1-based across the *whole* order --
- * not `pubquiz_download_urls_for_item`'s per-item sequence, which restarts
- * at 1 on every line item. Two different line items (two `--quiz` groups at
- * checkout, the normal multi-Quiz case) each have their own Quiz at
- * sequence 0, so using the per-item sequence directly here would give two
- * different Quizzes in one order the identical zip file name -- reproduced
- * empirically against the running local loop (ticket #73, PR review): two
- * Quizzes both named "pubquiz-<order>-1-nl.zip". This walks
- * `$order->get_items()` in its own (stable, creation-order) sequence and
- * assigns one running counter across every item's URLs, matching the order
- * `listQuizzesByOrderId` uses on the TypeScript side
- * (src/app/download/resolve-download.ts's DownloadQuizLookup). This relies
- * on WooCommerce's `$order->get_items()` returning items ordered by item id
- * ascending (its default, undocumented but stable ordering) -- item ids are
- * assigned in creation order, i.e. checkout order, matching the ascending
- * `woo_line_item_id` the TypeScript side sorts by.
- *
- * @param WC_Order $order
- * @return array<int,array<int,int>> item id => [per-item sequence => order-wide 1-based number].
- */
-function pubquiz_order_zip_numbers( $order ) {
-    static $cache = array();
-    $order_id = $order->get_id();
-    if ( isset( $cache[ $order_id ] ) ) {
-        return $cache[ $order_id ];
-    }
-
-    $numbers = array();
-    $counter = 0;
-    foreach ( $order->get_items() as $item ) {
-        foreach ( pubquiz_download_urls_for_item( $item ) as $sequence => $url ) {
-            $counter++;
-            $numbers[ $item->get_id() ][ $sequence ] = $counter;
-        }
-    }
-
-    $cache[ $order_id ] = $numbers;
-    return $numbers;
 }
 
 /**
@@ -182,11 +159,10 @@ function pubquiz_render_download_links( $item_id, $item, $order ) {
 
     $locale     = (string) $item->get_meta( 'pubquiz_locale', true );
     $categories = pubquiz_categories_summary_for_item( $item );
-    $numbers    = pubquiz_order_zip_numbers( $order );
 
     echo '<ul class="pubquiz-downloads">';
     foreach ( $urls as $sequence => $url ) {
-        $filename = pubquiz_zip_filename( $order->get_id(), $numbers[ $item->get_id() ][ $sequence ], $locale );
+        $filename = pubquiz_zip_filename( $order->get_id(), $sequence, $locale );
         echo '<li>';
         printf( '<a href="%1$s">%2$s</a>', esc_url( $url ), esc_html( $filename ) );
         if ( ! empty( $categories ) ) {
@@ -223,8 +199,6 @@ add_filter(
                 continue;
             }
 
-            $numbers = pubquiz_order_zip_numbers( $order );
-
             foreach ( $order->get_items() as $item ) {
                 $urls = pubquiz_download_urls_for_item( $item );
                 if ( empty( $urls ) ) {
@@ -233,7 +207,7 @@ add_filter(
 
                 $locale = (string) $item->get_meta( 'pubquiz_locale', true );
                 foreach ( $urls as $sequence => $url ) {
-                    $filename    = pubquiz_zip_filename( $order->get_id(), $numbers[ $item->get_id() ][ $sequence ], $locale );
+                    $filename    = pubquiz_zip_filename( $order->get_id(), $sequence, $locale );
                     $downloads[] = array(
                         'download_url'        => $url,
                         'download_id'         => md5( $order_id . '-' . $item->get_id() . '-' . $sequence ),

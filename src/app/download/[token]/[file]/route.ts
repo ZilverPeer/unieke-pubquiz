@@ -5,6 +5,7 @@
  * resolveDownload (src/app/download/resolve-download.ts), driven directly
  * by its own unit tests; this file only adapts Request/Response.
  */
+import { orderWideQuizSequence } from "@/domain";
 import { createDeliverableDownloader, createOrderRepository, resolveLocalStackConfig } from "@/repository";
 import { resolveDownload } from "../../resolve-download";
 
@@ -31,16 +32,22 @@ export async function GET(
       // order, not just among Quizzes sharing this Quiz's line item (see
       // DownloadQuizLookup's doc comment in resolve-download.ts) -- so this
       // finds the Quiz's 0-based position among every Quiz belonging to the
-      // order, in listQuizzesByOrderId's stable (woo_line_item_id, sequence)
-      // order (the same order pubquiz_order_zip_numbers in the shop plugin
-      // numbers Quizzes in).
+      // order, via the one shared function (orderWideQuizSequence,
+      // src/domain/orders.ts) the deliverer also uses when it bakes this
+      // same number into the pubquiz_download_<n> meta key at delivery time
+      // (src/deliver/order-lookup.ts) -- both read listQuizzesByOrderId's
+      // stable (woo_line_item_id, sequence) order, so the two can't compute
+      // a different number for the same Quiz (ticket #73 PR review round 2).
       const siblings = await orderRepository.listQuizzesByOrderId(quiz.orderId);
-      const sequenceInOrder = siblings.findIndex((sibling) => sibling.id === quiz.id);
+      const sequenceInOrder = orderWideQuizSequence(
+        quiz.id,
+        siblings.map((sibling) => sibling.id),
+      );
       return {
         id: quiz.id,
         prunedAt: quiz.prunedAt,
         wooOrderId: order.wooOrderId,
-        sequenceInOrder: sequenceInOrder === -1 ? 0 : sequenceInOrder,
+        sequenceInOrder,
         locale: quiz.config.locale,
       };
     },

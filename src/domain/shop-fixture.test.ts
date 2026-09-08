@@ -69,6 +69,23 @@ describe("shop/mu-plugins/pubquiz-downloads.php", () => {
     const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
     expect(php).toContain("sprintf( 'pubquiz-%d-%d-%s.zip', $order_id, $sequence, $locale )");
   });
+
+  test("never recomputes the Quiz's order-wide number from live order items -- it's baked into the meta key by the deliverer and only ever parsed back out (ticket #73 PR review round 2)", () => {
+    const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
+    // A second, independent numbering computed here (walking
+    // $order->get_items()) is exactly what caused the mail and the
+    // download route to disagree on a Quiz's zip name -- see
+    // src/domain/orders.ts's orderWideQuizSequence doc comment.
+    expect(php).not.toMatch(/function\s+pubquiz_order_zip_numbers/);
+    // pubquiz_zip_filename's $sequence argument, both places it's built,
+    // must come straight from pubquiz_download_urls_for_item's ksort'd
+    // keys (the meta key's own captured number), not a numbers[...] lookup.
+    const zipFilenameCalls = php.match(/pubquiz_zip_filename\(\s*\$order->get_id\(\),\s*(\S+),\s*\$locale/g) ?? [];
+    expect(zipFilenameCalls.length).toBeGreaterThan(0);
+    for (const call of zipFilenameCalls) {
+      expect(call).toContain("$sequence");
+    }
+  });
 });
 
 describe("shop/mu-plugins/pubquiz-hold-processing.php", () => {

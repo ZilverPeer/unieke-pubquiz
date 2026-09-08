@@ -56,7 +56,11 @@ function fakeRepository(overrides: Partial<OrderRepository>): OrderRepository {
 }
 
 describe("createOrderLookup", () => {
-  test("resolves a Quiz's WooCommerce order id, line item id, and sibling statuses", async () => {
+  test("resolves a Quiz's WooCommerce order id, line item id, and its order-wide sibling position", async () => {
+    // quiz.sequence (1) is deliberately NOT what "sequence" on the context
+    // should equal -- it's a per-line-item value; the context's "sequence"
+    // is the Quiz's 0-based position in listQuizzesByOrderId's own order
+    // (orderWideQuizSequence), here 0 since "quiz-1" comes first.
     const quiz = fakeQuiz({ id: "quiz-1", orderId: "order-1", wooLineItemId: 42, sequence: 1, status: "delivered" });
     const sibling = fakeQuiz({ id: "quiz-2", orderId: "order-1", wooLineItemId: 43, status: "pending" });
     const order = fakeOrder({ id: "order-1", wooOrderId: 123 });
@@ -73,10 +77,31 @@ describe("createOrderLookup", () => {
     expect(context).toEqual({
       wooOrderId: 123,
       wooLineItemId: 42,
-      sequence: 1,
+      sequence: 0,
       siblingStatuses: ["delivered", "pending"],
     });
     expect(repository.listQuizzesByOrderId).toHaveBeenCalledWith("order-1");
+  });
+
+  test("gives the second Quiz in listQuizzesByOrderId's order the next order-wide sequence, even though its own quizzes.sequence is also 0", async () => {
+    // Reproduces the bug directly at this seam: two Quizzes on two
+    // different line items both have quizzes.sequence 0 (the field
+    // restarts per line item); the context's "sequence" must still be
+    // distinct.
+    const first = fakeQuiz({ id: "quiz-1", orderId: "order-1", wooLineItemId: 1, sequence: 0, status: "delivered" });
+    const second = fakeQuiz({ id: "quiz-2", orderId: "order-1", wooLineItemId: 2, sequence: 0, status: "delivered" });
+    const order = fakeOrder({ id: "order-1", wooOrderId: 123 });
+
+    const repository = fakeRepository({
+      getQuizById: vi.fn().mockResolvedValue(second),
+      getOrderById: vi.fn().mockResolvedValue(order),
+      listQuizzesByOrderId: vi.fn().mockResolvedValue([first, second]),
+    });
+
+    const lookup = createOrderLookup(repository);
+    const context = await lookup.forQuiz("quiz-2");
+
+    expect(context.sequence).toBe(1);
   });
 
   test("throws when the Quiz does not exist", async () => {

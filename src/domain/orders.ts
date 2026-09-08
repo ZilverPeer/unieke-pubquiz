@@ -110,3 +110,37 @@ export const DELIVERABLE_CONTENT_TYPES: Record<DeliverableFile, string> = {
 export function quizZipFilename(orderNumber: number, sequence: number, locale: Locale): string {
   return `pubquiz-${orderNumber}-${sequence + 1}-${locale}.zip`;
 }
+
+/**
+ * A Quiz's 0-based position among every Quiz belonging to its order --
+ * *not* `QuizRecord.sequence` (which restarts at 0 on every line item, for
+ * Quizzes sharing one quantity-above-one line item). This is the number
+ * `quizZipFilename`'s `sequence` argument and `downloadMetaKey`'s key both
+ * need, and the single place that computes it (ticket #73, PR review round
+ * 2): two different call sites computing it independently -- the deliverer
+ * from a Supabase read, the download route from another -- let a stale row
+ * on one side disagree with a fresh one on the other (reproduced: the mail
+ * said "...-1-nl.zip", the download served "...-2-nl.zip" for the same
+ * Quiz). The deliverer is now the only writer -- it bakes this number into
+ * the `pubquiz_download_<n>` meta key at delivery time
+ * (`downloadMetaKey(orderWideQuizSequence(...))`, `src/deliver/index.ts`
+ * via `order-lookup.ts`), and every other reader (the download route, the
+ * shop's PHP plugin) reads `<n>` back out of that key instead of
+ * recomputing it from a second source.
+ *
+ * `orderedQuizIds` must be every Quiz id belonging to the order, in a
+ * stable order shared by every caller -- `OrderRepository.listQuizzesByOrderId`'s
+ * `(woo_line_item_id, sequence)` ordering, which matches WooCommerce's own
+ * `$order->get_items()` (ascending item id, i.e. checkout/creation order).
+ *
+ * @throws RangeError if `quizId` isn't in `orderedQuizIds` -- a caller bug
+ * (the Quiz must be one of its own order's Quizzes), not a runtime state to
+ * recover from.
+ */
+export function orderWideQuizSequence(quizId: string, orderedQuizIds: readonly string[]): number {
+  const index = orderedQuizIds.indexOf(quizId);
+  if (index === -1) {
+    throw new RangeError(`orderWideQuizSequence: Quiz ${quizId} not found among its order's ${orderedQuizIds.length} Quiz id(s)`);
+  }
+  return index;
+}

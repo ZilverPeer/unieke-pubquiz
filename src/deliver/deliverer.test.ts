@@ -395,6 +395,49 @@ describe("createDeliverer", () => {
     expect(completions).toHaveLength(1); // completes only after both Quizzes of the shared line item are delivered
   });
 
+  test("two Quizzes on two different line items (both quizzes.sequence 0) get order-wide, not per-line-item, download keys", async () => {
+    // Reproduces the collision found empirically against the running local
+    // loop (ticket #73, PR review round 2): two Quizzes, one per line item,
+    // both with quizzes.sequence 0 (the field restarts per line item) --
+    // the meta key (and, downstream, the zip file name) must still be
+    // distinct: pubquiz_download_1 and pubquiz_download_2, in
+    // listQuizzesByOrderId order, not both pubquiz_download_1.
+    stub.seedOrder({
+      id: 999,
+      status: "processing",
+      line_items: [
+        { id: 1, meta_data: [] },
+        { id: 2, meta_data: [] },
+      ],
+    });
+    const order = fakeOrderRecord({ wooOrderId: 999 });
+    const quizzes = new Map<string, QuizRecord>([
+      ["quiz-a", fakeQuiz({ id: "quiz-a", wooLineItemId: 1, sequence: 0, status: "delivered" })],
+      ["quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 2, sequence: 0, status: "delivered" })],
+    ]);
+    const lookup = fakeOrderLookup(quizzes, order);
+    const deliverer = createDeliverer(config, lookup);
+
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
+    await deliverer.deliverQuiz({ quizId: "quiz-b", url: "http://localhost:3000/download/b/quiz.zip" });
+
+    const finalOrder = await new Promise<WooOrder>((resolve) => {
+      const req = httpRequest(
+        { hostname: "127.0.0.1", port: new URL(config.baseUrl).port, path: "/wp-json/wc/v3/orders/999", method: "GET" },
+        (res: IncomingMessage) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () => resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))));
+        },
+      );
+      req.end();
+    });
+    const lineItem1Keys = finalOrder.line_items.find((item) => item.id === 1)!.meta_data.map((m) => m.key);
+    const lineItem2Keys = finalOrder.line_items.find((item) => item.id === 2)!.meta_data.map((m) => m.key);
+    expect(lineItem1Keys).toEqual([downloadMetaKey(0)]); // "pubquiz_download_1"
+    expect(lineItem2Keys).toEqual([downloadMetaKey(1)]); // "pubquiz_download_2"
+  });
+
   test("noteFailure posts a private order note with the OPERATOR_NOTE_PREFIX and line item id", async () => {
     stub.seedOrder({ id: 999, status: "processing", line_items: [{ id: 1, meta_data: [] }] });
     const order = fakeOrderRecord({ wooOrderId: 999 });
