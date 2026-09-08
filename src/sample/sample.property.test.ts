@@ -150,7 +150,7 @@ interface Scenario {
 }
 
 /**
- * A single pick fills all 8 slots (the old `single_category` mode); with
+ * A single pick fills all 8 slots (the cycle rule's k=1 case); with
  * only 1-4 pool Categories, a multi-pick request almost always yields a
  * `categoryId: null` shortfall (already covered by sample.test.ts), so a
  * single pick is weighted much higher to keep runs where property 1-3
@@ -223,10 +223,10 @@ describe("sampleComposition properties", () => {
           expect(new Set(slot).size).toBe(slot.length);
         }
 
-        // No duplicate Item across the whole Composition, in either mode:
-        // `mixed` mode gives every slot a distinct Category (enforced by
-        // resolveSlotCategories) so two slots can never share an Item;
-        // `single_category` mode assigns the SAME Category to all 8 slots
+        // No duplicate Item across the whole Composition, regardless of pick
+        // count: several distinct picks give every slot a distinct Category
+        // (enforced by resolveSlotCategories) so two slots can never share
+        // an Item; a single pick assigns the SAME Category to all 8 slots
         // (6 of them "text"), so sampleComposition itself must track Items
         // already placed by earlier slots of the same Composition and
         // exclude them from later slots' pools.

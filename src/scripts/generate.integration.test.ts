@@ -58,11 +58,11 @@ const noopWriteDeliverables: WriteDeliverables = async () => {};
 
 // Category id 1 is "Sport" (nl) / "Sports" (en) -- see supabase/seed.sql
 // section 1. Every Category gets 7 hard Text Items per Subsubcategory (70
-// total, 10 Items of slack over the 60 a single_category Quiz's 6 Text
+// total, 10 Items of slack over the 60 a single-pick Quiz's 6 Text
 // Rounds need -- see supabase/README.md "Pool coverage"). A first
-// single_category run at --difficulty hard against this Category consumes
+// single-pick run at --difficulty hard against this Category consumes
 // 60 of those 70 (one per Subsubcategory per Round, 6 Rounds), leaving
-// exactly 10 (one per Subsubcategory). A second single_category run against
+// exactly 10 (one per Subsubcategory). A second single-pick run against
 // the same Category and Difficulty then succeeds at slot 0 -- drawing those
 // last 10 -- and genuinely shortfalls at slot 1 (the next Text Round), which
 // finds zero hard Text Items left in any of the Category's Subsubcategories.
@@ -231,7 +231,7 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
 });
 
 describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)", () => {
-  it("a second single_category --difficulty hard run for the same email and Category pick fails slot 1 with shortfall 10, persists nothing, and writes no output folder", async () => {
+  it("a second single-pick --difficulty hard run for the same email and Category pick fails slot 1 with shortfall 10, persists nothing, and writes no output folder", async () => {
     const email = freshEmail("unsatisfiable");
     const outDir = join(await makeTmpDir(), "run-2");
 

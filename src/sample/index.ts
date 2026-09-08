@@ -90,10 +90,11 @@ export function sampleComposition(input: SampleInput): SampleResult {
   const { slotCategories } = resolved;
   const slots: string[][] = [];
   // Items placed in earlier slots must not be reused by later slots of the
-  // same Composition (in single_category mode several slots share a
-  // Category). Seed the union with the caller's own exclusions, then grow it
-  // as each slot is filled; a later slot that cannot be filled without
-  // repeating an already-placed Item is a genuine shortfall for that slot.
+  // same Composition (with fewer than 8 picks, several slots share a
+  // Category -- the cycle rule, see resolveSlotCategories above). Seed the
+  // union with the caller's own exclusions, then grow it as each slot is
+  // filled; a later slot that cannot be filled without repeating an
+  // already-placed Item is a genuine shortfall for that slot.
   const placedItemIds = new Set<string>(excludedItemIds);
 
   for (let slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++) {

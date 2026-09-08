@@ -215,12 +215,12 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
   });
 
   it(
-    "a Quiz whose configuration cannot be satisfied ends failed after one attempt, with slot/Category/shortfall in the reason, nothing in the bucket",
+    "a single-pick Quiz whose Category runs short ends failed after one attempt, with slot/Category/shortfall in the reason, nothing in the bucket",
     async () => {
       // Same fixture as generate.integration.test.ts's "unsatisfiable
       // requests" suite: Category id 1 ("Sport"/"Sports") gets 70 hard Text
       // Items (7 per Subsubcategory x 10), 60 of which a first
-      // single_category/hard run consumes, leaving exactly 10 -- enough for
+      // single-pick/hard run consumes, leaving exactly 10 -- enough for
       // a second run's slot 0 but not its slot 1.
       const HARD_TEXT_CATEGORY_ID = "1";
       const HARD_TEXT_CATEGORY_NAME: Record<Locale, string> = { nl: "Sport", en: "Sports" };

@@ -125,10 +125,11 @@ describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.locale}'`);
     expect(php).toContain("'difficulty'");
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.requestedDifficulty}'`);
-    // 'mode' -> pubquiz_mode is no longer pinned here: ticket #71 removed
-    // CHECKOUT_META_KEYS.quizMode from the domain, but this PHP bridge (and
-    // setup-field-group.php's 'mode' field) is left untouched -- that's
-    // ticket #72's product page field group. See PR body.
+    // The 'mode' field id -> its meta key is no longer pinned here: ticket
+    // #71 removed the mode concept (and its CHECKOUT_META_KEYS constant)
+    // from the domain, but this PHP bridge (and setup-field-group.php's
+    // 'mode' field) is left untouched -- that's ticket #72's product page
+    // field group. See PR body.
   });
 
   test("maps category_N field ids to the pubquiz_category_ stem", () => {
