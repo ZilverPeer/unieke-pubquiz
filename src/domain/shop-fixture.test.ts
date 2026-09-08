@@ -31,6 +31,16 @@ describe("shop/fixtures/order-updated-processing.json", () => {
     CHECKOUT_META_KEYS.requestedDifficulty,
     ...Array.from({ length: SLOT_COUNT }, (_, slot) => CHECKOUT_META_KEYS.categoryPick(slot)),
     "_wapf_meta",
+    // The plugin's own visible, Dutch-labelled {label} => {value} entries
+    // (setup-field-group.php's field labels) -- WooCommerce's REST webhook
+    // payload (ticket #72's recapture: api version v3) does not filter
+    // these out the way the customer-facing order view and completed-order
+    // email do (pubquiz-checkout-meta.php's two hiding filters only apply
+    // to those, per shop/README.md "Readable Dutch options"), so they are
+    // present in the captured fixture alongside the pubquiz_* keys.
+    "Taal",
+    "Moeilijkheid",
+    "Categorieën",
   ]);
 
   test("every line item meta_data key is one CHECKOUT_META_KEYS produces, or the plugin's own bookkeeping key", () => {
@@ -103,24 +113,39 @@ describe("shop/mu-plugins/pubquiz-customer-notice.php", () => {
 
 describe("shop/mu-plugins/wp-cli-scripts/setup-field-group.php", () => {
   /**
-   * Ticket #57: field labels are now Dutch (Taal/Moeilijkheid/Soort quiz/
-   * Categorie N), not the literal CHECKOUT_META_KEYS strings -- the wire
-   * format moved to pubquiz-checkout-meta.php's `_wapf_meta` bridge (pinned
-   * below). This file still fixes the field *ids* the bridge plugin reads
-   * (locale/difficulty/mode/category_N) and no longer hardcodes a Category
-   * id list -- Categories come from $pubquiz_categories, set by
-   * setup-shop.php from the Supabase stack (scripts/shop/lib/categories.ts).
+   * Ticket #72: three always-visible fields -- locale/difficulty stay
+   * selects, the eight category_N selects and the mode select are gone,
+   * replaced by one `categories` checkboxes field (one choice per `nl`
+   * Category name, none preselected). Field labels are Dutch, readable
+   * text -- the wire format lives in pubquiz-checkout-meta.php's
+   * `_wapf_meta` bridge (pinned below). This file still fixes the field
+   * *ids* the bridge plugin reads (locale/difficulty/categories) and no
+   * longer hardcodes a Category id list -- Categories come from
+   * $pubquiz_categories, set by setup-shop.php from the Supabase stack
+   * (scripts/shop/lib/categories.ts).
    */
   const php = readFileSync(
     join(REPO_ROOT, "shop", "mu-plugins", "wp-cli-scripts", "setup-field-group.php"),
     "utf8",
   );
 
-  test("declares field ids matching CHECKOUT_META_KEYS's key stems", () => {
+  test("declares field ids matching CHECKOUT_META_KEYS's key stems, plus the categories checkboxes field", () => {
     expect(php).toContain("'locale'");
     expect(php).toContain("'difficulty'");
-    expect(php).toContain("'mode'");
-    expect(php).toContain("'category_' . ( $slot + 1 )");
+    expect(php).toContain("'categories'");
+    expect(php).toContain("'checkboxes'");
+  });
+
+  test("the mode field and the eight category_N selects are gone", () => {
+    expect(php).not.toContain("'mode'");
+    expect(php).not.toContain("'category_' . ( $slot + 1 )");
+    expect(php).not.toContain("Soort quiz");
+  });
+
+  test("the categories field carries the exact description text and is not required", () => {
+    expect(php).toContain(
+      "Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.",
+    );
   });
 
   test("no longer hardcodes a Category id list", () => {
@@ -147,17 +172,22 @@ describe("shop/mu-plugins/pubquiz-checkout-meta.php", () => {
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.locale}'`);
     expect(php).toContain("'difficulty'");
     expect(php).toContain(`=> '${CHECKOUT_META_KEYS.requestedDifficulty}'`);
-    // The 'mode' field id -> its meta key is no longer pinned here: ticket
-    // #71 removed the mode concept (and its CHECKOUT_META_KEYS constant)
-    // from the domain, but this PHP bridge (and setup-field-group.php's
-    // 'mode' field) is left untouched -- that's ticket #72's product page
-    // field group. See PR body.
   });
 
-  test("maps category_N field ids to the pubquiz_category_ stem", () => {
+  test("the mode field id is no longer written (ticket #72: the mode field is gone)", () => {
+    expect(php).not.toContain("'mode'");
+    expect(php).not.toContain("pubquiz_mode");
+  });
+
+  test("writes pubquiz_category_1..N from the categories checkboxes field's picks, in pick order", () => {
     const stem = CHECKOUT_META_KEYS.categoryPick(0).replace("_1", "_");
     expect(php).toContain(`'${stem}'`);
-    expect(php).toContain("category_(\\d+)");
+    expect(php).toContain("'categories'");
+  });
+
+  test("caps picks at 8 with the Dutch notice on add-to-cart", () => {
+    expect(php).toContain("woocommerce_add_to_cart_validation");
+    expect(php).toContain("Kies maximaal 8 categorieën.");
   });
 });
 

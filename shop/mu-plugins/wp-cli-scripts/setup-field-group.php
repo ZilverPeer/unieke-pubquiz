@@ -12,24 +12,41 @@
  * WordPress's must-use loader (which only scans the top level of
  * wp-content/mu-plugins/*.php) never auto-loads it.
  *
- * Ticket #57 ("readable Dutch product options"): field ids stay
- * `locale`/`difficulty`/`mode`/`category_1`..`category_8` (matching
- * CHECKOUT_META_KEYS's key stems) and choice slugs stay the domain values
- * (Locale/RequestedDifficulty/QuizMode literals, Category ids as strings)
- * -- both read back by shop/mu-plugins/pubquiz-checkout-meta.php's
+ * Ticket #72 ("three-field product page"): exactly three fields, all
+ * visible -- `locale` and `difficulty` stay selects; the eight
+ * `category_1`..`category_8` selects and the `mode` select are gone,
+ * replaced by one `categories` field of type `checkboxes` (the free
+ * tier's only multi-pick field type; there is no maximum-selection
+ * setting for it -- the only `maximum` option the plugin honours is the
+ * number field's `max` HTML attribute, verified against
+ * includes/classes/class-html.php -- so the cap of 8 is enforced by
+ * pubquiz-checkout-meta.php's own `woocommerce_add_to_cart_validation`
+ * hook instead). Field ids stay `locale`/`difficulty`/`categories`
+ * (matching CHECKOUT_META_KEYS's key stems) and choice slugs stay the
+ * domain values (Locale/RequestedDifficulty literals, Category ids as
+ * strings) -- read back by shop/mu-plugins/pubquiz-checkout-meta.php's
  * `_wapf_meta` bridge, which is what the webhook parser actually sees.
- * Field **labels** and choice **labels** are now Dutch, readable text
- * (Taal/Moeilijkheid/Soort quiz/Categorie N; Nederlands/Engels;
- * Makkelijk/Gemiddeld/Moeilijk/Gemengd; Gemengd/Eén categorie; each
- * Category's `nl` name) -- this plugin's free tier writes each order line
- * item meta_data entry as `$field->label => $field->value` (a *second*,
- * customer-readable copy of the pick, ignored by the webhook parser) and,
- * separately, an internal `_wapf_meta` array carrying `id`/`label`/`value`/
- * `raw` per field (`raw` is the choice's *slug*, never its label) --
- * pubquiz-checkout-meta.php reads `raw` out of that array to write the
- * `pubquiz_*` keys the webhook parser expects, so the label text customers
- * see no longer has to double as the machine-readable value (see
- * shop/README.md "Category picks" -- that limitation is gone).
+ * Field **labels** and choice **labels** are Dutch, readable text
+ * (Taal/Moeilijkheid/Categorieën; Nederlands/Engels;
+ * Makkelijk/Gemiddeld/Moeilijk/Gemengd; each Category's `nl` name) --
+ * this plugin's free tier writes each order line item meta_data entry as
+ * `$field->label => $field->value` (a *second*, customer-readable copy of
+ * the pick, ignored by the webhook parser) and, separately, an internal
+ * `_wapf_meta` array carrying `id`/`label`/`value`/`raw` per field (`raw`
+ * is the choice's *slug*, never its label -- for `categories`, an array of
+ * slugs, one per checked box, verified against
+ * includes/controllers/class-product-controller.php's `to_cart_fields()`:
+ * `'raw' => is_string($raw_value) ? ... : array_map('sanitize_textarea_field', $raw_value)`,
+ * and checkbox inputs post `wapf[field_categories][]`, an array, per
+ * views/frontend/fields/checkboxes.php) -- pubquiz-checkout-meta.php reads
+ * `raw` out of that array to write the `pubquiz_*` keys the webhook parser
+ * expects, so the label text customers see no longer has to double as the
+ * machine-readable value.
+ *
+ * The `categories` field's description property is rendered by this
+ * plugin's own free-tier template (`views/frontend/field-group.php` calls
+ * `Html::field_description($field)`, which prints `$field->description`
+ * verbatim when non-empty) -- no fallback hook was needed.
  */
 
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
@@ -85,33 +102,20 @@ $fields[] = [
     ],
 ];
 
-$fields[] = [
-    'id'           => 'mode',
-    'label'        => 'Soort quiz',
-    'type'         => 'select',
-    'required'     => 'true',
-    'conditionals' => [],
-    'choices'      => [
-        pubquiz_choice( 'mixed', 'Gemengd', true ),
-        pubquiz_choice( 'single_category', 'Eén categorie' ),
-    ],
-];
-
-for ( $slot = 0; $slot < 8; $slot++ ) {
-    $choices = [ pubquiz_choice( '', '(geen)', true ) ];
-    foreach ( $pubquiz_categories as $category ) {
-        $choices[] = pubquiz_choice( (string) $category['id'], (string) $category['name'] );
-    }
-
-    $fields[] = [
-        'id'           => 'category_' . ( $slot + 1 ),
-        'label'        => 'Categorie ' . ( $slot + 1 ),
-        'type'         => 'select',
-        'required'     => 'false',
-        'conditionals' => [],
-        'choices'      => $choices,
-    ];
+$category_choices = [];
+foreach ( $pubquiz_categories as $category ) {
+    $category_choices[] = pubquiz_choice( (string) $category['id'], (string) $category['name'] );
 }
+
+$fields[] = [
+    'id'           => 'categories',
+    'label'        => 'Categorieën',
+    'description'  => 'Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.',
+    'type'         => 'checkboxes',
+    'required'     => 'false',
+    'conditionals' => [],
+    'choices'      => $category_choices,
+];
 
 $raw = [
     'id'     => (string) $product->ID,

@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-09-06T18:46:43.357Z",
+  "capturedAt": "2026-09-08T13:20:27.586Z",
   "method": "POST",
   "url": "/api/webhooks/woocommerce",
   "headers": {
@@ -12,33 +12,33 @@
     "x-wc-webhook-topic": "order.updated",
     "x-wc-webhook-resource": "order",
     "x-wc-webhook-event": "updated",
-    "x-wc-webhook-signature": "mO4k5oAx2luaY7l5AVr6rpQzOTFLI2PfjVozzYqNyzI=",
+    "x-wc-webhook-signature": "Kh5wz6vd7x9cw06JMZ1Cn3qFUZlWKVz3NUckj0fM1vo=",
     "x-wc-webhook-id": "1",
-    "x-wc-webhook-delivery-id": "4673367bf794e809cd31e5a42794920b",
-    "content-length": "2656",
-    "connection": "close"
+    "x-wc-webhook-delivery-id": "f03f0e3cb8598d9f1c57bdfb55c376a0",
+    "connection": "close",
+    "content-length": "3852"
   },
   "body": {
-    "id": 14,
+    "id": 30,
     "parent_id": 0,
     "status": "processing",
-    "currency": "USD",
+    "currency": "EUR",
     "version": "11.1.0",
     "prices_include_tax": false,
-    "date_created": "2026-09-06T18:42:43",
-    "date_modified": "2026-09-06T18:46:28",
+    "date_created": "2026-09-08T13:20:22",
+    "date_modified": "2026-09-08T13:20:23",
     "discount_total": "0.00",
     "discount_tax": "0.00",
     "shipping_total": "0.00",
     "shipping_tax": "0.00",
     "cart_tax": "0.00",
-    "total": "9.95",
+    "total": "14.95",
     "total_tax": "0.00",
     "customer_id": 0,
-    "order_key": "wc_order_GBGy3itiOeCCx",
+    "order_key": "wc_order_Tq0TSSNrdO08e",
     "billing": {
-      "first_name": "",
-      "last_name": "",
+      "first_name": "Fixture",
+      "last_name": "Capture",
       "company": "",
       "address_1": "",
       "address_2": "",
@@ -61,62 +61,147 @@
       "country": "",
       "phone": ""
     },
-    "payment_method": "",
-    "payment_method_title": "",
-    "transaction_id": "",
-    "customer_ip_address": "",
-    "customer_user_agent": "",
-    "created_via": "rest-api",
-    "customer_note": "refire2",
+    "payment_method": "pubquiz_test_gateway",
+    "payment_method_title": "Test payment (local only)",
+    "transaction_id": "pubquiz-test-30",
+    "customer_ip_address": "172.21.0.1",
+    "customer_user_agent": "curl/8.18.0",
+    "created_via": "checkout",
+    "customer_note": "",
     "date_completed": null,
-    "date_paid": null,
-    "cart_hash": "",
-    "number": "14",
-    "meta_data": [],
+    "date_paid": "2026-09-08T13:20:22",
+    "cart_hash": "51c2e96b0952a0ffb399fdf638b8f038",
+    "number": "30",
+    "meta_data": [
+      {
+        "id": 46,
+        "key": "_debug_log_source_pending_deletion",
+        "value": "place-order-debug-f3fc3cb7"
+      },
+      {
+        "id": 41,
+        "key": "is_vat_exempt",
+        "value": "no"
+      }
+    ],
     "line_items": [
       {
-        "id": 4,
-        "name": "Pubquiz",
-        "product_id": 10,
+        "id": 22,
+        "name": "Pubquiz – digitale download",
+        "product_id": 15,
         "variation_id": 0,
         "quantity": 1,
         "tax_class": "",
-        "subtotal": "9.95",
+        "subtotal": "14.95",
         "subtotal_tax": "0.00",
-        "total": "9.95",
+        "total": "14.95",
         "total_tax": "0.00",
         "taxes": [],
         "meta_data": [
           {
-            "id": 51,
+            "id": 318,
+            "key": "Taal",
+            "value": "Nederlands",
+            "display_key": "Taal",
+            "display_value": "Nederlands"
+          },
+          {
+            "id": 319,
+            "key": "Moeilijkheid",
+            "value": "Gemengd",
+            "display_key": "Moeilijkheid",
+            "display_value": "Gemengd"
+          },
+          {
+            "id": 320,
+            "key": "Categorieën",
+            "value": "Sport, Muziek, Wetenschap",
+            "display_key": "Categorieën",
+            "display_value": "Sport, Muziek, Wetenschap"
+          },
+          {
+            "id": 321,
+            "key": "_wapf_meta",
+            "value": {
+              "locale": {
+                "id": "locale",
+                "label": "Taal",
+                "value": "Nederlands",
+                "raw": "nl"
+              },
+              "difficulty": {
+                "id": "difficulty",
+                "label": "Moeilijkheid",
+                "value": "Gemengd",
+                "raw": "mixed"
+              },
+              "categories": {
+                "id": "categories",
+                "label": "Categorieën",
+                "value": "Sport, Muziek, Wetenschap",
+                "raw": [
+                  "1",
+                  "3",
+                  "5"
+                ]
+              }
+            },
+            "display_key": "_wapf_meta",
+            "display_value": {
+              "locale": {
+                "id": "locale",
+                "label": "Taal",
+                "value": "Nederlands",
+                "raw": "nl"
+              },
+              "difficulty": {
+                "id": "difficulty",
+                "label": "Moeilijkheid",
+                "value": "Gemengd",
+                "raw": "mixed"
+              },
+              "categories": {
+                "id": "categories",
+                "label": "Categorieën",
+                "value": "Sport, Muziek, Wetenschap",
+                "raw": [
+                  "1",
+                  "3",
+                  "5"
+                ]
+              }
+            }
+          },
+          {
+            "id": 322,
             "key": "pubquiz_locale",
             "value": "nl",
             "display_key": "pubquiz_locale",
             "display_value": "nl"
           },
           {
-            "id": 52,
+            "id": 323,
             "key": "pubquiz_difficulty",
             "value": "mixed",
             "display_key": "pubquiz_difficulty",
             "display_value": "mixed"
           },
           {
-            "id": 54,
+            "id": 324,
             "key": "pubquiz_category_1",
             "value": "1",
             "display_key": "pubquiz_category_1",
             "display_value": "1"
           },
           {
-            "id": 55,
+            "id": 325,
             "key": "pubquiz_category_2",
             "value": "3",
             "display_key": "pubquiz_category_2",
             "display_value": "3"
           },
           {
-            "id": 56,
+            "id": 326,
             "key": "pubquiz_category_3",
             "value": "5",
             "display_key": "pubquiz_category_3",
@@ -125,7 +210,7 @@
         ],
         "sku": "",
         "global_unique_id": "",
-        "price": 9.95,
+        "price": 14.95,
         "image": {
           "id": "",
           "src": ""
@@ -138,19 +223,19 @@
     "fee_lines": [],
     "coupon_lines": [],
     "refunds": [],
-    "payment_url": "http://localhost:45330/checkout/order-pay/14/?pay_for_order=true&key=wc_order_GBGy3itiOeCCx",
+    "payment_url": "http://localhost:45330/afrekenen/order-pay/30/?pay_for_order=true&key=wc_order_Tq0TSSNrdO08e",
     "is_editable": false,
     "needs_payment": false,
     "needs_processing": false,
-    "date_created_gmt": "2026-09-06T18:42:43",
-    "date_modified_gmt": "2026-09-06T18:46:28",
+    "date_created_gmt": "2026-09-08T13:20:22",
+    "date_modified_gmt": "2026-09-08T13:20:23",
     "date_completed_gmt": null,
-    "date_paid_gmt": null,
-    "currency_symbol": "$",
+    "date_paid_gmt": "2026-09-08T13:20:22",
+    "currency_symbol": "€",
     "_links": {
       "self": [
         {
-          "href": "http://localhost:45330/wp-json/wc/v2/orders/14",
+          "href": "http://localhost:45330/wp-json/wc/v3/orders/30",
           "targetHints": {
             "allow": [
               "GET",
@@ -164,13 +249,13 @@
       ],
       "collection": [
         {
-          "href": "http://localhost:45330/wp-json/wc/v2/orders"
+          "href": "http://localhost:45330/wp-json/wc/v3/orders"
         }
       ],
       "email_templates": [
         {
           "embeddable": true,
-          "href": "http://localhost:45330/wp-json/wc/v2/orders/14/actions/email_templates"
+          "href": "http://localhost:45330/wp-json/wc/v3/orders/30/actions/email_templates"
         }
       ]
     }

@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import { parseOrderPayload } from "./parse-order";
 
 // Recorded real WooCommerce payload (ticket #37, re-recorded for #71 now
-// that the checkout no longer sends a mode meta key) -- one line item,
-// quantity 1, three Category picks in pick order (ids "1", "3", "5") plus
-// locale/difficulty meta -- see shop/README.md "The webhook".
+// that the checkout no longer sends a mode meta key, and again for #72's
+// Categorieën checkboxes field) -- one line item, quantity 1, three
+// Category picks in pick order (ids "1", "3", "5") plus locale/difficulty
+// meta -- see shop/README.md "The webhook".
 const FIXTURE_PATH = join(process.cwd(), "shop/fixtures/order-updated-processing.json");
 
 function loadFixtureBody(): Record<string, unknown> {
@@ -44,7 +45,7 @@ describe("parseOrderPayload", () => {
 
     const { input } = parseOrderPayload(body, EXISTING_CATEGORY_IDS);
 
-    expect(input.wooOrderId).toBe(14);
+    expect(input.wooOrderId).toBe(30);
     expect(input.billingEmail).toBe("fixture-buyer@example.com");
     expect(input.wooStatus).toBe("processing");
     expect(input.rawPayload).toBe(body);
@@ -57,7 +58,7 @@ describe("parseOrderPayload", () => {
 
     expect(input.lineItems).toHaveLength(1);
     const [lineItem] = input.lineItems;
-    expect(lineItem.wooLineItemId).toBe(4);
+    expect(lineItem.wooLineItemId).toBe(22);
     expect(lineItem.quantity).toBe(1);
     expect(lineItem.config).toEqual({
       locale: "nl",
@@ -80,7 +81,7 @@ describe("parseOrderPayload", () => {
     expect(input.lineItems[0].config.locale).toBe("nl");
   });
 
-  it("ignores a pubquiz_mode meta key, still sent by the live shop until ticket #72 replaces the field group", () => {
+  it("ignores a pubquiz_mode meta key, in case anything still writes one (the mode field group is gone as of #72)", () => {
     const body = loadFixtureBody();
     const lineItems = cloneLineItems(body);
     lineItems[0] = withMeta(lineItems[0], "pubquiz_mode", "single_category");

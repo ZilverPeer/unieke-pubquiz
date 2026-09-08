@@ -23,7 +23,7 @@ function sign(body: string, secret: string = SECRET): string {
 function buildOrderRecord(): OrderRecord {
   return {
     id: "order-1",
-    wooOrderId: 14,
+    wooOrderId: 30,
     billingEmail: "fixture-buyer@example.com",
     wooStatus: "processing",
     createdAt: new Date().toISOString(),
@@ -34,7 +34,7 @@ function buildQuizRecord(overrides: Partial<QuizRecord> = {}): QuizRecord {
   return {
     id: "quiz-1",
     orderId: "order-1",
-    wooLineItemId: 4,
+    wooLineItemId: 22,
     sequence: 0,
     config: {
       locale: "nl",
@@ -151,7 +151,7 @@ describe("handleWebhook", () => {
     expect(deps.orderRepository.upsertOrder).toHaveBeenCalledTimes(1);
     expect(deps.orderRepository.transitionQuizStatus).not.toHaveBeenCalled();
     expect(deps.enqueueQuizJob).toHaveBeenCalledTimes(1);
-    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-4-0");
+    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-22-0");
     expect(deps.noteFailure).not.toHaveBeenCalled();
   });
 
@@ -170,14 +170,14 @@ describe("handleWebhook", () => {
     expect(result.status).toBe(200);
     expect(deps.orderRepository.transitionQuizStatus).toHaveBeenCalledTimes(1);
     expect(deps.orderRepository.transitionQuizStatus).toHaveBeenCalledWith(
-      "quiz-4-0",
+      "quiz-22-0",
       "failed",
       expect.objectContaining({ failureReason: expect.stringMatching(/unknown category id "999"/i) }),
     );
     expect(deps.enqueueQuizJob).not.toHaveBeenCalled();
     expect(deps.noteFailure).toHaveBeenCalledTimes(1);
     expect(deps.noteFailure).toHaveBeenCalledWith({
-      quizId: "quiz-4-0",
+      quizId: "quiz-22-0",
       reason: expect.stringMatching(/unknown category id "999"/i),
     });
   });
@@ -196,7 +196,7 @@ describe("handleWebhook", () => {
     expect(result.status).toBe(200);
     expect(deps.orderRepository.transitionQuizStatus).toHaveBeenCalledTimes(1);
     expect(deps.orderRepository.transitionQuizStatus).toHaveBeenCalledWith(
-      "quiz-4-0",
+      "quiz-22-0",
       "failed",
       expect.objectContaining({ failureReason: expect.stringMatching(/unknown category id "999"/i) }),
     );
@@ -211,9 +211,9 @@ describe("handleWebhook", () => {
     const rawBody = JSON.stringify({ ...body, line_items: lineItems });
     const deps = buildDeps();
     deps.orderRepository.transitionQuizStatus.mockRejectedValueOnce(
-      new QuizStatusChangedConcurrentlyError("quiz-4-0", "pending"),
+      new QuizStatusChangedConcurrentlyError("quiz-22-0", "pending"),
     );
-    deps.orderRepository.getQuizById.mockResolvedValueOnce(buildQuizRecord({ id: "quiz-4-0", status: "failed" }));
+    deps.orderRepository.getQuizById.mockResolvedValueOnce(buildQuizRecord({ id: "quiz-22-0", status: "failed" }));
 
     const result = await handleWebhook(rawBody, sign(rawBody), toWebhookDeps(deps));
 
@@ -231,9 +231,9 @@ describe("handleWebhook", () => {
     const rawBody = JSON.stringify({ ...body, line_items: lineItems });
     const deps = buildDeps();
     deps.orderRepository.transitionQuizStatus.mockRejectedValueOnce(
-      new QuizStatusChangedConcurrentlyError("quiz-4-0", "pending"),
+      new QuizStatusChangedConcurrentlyError("quiz-22-0", "pending"),
     );
-    deps.orderRepository.getQuizById.mockResolvedValueOnce(buildQuizRecord({ id: "quiz-4-0", status: "pending" }));
+    deps.orderRepository.getQuizById.mockResolvedValueOnce(buildQuizRecord({ id: "quiz-22-0", status: "pending" }));
 
     const result = await handleWebhook(rawBody, sign(rawBody), toWebhookDeps(deps));
 
@@ -253,9 +253,9 @@ describe("handleWebhook", () => {
 
     expect(result.status).toBe(200);
     expect(deps.enqueueQuizJob).toHaveBeenCalledTimes(3);
-    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-4-0");
-    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-4-1");
-    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-4-2");
+    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-22-0");
+    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-22-1");
+    expect(deps.enqueueQuizJob).toHaveBeenCalledWith("quiz-22-2");
   });
 
   it("does not re-transition or re-enqueue a Quiz that already left pending on redelivery", async () => {
@@ -264,7 +264,7 @@ describe("handleWebhook", () => {
     const deps = buildDeps();
     deps.orderRepository.upsertOrder.mockResolvedValueOnce({
       order: buildOrderRecord(),
-      quizzes: [buildQuizRecord({ id: "quiz-4-0", status: "generating" })],
+      quizzes: [buildQuizRecord({ id: "quiz-22-0", status: "generating" })],
     });
 
     const result = await handleWebhook(rawBody, sign(rawBody), toWebhookDeps(deps));

@@ -310,29 +310,65 @@ via `shop/mu-plugins/wp-cli-scripts/setup-field-group.php`, run by
 plugin's own `Field_Groups::raw_json_to_field_group()` builder rather than
 clicking through wp-admin -- this keeps `shop:up` scriptable and idempotent.
 
-Fields, one per `CHECKOUT_META_KEYS` entry: `locale`, `difficulty`, `mode`
-(all required selects) and `category_1`..`category_8` (optional selects,
-one per Item slot). Field **ids** stay these fixed strings; field and choice
-**labels** are readable Dutch text (Taal/Moeilijkheid/Soort quiz/Categorie N;
-Nederlands/Engels; Makkelijk/Gemiddeld/Moeilijk/Gemengd; Gemengd/Eén
-categorie; each Category's `nl` name) -- see "Readable Dutch options and the
-label-to-key bridge" below for why that no longer breaks the webhook wire
-format the way it used to.
+Three fields, all visible (ticket #72): `locale` (select, Taal, required,
+Nederlands preselected), `difficulty` (select, Moeilijkheid, required,
+Gemengd preselected), and `categories` (**checkboxes**, Categorieën, not
+required -- one choice per `nl` Category name, none preselected, with the
+description "Zonder keuze krijgt elke ronde een willekeurige categorie.
+Kies categorieën als je ze in je quiz wilt."). The eight `category_1`..
+`category_8` selects and the `mode` select from before this ticket are gone
+-- see CONTEXT.md "Quiz" for the cycle rule that replaced "Soort quiz", and
+"Cap of 8" below for why `categories` has no plugin-level maximum. Field
+**ids** stay `locale`/`difficulty`/`categories`; field and choice **labels**
+are readable Dutch text (Taal/Moeilijkheid/Categorieën; Nederlands/Engels;
+Makkelijk/Gemiddeld/Moeilijk/Gemengd; each Category's `nl` name) -- see
+"Readable Dutch options and the label-to-key bridge" below for why that
+doesn't break the webhook wire format.
 
-## Key verification (ticket item 3): does the real checkout path write the same keys?
+The `categories` field's description text renders through this plugin's own
+free-tier template (`views/frontend/field-group.php` calls
+`Html::field_description($field)`, which prints `$field->description`
+verbatim when set) -- no fallback rendering hook was needed.
+
+### Cap of 8
+
+The free tier's `checkboxes` field type has no maximum-selection setting --
+verified against the installed plugin's own source
+(`includes/classes/class-field-groups.php`'s `raw_json_to_field_group()`
+accepts a generic `maximum` option on any field, but
+`includes/classes/class-html.php` only ever reads `$field->options['maximum']`
+to set the `number` field type's HTML `max` attribute; nothing reads it for
+`checkboxes`). So the cap is enforced server-side instead:
+`pubquiz-checkout-meta.php` hooks `woocommerce_add_to_cart_validation` and
+rejects an add-to-cart whose `wapf[field_categories][]` POST array has more
+than 8 entries, with the Dutch notice "Kies maximaal 8 categorieën." (`wc_add_notice(..., 'error')`,
+`return false`); 0 picks always passes.
+
+**Pick order.** A browser always serialises a checked group of same-named
+inputs in DOM order, i.e. the order the choices were rendered in --
+`setup-field-group.php`'s choice order, which is Category id order (the
+order `$pubquiz_categories` lists them in, from `loadDutchCategories()`).
+So "pick order" -- what `pubquiz_category_1..N` and the sampler's cycle
+rule (CONTEXT.md "Quiz") both use -- is Category id order among the
+customer's checked boxes, not click order.
+
+## Key verification (ticket item 3, updated by #72): does the real checkout path write the same keys?
 
 Yes, verified against a real order placed through WooCommerce's actual
 checkout code path (not `shop:order`'s direct WP-CLI order creation) using
 curl to submit the classic add-to-cart and checkout forms exactly as a
 browser would (same endpoints, same fields, same nonce) -- reproducible
-without a GUI browser:
+without a GUI browser. The `categories` field is a checkbox group, so its
+form field name is `wapf[field_categories][]` (an array, one entry per
+checked box, per `views/frontend/fields/checkboxes.php`), unlike the
+single-value `wapf[field_<id>]` names `locale`/`difficulty` use:
 
 ```sh
-# 1. Add to cart with the plugin's real front-end field names (wapf[field_<id>])
+# 1. Add to cart with the plugin's real front-end field names
 curl -s -c cookies.txt -b cookies.txt \
   -d "quantity=1" -d "add-to-cart=<productId>" -d "wapf_field_groups=<productId>" \
   -d "wapf[field_locale]=en" -d "wapf[field_difficulty]=hard" \
-  -d "wapf[field_mode]=single_category" -d "wapf[field_category_1]=7" \
+  -d "wapf[field_categories][]=1" -d "wapf[field_categories][]=3" \
   "http://localhost:45330/product/pubquiz/"
 
 # 2. GET the checkout page, scrape the nonce
@@ -360,21 +396,42 @@ item's `meta_data` as:
 ```
 Taal = Engels
 Moeilijkheid = Moeilijk
-Soort quiz = Eén categorie
-Categorie 1 = Literatuur
-_wapf_meta = { ... the plugin's own internal bookkeeping, including each field's "raw" slug ... }
+Categorieën = Sport, Literatuur
+_wapf_meta = {
+  "locale":     { "id": "locale", "label": "Taal", "value": "Engels", "raw": "en" },
+  "difficulty": { "id": "difficulty", "label": "Moeilijkheid", "value": "Moeilijk", "raw": "hard" },
+  "categories": { "id": "categories", "label": "Categorieën", "value": "Sport, Literatuur", "raw": ["1", "3"] }
+}
 pubquiz_locale = en
 pubquiz_difficulty = hard
-pubquiz_mode = single_category
-pubquiz_category_1 = 7
+pubquiz_category_1 = 1
+pubquiz_category_2 = 3
 ```
 
-The Dutch-labelled entries (`Taal`, `Moeilijkheid`, ...) are the plugin's own
-`{label} => {value}` writes, customer-readable but no longer the wire
-format (see "Readable Dutch options and the label-to-key bridge" below); the
-four `pubquiz_*` keys match `CHECKOUT_META_KEYS` exactly, byte for byte, with
-correct slug values -- the same shape `shop:order` produces, and what the
-webhook parser (#39) actually reads.
+**The `categories` field's `_wapf_meta` `raw` value is an array of Category
+id slugs, one per checked box, in the customer's check order** -- not a
+joined string, unlike every other field type here. Verified directly
+against the installed plugin's own
+`includes/controllers/class-product-controller.php`'s `to_cart_fields()`:
+`'raw' => is_string($raw_value) ? sanitize_textarea_field($raw_value) :
+array_map('sanitize_textarea_field', $raw_value)` -- checkbox inputs post
+`wapf[field_categories][]`, an array, so `$raw_value` is only ever a string
+here when nothing is checked, and in that case `create_order_line_item()`
+never adds a `categories` entry to `_wapf_meta` at all (it only adds an
+entry when `!empty($field['value'])`). `pubquiz-checkout-meta.php`'s
+`pubquiz_write_category_picks()` reads that array and writes
+`pubquiz_category_1..N` in pick order (the array's own order), skipping
+empty and duplicate ids as defence -- a checkbox group can't actually
+produce either.
+
+The Dutch-labelled entries (`Taal`, `Moeilijkheid`, `Categorieën`) are the
+plugin's own `{label} => {value}` writes, customer-readable but no longer
+the wire format (see "Readable Dutch options and the label-to-key bridge"
+below); the `pubquiz_*` keys match `CHECKOUT_META_KEYS` exactly, byte for
+byte, with correct slug values -- the same shape `shop:order` produces, and
+what the webhook parser (#39) actually reads. No `pubquiz_mode` key exists
+any more (ticket #71 removed the `mode` concept from the domain; ticket #72
+removed its field from the group and its mapping from the bridge plugin).
 
 ## Readable Dutch options and the label-to-key bridge (ticket #57)
 
@@ -385,9 +442,7 @@ Advanced Product Fields writes each order line item's `meta_data` as
 `{label} => {value}` -- the label doubled as the wire format, at the cost of
 a checkout UI showing customers raw keys and numbers instead of words.
 
-This ticket makes the labels Dutch and readable (Taal/Moeilijkheid/Soort
-quiz/Categorie N; Nederlands/Engels; Makkelijk/Gemiddeld/Moeilijk/Gemengd;
-Gemengd/Eén categorie; each Category's `nl` name) without losing the
+This ticket made the labels Dutch and readable without losing the
 `pubquiz_*` wire format, using a second thing the same plugin writes on
 every line item alongside the `{label} => {value}` pairs: a `_wapf_meta`
 line item meta entry, one array element per field, each carrying
@@ -397,21 +452,26 @@ line item meta entry, one array element per field, each carrying
 A new must-use plugin, `shop/mu-plugins/pubquiz-checkout-meta.php`, hooks
 `woocommerce_checkout_create_order_line_item` at priority 30 (after the
 product-fields plugin's own priority-20 hook, so `_wapf_meta` already
-exists) and, for each `_wapf_meta` entry whose field id is `locale`,
-`difficulty`, `mode` or `category_N`, adds a `pubquiz_*` line item meta key
-with that entry's `raw` value -- an empty `raw` (an unfilled Category slot,
-"(geen)") is skipped, same as before. It hides those `pubquiz_*` keys from
-the customer-facing item table, the completed-order mail and My Account, and
-from the wp-admin order screen, with the same two filters
-`pubquiz-downloads.php` already uses for its own `pubquiz_download_*` keys
--- the Dutch-labelled entries remain visible as the customer's order
-summary. The webhook's REST payload is not filtered by either hook, so the
-parser still sees the `pubquiz_*` keys unchanged; `src/domain/checkout.ts`
-and the webhook parser needed no changes.
+exists) and adds a `pubquiz_*` line item meta key per field: `locale` and
+`difficulty` map straight to `pubquiz_locale`/`pubquiz_difficulty` from
+their (string) `raw` value; `categories` (ticket #72's checkboxes field)
+writes `pubquiz_category_1..N` from its (array) `raw` value in pick order
+instead -- see "Cap of 8" above for the field ids and shapes as they stand
+today (the `mode` field and its `pubquiz_mode` mapping, and the eight
+`category_N` selects this paragraph originally described, are gone as of
+ticket #72). It hides those `pubquiz_*` keys from the customer-facing item
+table, the completed-order mail and My Account, and from the wp-admin order
+screen, with the same two filters `pubquiz-downloads.php` already uses for
+its own `pubquiz_download_*` keys -- the Dutch-labelled entries remain
+visible as the customer's order summary. The webhook's REST payload is not
+filtered by either hook, so the parser still sees the `pubquiz_*` keys
+unchanged; `src/domain/checkout.ts` and the webhook parser needed no
+changes.
 
 `shop-fixture.test.ts` pins `pubquiz-checkout-meta.php`'s field-id-to-key
-mapping against `CHECKOUT_META_KEYS`'s literal values, and pins that
-`setup-field-group.php` no longer hardcodes a Category id list (see below).
+mapping against `CHECKOUT_META_KEYS`'s literal values, the cap notice text,
+and pins that `setup-field-group.php` no longer hardcodes a Category id
+list (see below).
 
 ## Category names: the Supabase stack, not a hardcoded list (ticket #57)
 
@@ -553,10 +613,15 @@ npx wp-env run cli -- wp action-scheduler run --user=admin
 ```
 
 The fixture at `shop/fixtures/order-updated-processing.json` was captured
-this way, from an order with 3 Category picks (slots 1-3), and contains
-the full captured HTTP request: headers (including
-`X-WC-Webhook-Signature`) and the JSON body with the order's `line_items[].meta_data`
-containing all four keys per Item plus every filled Category slot.
+this way, from an order with 3 Category picks (Categorieën checkboxes,
+ticket #72), and contains the full captured HTTP request: headers
+(including `X-WC-Webhook-Signature`) and the JSON body with the order's
+`line_items[].meta_data` containing `pubquiz_locale`, `pubquiz_difficulty`
+and `pubquiz_category_1..3` (no `pubquiz_mode`), plus the plugin's own
+Dutch-labelled entries and `_wapf_meta`. Its billing email
+(`fixture-buyer@example.com`) must stay exactly what
+`route.integration.test.ts`'s `FIXTURE_BILLING_EMAIL` constant expects --
+that's what every test in that file scopes its cleanup to.
 
 ## REST credentials
 
