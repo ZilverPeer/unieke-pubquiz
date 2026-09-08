@@ -33,6 +33,7 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - PR 101 reviewers: standards aefc40978883814c4, spec a49796d173f4457eb
 - PR 100 reviewers: standards a27b75908974c6d2f, spec afc55313fadfc1bff
 - PR 105 reviewers: standards a655e5efa29f259a7, spec a867a942693ce1e2c
+- PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
 
 ## Spec 5 tickets (18:44)
 
@@ -69,6 +70,10 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 
 - PR opened (eb0c604) after 43 min. Evidence 1 to 5, 7, 8 in the body; check 6 (completed mail with two zip rows) has a gap: the app on 3000 was the main checkout's `next dev` with a WooCommerce key made stale by the worktree's `shop:up`, so delivery got 401 three times; zips were proven through the download route instead (order 38). Tom Select is Apache-2.0, not MIT as the brief said; assets served through a second wp-env mapping.
 - Orchestrator tried to stop the stale app itself (`taskkill`, `Stop-Process`); both denied by the permission classifier. Spec reviewer gets a sole-agent exception to stop that tree and run `loop:up` from the worktree, then proves check 6 with a fresh email. Reviewers dispatched right after the master check for PR 104.
+
+### #92 (PR 106)
+
+- 18:38 PR opened (027ea00) after 15 min. Integration 2/2; red evidence produced by hardcoding `fits: true` (reviewers judge). The implementer printed a local test-operator session JWT into its own tool output once (not committed, not in the PR). Reviewers dispatched 18:40.
 
 ### #87, #88, #92, #93
 
