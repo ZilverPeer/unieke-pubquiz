@@ -3,12 +3,16 @@
  */
 import type { Composition, GenerationFailure, PoolItem, QuizRequest } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT, SLOT_KINDS } from "@/domain";
-import { pickIndex } from "./shuffle";
 import { fillSlot } from "./slots";
+import { resolveSlotCategories } from "./slot-categories";
 import type { RandomSource } from "./random";
 
 export type { RandomSource } from "./random";
 export { createSeededRandom } from "./random";
+export type { CoverageCell, DryRunShortfall } from "./coverage";
+export { computeCoverage, dryRunRequest } from "./coverage";
+export type { ResolveSlotCategoriesResult } from "./slot-categories";
+export { resolveSlotCategories } from "./slot-categories";
 
 export interface SampleInput {
   request: QuizRequest;
@@ -21,58 +25,6 @@ export interface SampleInput {
 export type SampleResult =
   | { ok: true; composition: Composition }
   | { ok: false; failure: GenerationFailure };
-
-type ResolveSlotCategoriesResult =
-  | { ok: true; slotCategories: string[] }
-  | { ok: false; failure: GenerationFailure };
-
-/**
- * Resolves the Category id used for every one of the 8 slots, cycling the
- * customer's picks evenly over the slots in pick order: with k picks (k >= 1),
- * slot i gets pick `i % k`. Throws (input validation, not a
- * GenerationFailure) when the request's picks themselves are invalid -
- * more than 8, or not distinct. With 0 picks, every slot gets a random
- * Category, distinct across slots (a content shortfall - returned as a
- * GenerationFailure with categoryId null - when the pool doesn't have 8
- * distinct Categories to give).
- */
-function resolveSlotCategories(
-  request: QuizRequest,
-  pool: readonly PoolItem[],
-  random: RandomSource,
-): ResolveSlotCategoriesResult {
-  const { categoryPicks } = request;
-
-  if (categoryPicks.length > SLOT_COUNT) {
-    throw new Error(`at most ${SLOT_COUNT} Category picks`);
-  }
-  if (new Set(categoryPicks).size !== categoryPicks.length) {
-    throw new Error("Category picks must be distinct");
-  }
-
-  const k = categoryPicks.length;
-  if (k > 0) {
-    const slotCategories = Array.from({ length: SLOT_COUNT }, (_, slotIndex) => categoryPicks[slotIndex % k]);
-    return { ok: true, slotCategories };
-  }
-
-  const poolCategoryIds = Array.from(new Set(pool.map((item) => item.categoryId)));
-  const candidates = [...poolCategoryIds];
-
-  const slotCategories: string[] = [];
-  for (let slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++) {
-    if (candidates.length === 0) {
-      return {
-        ok: false,
-        failure: { slotIndex, categoryId: null, shortfall: SLOT_COUNT - slotIndex },
-      };
-    }
-    const index = pickIndex(candidates.length, random);
-    const [categoryId] = candidates.splice(index, 1);
-    slotCategories.push(categoryId);
-  }
-  return { ok: true, slotCategories };
-}
 
 /**
  * Samples a Composition for the request from the pool, or returns the first

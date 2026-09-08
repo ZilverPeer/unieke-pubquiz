@@ -44,12 +44,13 @@ function buildQuota(
   requestedDifficulty: RequestedDifficulty,
   itemsPerSlot: number,
   random: RandomSource,
+  quotaExtraIndex?: number,
 ): Difficulty[] {
   if (requestedDifficulty !== "mixed") {
     return new Array(itemsPerSlot).fill(requestedDifficulty) as Difficulty[];
   }
 
-  const extraIndex = pickIndex(DIFFICULTIES.length, random);
+  const extraIndex = quotaExtraIndex ?? pickIndex(DIFFICULTIES.length, random);
   const base = Math.floor(itemsPerSlot / DIFFICULTIES.length);
   const extra = itemsPerSlot - base * DIFFICULTIES.length;
 
@@ -70,6 +71,15 @@ export interface FillSlotInput {
   excludedItemIds: ReadonlySet<string>;
   random: RandomSource;
   itemsPerSlot: number;
+  /**
+   * For `mixed`, forces which Difficulty level (0 = easy, 1 = medium,
+   * 2 = hard) gets the 4/3/3 split's extra Item, instead of drawing it from
+   * `random`. Ignored for a single-Difficulty request. Lets coverage's `fits`
+   * check probe all three placements deterministically without consuming
+   * the caller's random source or changing `sampleComposition`'s draws
+   * (omitted there, so existing seeds still reproduce).
+   */
+  quotaExtraIndex?: number;
 }
 
 /**
@@ -85,8 +95,17 @@ export interface FillSlotInput {
  * mixed requests alike. Final position order is randomised.
  */
 export function fillSlot(input: FillSlotInput): SlotPickResult {
-  const { kind, categoryId, locale, requestedDifficulty, pool, excludedItemIds, random, itemsPerSlot } =
-    input;
+  const {
+    kind,
+    categoryId,
+    locale,
+    requestedDifficulty,
+    pool,
+    excludedItemIds,
+    random,
+    itemsPerSlot,
+    quotaExtraIndex,
+  } = input;
 
   const eligibleByDifficulty = new Map<Difficulty, Map<string, PoolItem[]>>();
   for (const difficulty of DIFFICULTIES) {
@@ -103,7 +122,7 @@ export function fillSlot(input: FillSlotInput): SlotPickResult {
     }
   }
 
-  const quota = buildQuota(requestedDifficulty, itemsPerSlot, random);
+  const quota = buildQuota(requestedDifficulty, itemsPerSlot, random, quotaExtraIndex);
   const slotEligibleIds = quota.map((difficulty) =>
     Array.from(eligibleByDifficulty.get(difficulty)!.keys()),
   );
