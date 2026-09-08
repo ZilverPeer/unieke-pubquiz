@@ -34,7 +34,8 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - PR 100 reviewers: standards a27b75908974c6d2f, spec afc55313fadfc1bff
 - PR 105 reviewers: standards a655e5efa29f259a7, spec a867a942693ce1e2c
 - PR 106 reviewers: standards a9cd12dc6978762fc, spec a2f2fd21c18e55f41
-- PR 108 reviewers: dispatched 18:50 (ids in the next logbook commit)
+- PR 108 reviewers: standards a72b201e32446197c, spec a75139b2aec7d6635
+- PR 109 reviewers: dispatched 18:55 (ids in the next logbook commit)
 
 ## Spec 5 tickets (18:44)
 
@@ -79,6 +80,10 @@ Before the four admin tickets: `messages/<locale>/<namespace>.json` merged at re
 ### #93 (PR 108)
 
 - 18:45 PR opened (de31090) after 24 min. Integration 6/6 alone; red evidence again by stubbing after the fact (reviewers judge). `retry-quiz.ts` core was already injectable, no extraction. Adds `assertOperator()` to `src/admin/auth/session.ts`, which #87 also edits: conflict check at merge. Reviewers dispatched 18:50.
+
+### #87 (PR 109)
+
+- 18:52 PR opened (62027e2) after 32 min. Unit 17 red-first (stub throwing), integration 7/7. Forms are Client Components with `useActionState` (not curl-drivable; reviewers judge). Delete guard is count-then-delete, two statements. Adds `assertOperator()` and injectable `revalidateCategories`. Seed sequence defect filed as #107. Reviewers dispatched 18:55.
 
 ### #87, #88, #92, #93
 
