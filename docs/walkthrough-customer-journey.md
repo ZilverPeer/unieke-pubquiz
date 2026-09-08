@@ -27,11 +27,12 @@ Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz 
 
 Picking **Eén categorie** reveals **Categorie 1**, a dropdown of the seeded Categories' Dutch names (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has). Pick a value for each visible dropdown, then click **Toevoegen aan winkelwagen**.
 
-**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; `14` is the Pubquiz product id, confirm with `npm run shop:up`'s own "Product: #14" line if it's ever different locally):
+**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads):
 
 ```powershell
+$productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
 curl.exe -s -c cookies.txt -b cookies.txt `
-  -d "quantity=1" -d "add-to-cart=14" -d "wapf_field_groups=14" `
+  -d "quantity=1" -d "add-to-cart=$productId" -d "wapf_field_groups=$productId" `
   -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
   -d "wapf[field_mode]=single_category" -d "wapf[field_category_1]=1" `
   "http://localhost:45330/product/pubquiz/"

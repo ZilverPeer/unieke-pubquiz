@@ -29,3 +29,17 @@ export function parseSupabaseStatusResult(result: SupabaseStatusProcessResult): 
   }
   return { running: true, env: parseStatusEnv(result.stdout) };
 }
+
+/**
+ * Ticket #66: the one line `loop/up.ts` prints after `npx supabase start`
+ * succeeds. `npx supabase start`'s stdout is one JSON line carrying the
+ * local stack's keys (publishable, secret, service role, S3 access key --
+ * the well-known local demo keys, but the repo rule is that no key ever
+ * appears in printed output). This function takes the parsed status object
+ * but deliberately never reads any of its values, so the "started" line it
+ * builds can never leak one, however key-shaped the object's contents are.
+ */
+export function formatSupabaseStartedLine(status: Record<string, unknown>): string {
+  void status; // deliberately unread -- see the docblock above.
+  return "Supabase: started.";
+}

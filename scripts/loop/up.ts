@@ -8,12 +8,16 @@
  *    `npm run db:reset` once, if it's empty -- the loop never resets on its
  *    own (see docs/agents/orchestration.md "Before dispatching").
  * 2. `npm run shop:up` (wp-env + Mailpit + the cron ticker, already
- *    idempotent -- see shop/README.md).
+ *    idempotent -- see shop/README.md). Since ticket #67, that step also
+ *    writes `.local/shop-setup.json` (see
+ *    scripts/shop/lib/setup-result-file.ts), which this file reads back to
+ *    print the Pubquiz product id and its add-to-cart URL.
  * 3. The app with the worker: reused if `http://localhost:3000` already
  *    answers, otherwise spawned detached (`npx next dev`,
  *    `PUBQUIZ_WORKER=1`), stdout/stderr to `.local/next-dev.log`, its pid to
  *    `.local/next-dev.pid`, waited on (120s timeout).
- * 4. Prints the shop, Mailpit and app URLs, and the log path.
+ * 4. Prints the shop, Mailpit and app URLs, the product id and add-to-cart
+ *    URL, and the log path.
  *
  * Deliberately does NOT `import "../load-env"` (unlike scripts/shop/*.ts):
  * this file never reads `WOOCOMMERCE_*`/`SUPABASE_*` itself, and loading
@@ -33,7 +37,9 @@ import { existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { createSupabaseClient, resolveLocalStackConfig } from "../../src/repository";
 import { isPidAlive, type PidAliveDeps } from "./lib/pid-alive";
-import { parseSupabaseStatusResult } from "./lib/supabase-status";
+import { formatSupabaseStartedLine, parseSupabaseStatusResult } from "./lib/supabase-status";
+import { formatShopSetupLines } from "./lib/shop-setup-summary";
+import { readSetupResultFile } from "../shop/lib/setup-result-file";
 import { waitUntilUrlAnswers } from "./lib/wait-for-url";
 import { deletePidFile, readPidFile, writePidFile } from "./lib/pidfile";
 import {
@@ -66,10 +72,36 @@ function ensureSupabaseUp(): void {
   }
 
   console.log("Supabase: not running, starting it (npx supabase start)...");
-  const startResult = spawnSync("npx supabase start", { stdio: "inherit", shell: true });
+  // Both stdout and stderr captured, neither inherited: `npx supabase
+  // start`'s stdout is one JSON line carrying the local stack's keys
+  // (publishable, secret, service role, S3 access key -- the well-known
+  // local demo keys, but the repo rule is that no key ever appears in
+  // printed output). On failure only the last few lines of stderr (never
+  // stdout, which is where the JSON is) are printed.
+  const startResult = spawnSync("npx supabase start", {
+    encoding: "utf8",
+    shell: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   if (startResult.status !== 0) {
+    const stderrLines = (startResult.stderr ?? "").split(/\r?\n/).filter((line) => line.length > 0);
+    const lastLines = stderrLines.slice(-5).join("\n");
+    console.error(`npx supabase start exited with status ${startResult.status ?? "null"}.`);
+    if (lastLines) console.error(lastLines);
+    console.error('Run "npx supabase start" by hand.');
     throw new Error("npx supabase start failed -- see the output above.");
   }
+
+  let parsedStdout: Record<string, unknown> = {};
+  try {
+    parsedStdout = JSON.parse(startResult.stdout ?? "{}") as Record<string, unknown>;
+  } catch {
+    // `npx supabase start`'s stdout didn't parse as JSON (e.g. an older CLI
+    // printing a table instead) -- formatSupabaseStartedLine never reads
+    // its argument's values anyway, so an empty object is just as safe.
+    parsedStdout = {};
+  }
+  console.log(formatSupabaseStartedLine(parsedStdout));
 }
 
 async function ensureSeeded(): Promise<void> {
@@ -203,6 +235,11 @@ async function main() {
   console.log(`  Mailpit:  ${MAILPIT_URL}`);
   console.log(`  App:      ${APP_URL}`);
   console.log(`  App log:  ${NEXT_DEV_LOG_PATH}`);
+  // Ticket #67: read back what shop:up (via setup.ts) just wrote, so the
+  // walkthrough doesn't need a hardcoded product id.
+  for (const line of formatShopSetupLines(readSetupResultFile())) {
+    console.log(`  ${line}`);
+  }
 }
 
 main().catch((error) => {
