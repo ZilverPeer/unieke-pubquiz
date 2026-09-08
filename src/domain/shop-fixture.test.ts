@@ -60,9 +60,14 @@ describe("shop/mu-plugins/pubquiz-operator-mail.php", () => {
 describe("shop/mu-plugins/pubquiz-downloads.php", () => {
   test("declares the PUBQUIZ_DOWNLOAD_META_PREFIX literal matching downloadMetaKey's stem", () => {
     const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
-    // downloadMetaKey's stem is everything before "<1-based sequence>_<file>".
-    const stem = downloadMetaKey(0, "quizmaster.pdf").replace("1_quizmaster.pdf", "");
+    // downloadMetaKey's stem is everything before the 1-based sequence.
+    const stem = downloadMetaKey(0).replace(/1$/, "");
     expect(php).toContain(`PUBQUIZ_DOWNLOAD_META_PREFIX = '${stem}'`);
+  });
+
+  test("builds the zip file name with the same sprintf pattern as quizZipFilename (ticket #73)", () => {
+    const php = readFileSync(join(REPO_ROOT, "shop", "mu-plugins", "pubquiz-downloads.php"), "utf8");
+    expect(php).toContain("sprintf( 'pubquiz-%d-%d-%s.zip', $order_id, $sequence, $locale )");
   });
 });
 

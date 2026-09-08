@@ -1,4 +1,4 @@
-The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its four Deliverables. Started from `src/instrumentation.ts` when `PUBQUIZ_WORKER=1`. May import `src/domain`, `src/repository`, `src/scripts/generate-quiz` and `src/deliver`'s interface -- the one module in the codebase allowed to cross those boundaries (CLAUDE.md "Orthogonal pipeline"). No WooCommerce knowledge lives here.
+The pg-boss worker (spec #36, ticket #40): turns a `pending` Quiz into its single zip Deliverable. Started from `src/instrumentation.ts` when `PUBQUIZ_WORKER=1`. May import `src/domain`, `src/repository`, `src/scripts/generate-quiz` and `src/deliver`'s interface -- the one module in the codebase allowed to cross those boundaries (CLAUDE.md "Orthogonal pipeline"). No WooCommerce knowledge lives here.
 
 ## Files
 
@@ -19,7 +19,7 @@ One queue, `quiz-generation` (`QUIZ_QUEUE`), policy `exclusive` with the Quiz id
 A job carries just `{ quizId }`; everything else is looked up from the repository. `handleQuizJob`:
 
 1. Loads the Quiz. If it's already `"delivered"` (a retry landing after a prior attempt's `deliverQuiz` call failed -- see step 3), skip straight to step 3, re-deriving the same file URLs from the already-recorded download token. `"delivered"` has no outgoing edge in `QUIZ_STATUS_TRANSITIONS`, so generation is never repeated once it has succeeded once.
-2. Otherwise: transitions `pending` (or `failed`, on a retry after `failed`) -> `generating`, looks up the order for the billing email `generateQuiz` needs, and runs `generateQuiz` unchanged with a write callback that uploads the four Deliverables to `deliverables/<quiz id>/<file>` as they're produced.
+2. Otherwise: transitions `pending` (or `failed`, on a retry after `failed`) -> `generating`, looks up the order for the billing email `generateQuiz` needs, and runs `generateQuiz` unchanged with a write callback that zips the four rendered files (`buildQuizZip`, `src/render`) and uploads the single zip to `deliverables/<quiz id>/quiz.zip` (ticket #73).
 
 The whole of step 1 and 2 -- the lookup, the transition, the order lookup, and generation itself -- runs inside one try/catch, so *any* error from any part of it (not just a failure from `generateQuiz`) is handled the same way, and pg-boss never dead-letters a job leaving a Quiz stuck. Three outcomes:
 
@@ -27,20 +27,20 @@ The whole of step 1 and 2 -- the lookup, the transition, the order lookup, and g
    - **Any other thrown error, before the last attempt** -- treated as retryable and rethrown so pg-boss retries it. If this attempt itself moved the Quiz to `generating`, that's undone first (back to `pending`) so the next attempt starts clean; an error from before any transition (the Quiz not found, or the transition itself losing a race) leaves nothing to undo -- the next attempt's own fresh lookup picks the right path regardless.
    - **Any other thrown error, on the last attempt** -- the Quiz moves to `failed` (with the error's message) and `noteFailure` is called instead of rethrowing, so the job still completes successfully. This covers a stale `generating` Quiz too (see "Known limitation" below): `transitionQuizStatus` re-reads the Quiz's actual current status itself, so `failQuiz` needs no special-casing for which status a Quiz is failing from -- both `pending -> failed` and `generating -> failed` are legal edges. If that write itself loses a compare-and-swap race (`QuizStatusChangedConcurrentlyError`), it re-reads the status before deciding: already `failed`/`delivered` means another writer got there first and there's nothing left to do; still live, it retries the write once.
    - **Success** -- a crypto-random URL-safe download token is generated (`randomBytes(32).toString("base64url")`) and recorded together with the Composition id via `recordDelivery`, which also moves the Quiz to `delivered`.
-3. Calls `deliverer.deliverQuiz({ quizId, files })`, `files` being the four Deliverables with URLs `<APP_BASE_URL>` + `downloadPath(token, file)` (`src/domain/orders.ts`, the one place the download route's shape is pinned -- both this worker and the download route (#42) import it). `deliverQuiz` is contractually idempotent (`src/deliver/index.ts`), so retrying only this step is safe. If it throws:
+3. Calls `deliverer.deliverQuiz({ quizId, url })`, `url` being `<APP_BASE_URL>` + `downloadPath(token, "quiz.zip")` (`src/domain/orders.ts`, the one place the download route's shape is pinned -- both this worker and the download route (#42) import it). `deliverQuiz` is contractually idempotent (`src/deliver/index.ts`), so retrying only this step is safe. If it throws:
    - Before the last attempt: rethrow, so pg-boss retries. The Quiz stays `delivered` throughout -- only `deliverQuiz` is retried, generation is never repeated.
    - On the last attempt: log and return. The Quiz stays `delivered` with no further state change; the order the Quiz belongs to won't complete. Deciding what (if anything) reconciles that is out of scope for #40 -- see ticket #43.
 
 ### Known limitations
 
 - **A crash mid-generation.** If the worker process is killed (not a thrown/caught exception) while a Quiz is `generating`, the Quiz is left `generating` with no live job. A later job for the same Quiz id (a fresh sweep, say) will try to transition `generating` -> `generating`, which is not a listed edge in `QUIZ_STATUS_TRANSITIONS` and throws `IllegalQuizTransitionError` -- handled like any other error (see above): retried until the last attempt, which marks the Quiz `failed`. There is no reaper that notices a stale `generating` Quiz *before* its next attempt (e.g. by age against the job's `expireInSeconds`) and no automatic retry is scheduled for it beyond a job actually being sent again; that's left for a follow-up.
-- **A mid-upload failure on the last attempt.** If uploading one of the four Deliverables fails partway through and this is the last attempt, the Quiz moves to `failed` (per the state machine above) but any Deliverable(s) already uploaded for this attempt are left in the bucket. No explicit cleanup is done here: a `failed` Quiz's objects are pruned along with the rest of its data by the pruning job (#42), so this is not a leak, just a delay.
+- **A mid-upload failure on the last attempt.** If uploading the zip Deliverable fails partway through and this is the last attempt, the Quiz moves to `failed` (per the state machine above) but any object already uploaded for this attempt is left in the bucket. No explicit cleanup is done here: a `failed` Quiz's objects are pruned along with the rest of its data by the pruning job (#42), so this is not a leak, just a delay.
 
 ## Pruning
 
 `pruneDeliverables` (`prune.ts`) handles each Quiz's cleanup (either branch: an expired-token Quiz or a leftover `failed` one) independently, wrapped in its own try/catch. One Quiz's error (a Storage failure, a transient DB error, ...) is logged (`[worker] prune failed for Quiz <id>`) and that Quiz id is added to `PruneResult.failedQuizIds`; the run continues with the rest of the batch rather than aborting. A Quiz that failed this way is simply retried on the next scheduled run -- no separate retry bookkeeping.
 
-Pruning an expired Quiz deletes its four Storage objects and calls `markPruned` -- it deliberately does **not** clear the download token. Keeping the token means the download route (`src/app/download`) still recognises the link and answers 410 (Gone) rather than 404 (Not Found): a customer whose Deliverables aged out gets a "this has expired" signal, not "never existed". `--composition <id>` (`src/scripts/recompose-quiz.ts`) re-uploads a pruned Quiz's Deliverables and calls `clearPruned`, so the exact same link works again without minting a new token.
+Pruning an expired Quiz deletes its Storage object (the zip) and calls `markPruned` -- it deliberately does **not** clear the download token. Keeping the token means the download route (`src/app/download`) still recognises the link and answers 410 (Gone) rather than 404 (Not Found): a customer whose Deliverables aged out gets a "this has expired" signal, not "never existed". `--composition <id>` (`src/scripts/recompose-quiz.ts`) re-uploads a pruned Quiz's zip Deliverable and calls `clearPruned`, so the exact same link works again without minting a new token.
 
 ## Startup sweep
 
@@ -49,7 +49,7 @@ Inserting a Quiz row (the webhook, #39) and enqueueing its job are not one trans
 ## Environment variables
 
 - `DATABASE_URL` -- the Postgres connection string pg-boss uses as its own store (raw `pg`, not PostgREST). Falls back to the local Supabase stack's default (`postgresql://postgres:postgres@127.0.0.1:45322/postgres`, see `supabase/config.toml`) when unset.
-- `APP_BASE_URL` -- the base URL the download route is served from, used to build each Deliverable's URL. Falls back to `http://localhost:3000`.
+- `APP_BASE_URL` -- the base URL the download route is served from, used to build the Deliverable's URL. Falls back to `http://localhost:3000`.
 - `PUBQUIZ_WORKER` -- set to `1` to start the worker from `src/instrumentation.ts`. Unset (the default) for `next build`, plain `next dev`, and every test suite, so none of them hold open a live pg-boss connection.
 
 ## The `pgboss` schema

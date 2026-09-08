@@ -14,7 +14,8 @@
  * second sequence on the same line item id to check that quantity-above-one
  * doesn't clobber links (finding 1, PR #48 review) -- e.g. run
  * `deliver <id> <lineItemId> 0` then `deliver <id> <lineItemId> 1` against
- * the same order/line item and confirm eight distinct meta entries.
+ * the same order/line item and confirm two distinct meta entries (one per
+ * Quiz, ticket #73).
  */
 import "../load-env";
 import { createDeliverer, type OrderLookup } from "../../src/deliver";
@@ -62,10 +63,9 @@ const deliverer = createDeliverer(config, fakeOrderLookup);
 
 async function main() {
   if (mode === "deliver") {
-    const files = ["quizmaster.pdf", "picture-handout.pdf", "answer-sheet.pdf", "music-round.mp3"] as const;
     await deliverer.deliverQuiz({
       quizId: "verify-deliver-script",
-      files: files.map((file) => ({ file, url: `http://localhost:3000${downloadPath("test-token", file)}` })),
+      url: `http://localhost:3000${downloadPath("test-token", "quiz.zip")}`,
     });
     console.log(`deliverQuiz done for order ${wooOrderId} / line item ${wooLineItemId}`);
   } else if (mode === "fail") {

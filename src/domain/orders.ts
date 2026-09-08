@@ -60,16 +60,21 @@ export interface QuizRecord {
 }
 
 /** The four Deliverables of a Quiz, by fixed file name. */
-export const DELIVERABLE_FILES = [
-  "quizmaster.pdf",
-  "picture-handout.pdf",
-  "answer-sheet.pdf",
-  "music-round.mp3",
-] as const;
+/**
+ * The single Deliverable stored/served per Quiz (ticket #73): a zip
+ * containing the four rendered files (see src/render/quiz-zip.ts's
+ * buildQuizZip, which keeps their own names -- quizmaster.pdf,
+ * picture-handout.pdf, answer-sheet.pdf, music-round.mp3 -- unchanged
+ * inside the archive). A tuple of one, not a bare string constant, so every
+ * caller that already iterates DELIVERABLE_FILES (the worker's upload, the
+ * pruning job's object-path list, the download route's file-name check)
+ * keeps working unchanged.
+ */
+export const DELIVERABLE_FILES = ["quiz.zip"] as const;
 
 export type DeliverableFile = (typeof DELIVERABLE_FILES)[number];
 
-/** Path of the app download route for one Deliverable (ticket #42 serves it). */
+/** Path of the app download route for a Quiz's Deliverable (ticket #42 serves it). */
 export function downloadPath(token: string, file: DeliverableFile): string {
   return `/download/${token}/${file}`;
 }
@@ -88,8 +93,20 @@ export const DOWNLOAD_VALIDITY_DAYS = 30;
  * never drift apart.
  */
 export const DELIVERABLE_CONTENT_TYPES: Record<DeliverableFile, string> = {
-  "quizmaster.pdf": "application/pdf",
-  "picture-handout.pdf": "application/pdf",
-  "answer-sheet.pdf": "application/pdf",
-  "music-round.mp3": "audio/mpeg",
+  "quiz.zip": "application/zip",
 };
+
+/**
+ * The one place that builds a Quiz's zip file name (ticket #73):
+ * `pubquiz-<WooCommerce order number>-<quiz sequence, 1-based>-<locale>.zip`.
+ * `orderNumber` is the Quiz's order's `wooOrderId`; `sequence` is 0-based
+ * internally (same convention as `CHECKOUT_META_KEYS.categoryPick` and
+ * `downloadMetaKey`), 1-based in the name. The download route
+ * (src/app/download) sends this as the `Content-Disposition` filename; the
+ * shop's `pubquiz-downloads.php` mu-plugin builds the identical string in
+ * PHP (it cannot import this function) -- `src/domain/shop-fixture.test.ts`
+ * pins the pattern literal so the two can't silently drift apart.
+ */
+export function quizZipFilename(orderNumber: number, sequence: number, locale: Locale): string {
+  return `pubquiz-${orderNumber}-${sequence + 1}-${locale}.zip`;
+}

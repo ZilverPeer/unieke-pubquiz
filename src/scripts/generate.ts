@@ -24,6 +24,7 @@ import {
   createRepository,
   resolveLocalStackConfig,
 } from "@/repository";
+import { buildQuizZip } from "@/render";
 import { QUIZ_QUEUE, startBoss, stopBoss } from "@/worker";
 import { parseScriptArgs } from "./cli-args";
 import { generateQuiz, type GeneratedQuizFiles } from "./generate-quiz";
@@ -71,11 +72,15 @@ async function main(): Promise<number> {
   const options = command.options;
   const repository = createRepository(resolveLocalStackConfig());
 
+  // Local inspection keeps writing all four loose files, unchanged, and
+  // additionally writes the zip next to them (ticket #73's real
+  // Deliverable) so Erik can inspect either form.
   const writeDeliverables = async (files: GeneratedQuizFiles): Promise<void> => {
     await mkdir(options.out, { recursive: true });
     for (const [name, bytes] of Object.entries(files)) {
       await writeFile(join(options.out, name), bytes);
     }
+    await writeFile(join(options.out, "quiz.zip"), buildQuizZip(files));
   };
 
   const result = await generateQuiz(options, repository, writeDeliverables);

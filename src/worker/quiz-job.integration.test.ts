@@ -23,7 +23,7 @@ import {
 } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { resolveFfmpeg } from "@/render";
-import type { Deliverer, DeliveredFile } from "@/deliver";
+import type { Deliverer } from "@/deliver";
 import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import { createQuizQueue, QUIZ_QUEUE, resolveDatabaseUrl } from "./boss";
 import { handleQuizJob, type QuizJobDeps, type QuizJobLike } from "./quiz-job";
@@ -84,10 +84,10 @@ async function insertPendingQuiz(billingEmail: string, config: QuizConfig): Prom
 
 /** In-memory stand-in for the pinned Deliverer interface, recording every call. */
 function createRecordingDeliverer(): Deliverer & {
-  deliverCalls: { quizId: string; files: readonly DeliveredFile[] }[];
+  deliverCalls: { quizId: string; url: string }[];
   failureCalls: { quizId: string; reason: string }[];
 } {
-  const deliverCalls: { quizId: string; files: readonly DeliveredFile[] }[] = [];
+  const deliverCalls: { quizId: string; url: string }[] = [];
   const failureCalls: { quizId: string; reason: string }[] = [];
   return {
     deliverCalls,
@@ -195,9 +195,7 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
     await handleQuizJob(firstAttempt(quizId), buildDeps(deliverer));
 
     const objectNames = await listDeliverableObjectNames(quizId);
-    expect(objectNames).toEqual(
-      ["answer-sheet.pdf", "music-round.mp3", "picture-handout.pdf", "quizmaster.pdf"].sort(),
-    );
+    expect(objectNames).toEqual(["quiz.zip"]);
 
     const quiz = await orderRepository.getQuizById(quizId);
     expect(quiz?.status).toBe("delivered");
@@ -209,12 +207,7 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
     expect(deliverer.failureCalls).toHaveLength(0);
     const call = deliverer.deliverCalls[0];
     expect(call.quizId).toBe(quizId);
-    expect(call.files.map((f) => f.file).sort()).toEqual(
-      ["answer-sheet.pdf", "music-round.mp3", "picture-handout.pdf", "quizmaster.pdf"].sort(),
-    );
-    for (const file of call.files) {
-      expect(file.url).toBe(`${APP_BASE_URL}${downloadPath(quiz!.downloadToken!, file.file)}`);
-    }
+    expect(call.url).toBe(`${APP_BASE_URL}${downloadPath(quiz!.downloadToken!, "quiz.zip")}`);
   });
 
   it(

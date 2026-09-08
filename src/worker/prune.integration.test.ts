@@ -146,9 +146,7 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
     expect(result.prunedQuizIds).not.toContain(quizId);
 
     const objectNames = await listDeliverableObjectNames(quizId);
-    expect(objectNames).toEqual(
-      ["answer-sheet.pdf", "music-round.mp3", "picture-handout.pdf", "quizmaster.pdf"].sort(),
-    );
+    expect(objectNames).toEqual(["quiz.zip"]);
 
     const quiz = await orderRepository.getQuizById(quizId);
     expect(quiz?.downloadToken).toBeTruthy();
@@ -166,11 +164,15 @@ describe.skipIf(resolveFfmpeg() === null)("pruneDeliverables (needs ffmpeg)", ()
     // (src/worker/README.md).
     const quizId = await insertPendingQuiz(freshEmail("prune-failed"), buildConfig());
     await orderRepository.transitionQuizStatus(quizId, "generating");
-    await uploadDeliverable(`${quizId}/quizmaster.pdf`, new Uint8Array([1, 2, 3]), "application/pdf");
+    // "quiz.zip" (application/zip), the only object DELIVERABLE_CONTENT_TYPES
+    // ever allows uploading since ticket #73 -- the deliverables bucket's
+    // allowed_mime_types no longer includes application/pdf (see
+    // supabase/migrations/00010_deliverables_zip_mime_type.sql).
+    await uploadDeliverable(`${quizId}/quiz.zip`, new Uint8Array([1, 2, 3]), "application/zip");
     await orderRepository.transitionQuizStatus(quizId, "failed", { failureReason: "test: simulated mid-upload failure" });
 
     const objectsBefore = await listDeliverableObjectNames(quizId);
-    expect(objectsBefore).toEqual(["quizmaster.pdf"]);
+    expect(objectsBefore).toEqual(["quiz.zip"]);
 
     const result = await pruneDeliverables({ orderRepository, removeDeliverables }, new Date());
 
