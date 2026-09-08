@@ -9,12 +9,12 @@ The package is ESM (`"type": "module"` in package.json) so that `tsx` loads `@re
 Loads the pool and exclusions for one billing email from the local database, samples a Composition, renders all four Deliverables, writes them to an output folder, and persists the Composition. This is the manual end-to-end check for the whole engine (spec #1) before any storefront exists.
 
 ```sh
-npx tsx src/scripts/generate.ts --locale nl|en --mode mixed|single_category --difficulty easy|medium|hard|mixed --email <billing email> [--pick <slot>=<categoryId>]... [--seed <int>] [--out <dir>]
+npx tsx src/scripts/generate.ts --locale nl|en --difficulty easy|medium|hard|mixed --email <billing email> [--pick <categoryId>]... [--seed <int>] [--out <dir>]
 ```
 
 `npx tsx src/scripts/generate.ts ...` is the canonical invocation and works the same everywhere. `npm run generate -- ...` is a shortcut for the same command, but on Windows with npm 11 a single `--` does not reliably forward flags to the script (npm swallows them; you'd see e.g. `Unknown argument "nl"`) -- use a second `--` there: `npm run generate -- -- --locale nl ...`.
 
-- `--pick <slot>=<categoryId>` assigns a Category id (the stringified bigint id from the database) to one of the 8 slots (0-7). Repeatable. `single_category` mode takes exactly one `--pick` (used for every slot); `mixed` mode honours each given pick and randomizes the rest.
+- `--pick <categoryId>` adds a Category id (the stringified bigint id from the database) to the customer's picks, in the order given. Repeatable, up to 8 times, ids must be distinct. Slot `i` gets pick `i mod k` for `k` picks; with no `--pick` at all, every slot gets a random, distinct Category (ticket #71's cycle rule -- see `src/sample/README.md`).
 - `--seed` defaults to a random 32-bit integer and is always printed -- on both success and failure -- so any run can be reproduced exactly.
 - `--out` defaults to `content/generated/<yyyymmdd-hhmmss>-<locale>/` (`content/` is gitignored — generated output never enters git).
 - Connects using `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` from the environment, falling back to running `supabase status -o env` itself (`resolveLocalStackConfig`, re-exported from `src/repository`, documented there as local-dev only). Requires the local stack to be up and seeded: `supabase start && npm run db:reset` (see `supabase/README.md`).
@@ -22,8 +22,8 @@ npx tsx src/scripts/generate.ts --locale nl|en --mode mixed|single_category --di
 ### Example commands
 
 ```sh
-npx tsx src/scripts/generate.ts --locale nl --mode mixed --difficulty mixed --email demo-nl@example.com --seed 42
-npx tsx src/scripts/generate.ts --locale en --mode single_category --pick 0=1 --difficulty mixed --email demo-en@example.com --seed 42
+npx tsx src/scripts/generate.ts --locale nl --difficulty mixed --email demo-nl@example.com --seed 42
+npx tsx src/scripts/generate.ts --locale en --pick 1 --difficulty mixed --email demo-en@example.com --seed 42
 ```
 
 ### Output
@@ -38,7 +38,7 @@ The Composition is persisted last, after every Deliverable has been written, so 
 
 ### Failure behaviour
 
-If the request can't be filled — not enough eligible Items for a slot, or (in `mixed` mode) not enough distinct Categories left to assign — generation hard-fails: two lines to stderr,
+If the request can't be filled — not enough eligible Items for a slot, or (with no `--pick`) not enough distinct Categories left to assign — generation hard-fails: two lines to stderr,
 
 ```
 Generation failed: slot <n>, Category <name or id, or "none">, shortfall <k>

@@ -12,7 +12,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PgBoss } from "pg-boss";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { CategoryPick, Locale, QuizConfig } from "@/domain";
+import type { Locale, QuizConfig } from "@/domain";
 import { downloadPath } from "@/domain";
 import { generateQuiz, type GeneratedQuizFiles } from "@/scripts/generate-quiz";
 import {
@@ -58,12 +58,11 @@ function freshEmail(prefix: string): string {
   return cleanup.trackEmail(`${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`);
 }
 
-const FULLY_RANDOM_PICKS: CategoryPick[] = new Array(8).fill(undefined);
+const FULLY_RANDOM_PICKS: string[] = [];
 
 function buildConfig(overrides: Partial<QuizConfig> = {}): QuizConfig {
   return {
     locale: "nl",
-    quizMode: "mixed",
     categoryPicks: FULLY_RANDOM_PICKS,
     requestedDifficulty: "mixed",
     ...overrides,
@@ -128,7 +127,6 @@ async function insertFakeComposition(billingEmail: string, config: QuizConfig): 
     .insert({
       billing_email: billingEmail,
       locale: config.locale,
-      quiz_mode: config.quizMode,
       requested_difficulty: config.requestedDifficulty,
       seed: 1,
     })
@@ -165,7 +163,6 @@ function createStubGenerateQuiz(compositionId: string): {
       compositionRecord: {
         billingEmail: options.billingEmail,
         locale: options.locale,
-        quizMode: options.quizMode,
         requestedDifficulty: options.requestedDifficulty,
         seed: options.seed,
         composition: { slots: [] },
@@ -211,27 +208,24 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
   });
 
   it(
-    "a Quiz whose configuration cannot be satisfied ends failed after one attempt, with slot/Category/shortfall in the reason, nothing in the bucket",
+    "a single-pick Quiz whose Category runs short ends failed after one attempt, with slot/Category/shortfall in the reason, nothing in the bucket",
     async () => {
       // Same fixture as generate.integration.test.ts's "unsatisfiable
       // requests" suite: Category id 1 ("Sport"/"Sports") gets 70 hard Text
       // Items (7 per Subsubcategory x 10), 60 of which a first
-      // single_category/hard run consumes, leaving exactly 10 -- enough for
+      // single-pick/hard run consumes, leaving exactly 10 -- enough for
       // a second run's slot 0 but not its slot 1.
       const HARD_TEXT_CATEGORY_ID = "1";
       const HARD_TEXT_CATEGORY_NAME: Record<Locale, string> = { nl: "Sport", en: "Sports" };
       const email = freshEmail("worker-shortfall");
 
-      function singleCategoryPick(categoryId: string): CategoryPick[] {
-        const picks = new Array(8).fill(undefined) as CategoryPick[];
-        picks[0] = categoryId;
-        return picks;
+      function singleCategoryPick(categoryId: string): string[] {
+        return [categoryId];
       }
 
       const firstResult = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick(HARD_TEXT_CATEGORY_ID),
           requestedDifficulty: "hard",
           billingEmail: email,
@@ -246,7 +240,6 @@ describe.skipIf(resolveFfmpeg() === null)("handleQuizJob, driven directly (needs
       const quizId = await insertPendingQuiz(
         email,
         buildConfig({
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick(HARD_TEXT_CATEGORY_ID),
           requestedDifficulty: "hard",
         }),

@@ -41,16 +41,16 @@ Start a second line item with `--quiz`:
 
 ```sh
 npx tsx scripts/shop/place-order.ts --email you@example.com \
-  --locale nl --difficulty easy --mode mixed --pick 0=1 \
-  --quiz --locale en --difficulty hard --mode single_category --pick 0=2
+  --locale nl --difficulty easy --pick 1 \
+  --quiz --locale en --difficulty hard --pick 2
 ```
 
 ### A failing order (impossible configuration)
 
-Either an unknown Category id (fails at webhook parse time, before any generation attempt) or a `single_category` pick with too few Items for that Category (fails during generation, a `QuizShortfallError`). The unknown-id form is the simplest to reproduce on demand:
+Either an unknown Category id (fails at webhook parse time, before any generation attempt) or a single pick with too few Items for that Category, which cycles onto all 8 slots (fails during generation, a `QuizShortfallError`). The unknown-id form is the simplest to reproduce on demand:
 
 ```sh
-npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --mode single_category --pick 0=999999
+npx tsx scripts/shop/place-order.ts --email you@example.com --locale nl --difficulty easy --pick 999999
 ```
 
 The order stays `processing`; check the order note and the operator alert mail (see "Inspecting mail" below).
@@ -126,5 +126,5 @@ Stop `next dev` with Ctrl-C. To fully reset the shop's WordPress database: `npx 
 - **File equivalence**: re-rendering the same Composition via `--composition <id>` and re-downloading through the same token produced PDFs identical in size (and content except for `@react-pdf/renderer`'s embedded `/CreationDate`/`/Creator` timestamp objects -- confirmed by diffing the differing byte ranges) and an MP3 within 1 byte of the original size (ffmpeg's own encode is not byte-deterministic run to run; duration/content is unchanged). PDF rendering is therefore not byte-deterministic across runs of the *same* Composition -- sizes match, not hashes.
 - **No-repeat**: two orders for the same billing email produced two Compositions with 80 Items each and **zero** overlapping Item ids between them.
 - **Failure path**: an order with an unknown Category id stayed `processing`, carried a `[pubquiz] line item ...: unknown Category id "999999" at slot 0` private note, produced the `[Pubquiz] Order #N needs attention` alert mail, and had no `pubquiz_download_*` meta on its line item.
-- **Multi-quiz order**: one order with two differently configured line items (`nl`/easy/mixed and `en`/hard/single_category) reached `completed` with 8 distinct download links (4 per Quiz) in one completed-order mail.
+- **Multi-quiz order**: one order with two differently configured line items (`nl`/easy/several picks and `en`/hard/one pick) reached `completed` with 8 distinct download links (4 per Quiz) in one completed-order mail.
 - **Webhook redelivery**: manually redelivering the webhook for an already-`completed` order left the order/Quiz rows and Storage objects unchanged (same ids, same 4 files per Quiz, no duplicates).

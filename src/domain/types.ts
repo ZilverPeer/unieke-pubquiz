@@ -5,8 +5,6 @@
 
 export type Locale = "nl" | "en";
 
-export type QuizMode = "mixed" | "single_category";
-
 export type ItemKind = "text" | "picture" | "music";
 
 export type Difficulty = "easy" | "medium" | "hard";
@@ -29,14 +27,15 @@ export const SLOT_COUNT = SLOT_KINDS.length;
 
 export const ITEMS_PER_SLOT = 10;
 
-/** A customer's Category pick for one of the 8 slots, or undefined to randomize it. */
-export type CategoryPick = string | undefined;
-
 export interface QuizRequest {
   locale: Locale;
-  quizMode: QuizMode;
-  /** Category id per slot (index 0-7), undefined where the slot is unassigned. */
-  categoryPicks: CategoryPick[];
+  /**
+   * The customer's Category ids, in pick order, 0 to 8 entries, distinct.
+   * Cycled evenly over the 8 Round slots: with k picks (k >= 1), slot i gets
+   * pick `i % k`; with 0 picks, every slot gets a random Category, distinct
+   * across slots. See src/sample/README.md "Categories".
+   */
+  categoryPicks: string[];
   requestedDifficulty: RequestedDifficulty;
   billingEmail: string;
 }
@@ -79,7 +78,6 @@ export interface GenerationFailure {
 export interface CompositionRecord {
   billingEmail: string;
   locale: Locale;
-  quizMode: QuizMode;
   requestedDifficulty: RequestedDifficulty;
   seed: number;
   composition: Composition;

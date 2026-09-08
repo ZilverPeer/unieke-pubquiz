@@ -146,7 +146,7 @@ function fakeQuiz(overrides: Partial<QuizRecord>): QuizRecord {
     orderId: "order-1",
     wooLineItemId: 1,
     sequence: 0,
-    config: { locale: "nl", quizMode: "mixed", categoryPicks: [], requestedDifficulty: "mixed" },
+    config: { locale: "nl", categoryPicks: [], requestedDifficulty: "mixed" },
     status: "delivered",
     failureReason: null,
     compositionId: "comp-1",

@@ -15,7 +15,6 @@ function buildCompositionRecord(overrides: Partial<CompositionRecord> = {}): Com
   return {
     billingEmail: "recompose-test@example.com",
     locale: "nl",
-    quizMode: "mixed",
     requestedDifficulty: "mixed",
     seed: 1,
     composition: { slots: new Array(8).fill([]) },

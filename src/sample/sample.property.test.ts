@@ -13,17 +13,9 @@
  */
 import * as fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import type {
-  CategoryPick,
-  Difficulty,
-  ItemKind,
-  Locale,
-  PoolItem,
-  QuizMode,
-  QuizRequest,
-  RequestedDifficulty,
-} from "@/domain";
+import type { Difficulty, ItemKind, Locale, PoolItem, QuizRequest, RequestedDifficulty } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT, SLOT_KINDS } from "@/domain";
+import { buildPoolFixture } from "@/domain/fixtures";
 import { createSeededRandom, sampleComposition } from "./index";
 import { fillSlot } from "./slots";
 
@@ -84,7 +76,7 @@ function makePoolItem(fields: {
  * runs.
  *
  * `sampleComposition` now excludes Items already placed by earlier slots of
- * the same Composition (see issue #34), so `single_category` mode - where up
+ * the same Composition (see issue #34), so a single-pick request - where up
  * to 6 "text" slots share one Category and its pool never refills between
  * slots - needs noticeably more headroom per (Subsubcategory, Difficulty)
  * cell than before that fix to still reach a full Composition most of the
@@ -93,9 +85,9 @@ function makePoolItem(fields: {
  * into shortfalls instead of being silently allowed. Widening to 25-35
  * Subsubcategories with a 3-10 item count and a locale pattern weighted more
  * heavily towards "both" restores headroom, measuring ~83/100 full
- * Compositions - the remainder are all genuine `mixed`-mode `categoryId:
- * null` shortfalls from too few pool Categories (unrelated to slot-sharing),
- * still exercising the `!result.ok` path.
+ * Compositions - the remainder are all genuine multi-pick `categoryId: null`
+ * shortfalls from too few pool Categories (unrelated to slot-sharing), still
+ * exercising the `!result.ok` path.
  */
 const worldArb: fc.Arbitrary<World> = fc
   .array(fc.integer({ min: 25, max: 35 }), { minLength: 1, maxLength: 4 })
@@ -158,50 +150,40 @@ interface Scenario {
 }
 
 /**
- * `mixed` mode picks one Category explicitly and leaves the other 7 slots
- * unassigned; with only 1-4 pool Categories that almost always yields a
- * `categoryId: null` shortfall (already covered by sample.test.ts), so
- * `single_category` is weighted much higher to keep runs where property 1-3
+ * A single pick fills all 8 slots (the cycle rule's k=1 case); with
+ * only 1-4 pool Categories, a multi-pick request almost always yields a
+ * `categoryId: null` shortfall (already covered by sample.test.ts), so a
+ * single pick is weighted much higher to keep runs where property 1-3
  * actually have Items to check.
  */
 const scenarioArb: fc.Arbitrary<Scenario> = worldArb.chain((world) =>
-  fc.record({
-    world: fc.constant(world),
-    quizMode: fc.oneof(
-      { weight: 4, arbitrary: fc.constant<QuizMode>("single_category") },
-      { weight: 1, arbitrary: fc.constant<QuizMode>("mixed") },
-    ),
-    requestedDifficulty: fc.constantFrom(...REQUESTED_DIFFICULTIES),
-    locale: fc.constantFrom<Locale>("nl", "en"),
-    pickSlot: fc.integer({ min: 0, max: SLOT_COUNT - 1 }),
-    pickCategoryIndex: fc.integer({ min: 0, max: world.categoryIds.length - 1 }),
-    // Exclude whole Subsubcategories (every Item in them), not scattered
-    // individual ids: with small pools and duplicate Items per (kind,
-    // Difficulty, Subsubcategory), excluding a handful of individual ids
-    // rarely lands on the one that would actually get picked, so a broken
-    // exclusion filter can slip past a smaller exclusion set undetected.
-    excludedSubsubIndices: fc.subarray(
-      Array.from(new Set(world.pool.map((item) => item.subsubcategoryId))),
-      { maxLength: Math.min(2, new Set(world.pool.map((item) => item.subsubcategoryId)).size) },
-    ),
-    seed: fc.integer(),
-  }).map(
-    ({
-      world,
-      quizMode,
-      requestedDifficulty,
-      locale,
-      pickSlot,
-      pickCategoryIndex,
-      excludedSubsubIndices,
-      seed,
-    }) => {
-      const categoryPicks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-      categoryPicks[pickSlot] = world.categoryIds[pickCategoryIndex];
+  fc
+    .oneof(
+      { weight: 4, arbitrary: fc.constant(1) },
+      { weight: 1, arbitrary: fc.integer({ min: 0, max: world.categoryIds.length }) },
+    )
+    .chain((pickCount) =>
+      fc.record({
+        world: fc.constant(world),
+        requestedDifficulty: fc.constantFrom(...REQUESTED_DIFFICULTIES),
+        locale: fc.constantFrom<Locale>("nl", "en"),
+        picks: fc.shuffledSubarray(world.categoryIds, { minLength: pickCount, maxLength: pickCount }),
+        // Exclude whole Subsubcategories (every Item in them), not scattered
+        // individual ids: with small pools and duplicate Items per (kind,
+        // Difficulty, Subsubcategory), excluding a handful of individual ids
+        // rarely lands on the one that would actually get picked, so a broken
+        // exclusion filter can slip past a smaller exclusion set undetected.
+        excludedSubsubIndices: fc.subarray(
+          Array.from(new Set(world.pool.map((item) => item.subsubcategoryId))),
+          { maxLength: Math.min(2, new Set(world.pool.map((item) => item.subsubcategoryId)).size) },
+        ),
+        seed: fc.integer(),
+      }),
+    )
+    .map(({ world, requestedDifficulty, locale, picks, excludedSubsubIndices, seed }) => {
       const request: QuizRequest = {
         locale,
-        quizMode,
-        categoryPicks,
+        categoryPicks: picks,
         requestedDifficulty,
         billingEmail: "player@example.com",
       };
@@ -210,8 +192,7 @@ const scenarioArb: fc.Arbitrary<Scenario> = worldArb.chain((world) =>
         world.pool.filter((item) => excludedSubsubSet.has(item.subsubcategoryId)).map((item) => item.id),
       );
       return { world, request, excludedIds, seed };
-    },
-  ),
+    }),
 );
 
 describe("sampleComposition properties", () => {
@@ -242,10 +223,10 @@ describe("sampleComposition properties", () => {
           expect(new Set(slot).size).toBe(slot.length);
         }
 
-        // No duplicate Item across the whole Composition, in either mode:
-        // `mixed` mode gives every slot a distinct Category (enforced by
-        // resolveSlotCategories) so two slots can never share an Item;
-        // `single_category` mode assigns the SAME Category to all 8 slots
+        // No duplicate Item across the whole Composition, regardless of pick
+        // count: several distinct picks give every slot a distinct Category
+        // (enforced by resolveSlotCategories) so two slots can never share
+        // an Item; a single pick assigns the SAME Category to all 8 slots
         // (6 of them "text"), so sampleComposition itself must track Items
         // already placed by earlier slots of the same Composition and
         // exclude them from later slots' pools.
@@ -325,6 +306,128 @@ describe("sampleComposition properties", () => {
     // Measured: 70/100 runs reached a full Composition, same generator and
     // global seed as property 1 above.
     expect(successCount).toBeGreaterThanOrEqual(50);
+  });
+});
+
+/**
+ * A dense, deterministic 8-Category pool - same shape as sample.test.ts's
+ * own buildSingleCategoryPool, dense enough that even k=1 (one Category
+ * cycled into all 8 slots, 6 of them "text", no refill between slots - see
+ * sample.test.ts) always fills, so property 5 below can assert on the exact
+ * Category cycled into every slot for every pick count 0-8, not just the
+ * ones that happen to succeed.
+ */
+function buildCyclePool() {
+  return buildPoolFixture({
+    locales: ["nl"],
+    categories: 8,
+    subsubcategoriesPerCategory: 10,
+    itemsPerKindPerDifficulty: 560,
+  });
+}
+
+function categoryIdOfSlot(pool: readonly PoolItem[], slot: readonly string[]): string {
+  const [firstId] = slot;
+  const item = pool.find((candidate) => candidate.id === firstId);
+  if (!item) throw new Error(`test setup error: no pool item with id ${firstId}`);
+  return item.categoryId;
+}
+
+function cycleRequest(picks: readonly string[]): QuizRequest {
+  return {
+    locale: "nl",
+    categoryPicks: [...picks],
+    requestedDifficulty: "easy",
+    billingEmail: "player@example.com",
+  };
+}
+
+describe("resolveSlotCategories cycle rule (property 5)", () => {
+  const { pool, categories } = buildCyclePool();
+  const categoryIds = categories.map((category) => category.id);
+
+  test("k >= 1 picks cycle over the 8 slots in pick order, each pick used floor(8/k) or ceil(8/k) times", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: SLOT_COUNT }).chain((k) =>
+          fc.record({
+            picks: fc.shuffledSubarray(categoryIds, { minLength: k, maxLength: k }),
+            seed: fc.integer(),
+          }),
+        ),
+        ({ picks, seed }) => {
+          const result = sampleComposition({
+            request: cycleRequest(picks),
+            pool,
+            excludedItemIds: new Set(),
+            random: createSeededRandom(seed),
+          });
+
+          expect(result.ok).toBe(true);
+          if (!result.ok) return;
+
+          const categoryPerSlot = result.composition.slots.map((slot) => categoryIdOfSlot(pool, slot));
+          const k = picks.length;
+          for (let slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++) {
+            expect(categoryPerSlot[slotIndex]).toBe(picks[slotIndex % k]);
+          }
+
+          const counts = new Map<string, number>();
+          for (const categoryId of categoryPerSlot) {
+            counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1);
+          }
+          const min = Math.floor(SLOT_COUNT / k);
+          const max = Math.ceil(SLOT_COUNT / k);
+          for (const pick of picks) {
+            const count = counts.get(pick) ?? 0;
+            expect(count).toBeGreaterThanOrEqual(min);
+            expect(count).toBeLessThanOrEqual(max);
+          }
+        },
+      ),
+    );
+  });
+
+  test("0 picks give 8 distinct random Categories", () => {
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        const result = sampleComposition({
+          request: cycleRequest([]),
+          pool,
+          excludedItemIds: new Set(),
+          random: createSeededRandom(seed),
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const categoryPerSlot = result.composition.slots.map((slot) => categoryIdOfSlot(pool, slot));
+        expect(new Set(categoryPerSlot).size).toBe(SLOT_COUNT);
+      }),
+    );
+  });
+
+  test("duplicate Category picks throw", () => {
+    expect(() =>
+      sampleComposition({
+        request: cycleRequest([categoryIds[0], categoryIds[1], categoryIds[0]]),
+        pool,
+        excludedItemIds: new Set(),
+        random: createSeededRandom(1),
+      }),
+    ).toThrow(/distinct/i);
+  });
+
+  test("more than 8 Category picks throw", () => {
+    const ninePicks = Array.from({ length: 9 }, (_, i) => `extra-category-${i}`);
+    expect(() =>
+      sampleComposition({
+        request: cycleRequest(ninePicks),
+        pool,
+        excludedItemIds: new Set(),
+        random: createSeededRandom(1),
+      }),
+    ).toThrow(/at most 8/i);
   });
 });
 

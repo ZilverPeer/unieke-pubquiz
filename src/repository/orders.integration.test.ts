@@ -5,7 +5,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CategoryPick, QuizConfig } from "@/domain";
+import type { QuizConfig } from "@/domain";
 import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import type { Database } from "./database.types";
 import { createOrderRepository, IllegalQuizTransitionError, resolveLocalStackConfig } from "./index";
@@ -31,21 +31,11 @@ function freshWooOrderId(): number {
   return nextWooOrderId++;
 }
 
-const CATEGORY_PICKS: CategoryPick[] = [
-  "1",
-  undefined,
-  "2",
-  undefined,
-  undefined,
-  undefined,
-  undefined,
-  undefined,
-];
+const CATEGORY_PICKS: string[] = ["1", "2"];
 
 function buildConfig(overrides: Partial<QuizConfig> = {}): QuizConfig {
   return {
     locale: "nl",
-    quizMode: "mixed",
     categoryPicks: CATEGORY_PICKS,
     requestedDifficulty: "mixed",
     ...overrides,
@@ -225,7 +215,6 @@ async function createComposition(): Promise<string> {
     .insert({
       billing_email: cleanup.trackEmail("composition@example.com"),
       locale: "nl",
-      quiz_mode: "mixed",
       requested_difficulty: "mixed",
       seed: 1,
     })

@@ -19,9 +19,10 @@ import { generateQuiz, type GeneratedQuizFiles, type WriteDeliverables } from ".
 const TONE_A = join(__dirname, "..", "..", "supabase", "seed-assets", "music-clips", "tone-a.mp3");
 
 async function buildFakeRepository(): Promise<ContentRepository> {
-  // 7 Items per (kind, Difficulty, Subsubcategory) - `baseOptions` below is
-  // `single_category`, and `sampleComposition` excludes Items already
-  // placed by earlier slots of the same Composition, so the 6 "text" slots
+  // 7 Items per (kind, Difficulty, Subsubcategory) - `baseOptions` below
+  // uses a single pick (which cycles onto all 8 slots), and
+  // `sampleComposition` excludes Items already placed by earlier slots of
+  // the same Composition, so the 6 "text" slots
   // need well more than one Item per Subsubcategory to each draw a fresh 10.
   const fixture = buildPoolFixture({
     locales: ["nl"],
@@ -68,8 +69,7 @@ async function buildFakeRepository(): Promise<ContentRepository> {
 function baseOptions(): GenerateOptions {
   return {
     locale: "nl",
-    quizMode: "single_category",
-    categoryPicks: ["category-0", undefined, undefined, undefined, undefined, undefined, undefined, undefined],
+    categoryPicks: ["category-0"],
     requestedDifficulty: "easy",
     billingEmail: "generate-quiz-test@example.com",
     seed: 1,

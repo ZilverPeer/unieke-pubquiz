@@ -58,11 +58,11 @@ const noopWriteDeliverables: WriteDeliverables = async () => {};
 
 // Category id 1 is "Sport" (nl) / "Sports" (en) -- see supabase/seed.sql
 // section 1. Every Category gets 7 hard Text Items per Subsubcategory (70
-// total, 10 Items of slack over the 60 a single_category Quiz's 6 Text
+// total, 10 Items of slack over the 60 a single-pick Quiz's 6 Text
 // Rounds need -- see supabase/README.md "Pool coverage"). A first
-// single_category run at --difficulty hard against this Category consumes
+// single-pick run at --difficulty hard against this Category consumes
 // 60 of those 70 (one per Subsubcategory per Round, 6 Rounds), leaving
-// exactly 10 (one per Subsubcategory). A second single_category run against
+// exactly 10 (one per Subsubcategory). A second single-pick run against
 // the same Category and Difficulty then succeeds at slot 0 -- drawing those
 // last 10 -- and genuinely shortfalls at slot 1 (the next Text Round), which
 // finds zero hard Text Items left in any of the Category's Subsubcategories.
@@ -75,17 +75,11 @@ function freshEmail(prefix: string): string {
   return email;
 }
 
-function fullyRandomCategoryPicks(): GenerateOptions["categoryPicks"] {
-  return new Array(SLOT_COUNT).fill(undefined);
-}
-
 function singleCategoryPick(categoryId: string): GenerateOptions["categoryPicks"] {
-  // single_category mode uses the first defined entry for every slot (see
+  // A single pick cycles onto every slot (ticket #71's cycle rule -- see
   // src/sample/README.md) -- one pick is enough, matching the CLI's own
-  // `--pick 0=<id>` convention.
-  const picks = fullyRandomCategoryPicks();
-  picks[0] = categoryId;
-  return picks;
+  // `--pick <id>` convention.
+  return [categoryId];
 }
 
 async function makeTmpDir(): Promise<string> {
@@ -130,8 +124,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
         const { status, stderr } = runCli([
           "--locale",
           locale,
-          "--mode",
-          "mixed",
           "--difficulty",
           "mixed",
           "--email",
@@ -204,7 +196,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
       const result1 = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick("1"),
           requestedDifficulty: "mixed",
           billingEmail: email,
@@ -217,7 +208,6 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
       const result2 = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick("2"),
           requestedDifficulty: "mixed",
           billingEmail: email,
@@ -241,7 +231,7 @@ describe.skipIf(resolveFfmpeg() === null)("generate CLI end to end (needs ffmpeg
 });
 
 describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)", () => {
-  it("a second single_category --difficulty hard run for the same email and Category pick fails slot 1 with shortfall 10, persists nothing, and writes no output folder", async () => {
+  it("a second single-pick --difficulty hard run for the same email and Category pick fails slot 1 with shortfall 10, persists nothing, and writes no output folder", async () => {
     const email = freshEmail("unsatisfiable");
     const outDir = join(await makeTmpDir(), "run-2");
 
@@ -249,7 +239,6 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
       const firstResult = await generateQuiz(
         {
           locale: "nl",
-          quizMode: "single_category",
           categoryPicks: singleCategoryPick(HARD_TEXT_CATEGORY_ID),
           requestedDifficulty: "hard",
           billingEmail: email,
@@ -267,14 +256,12 @@ describe.skipIf(resolveFfmpeg() === null)("unsatisfiable requests (needs ffmpeg)
       const { status, stdout, stderr } = runCli([
         "--locale",
         "nl",
-        "--mode",
-        "single_category",
         "--difficulty",
         "hard",
         "--email",
         email,
         "--pick",
-        `0=${HARD_TEXT_CATEGORY_ID}`,
+        HARD_TEXT_CATEGORY_ID,
         "--seed",
         "201",
         "--out",

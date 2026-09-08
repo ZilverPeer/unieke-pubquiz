@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { buildPoolFixture } from "@/domain/fixtures";
-import type { CategoryPick, Difficulty, PoolItem, QuizRequest } from "@/domain";
+import type { Difficulty, PoolItem, QuizRequest } from "@/domain";
 import { ITEMS_PER_SLOT, SLOT_COUNT, SLOT_KINDS } from "@/domain";
 import { createSeededRandom, sampleComposition } from "./index";
 
@@ -23,13 +23,13 @@ function buildFullPool() {
 /**
  * A pool with 8 Categories, each with 10 Subsubcategories, and 7 Items per
  * (Category, kind, Difficulty, Subsubcategory) combination - i.e. 70
- * eligible Items per (Category, kind, Difficulty). `single_category` mode
- * puts 6 "text" slots on the same Category with no refill between slots
+ * eligible Items per (Category, kind, Difficulty). A single pick cycles onto
+ * 6 "text" slots sharing the same Category with no refill between slots
  * (sampleComposition excludes Items already placed by earlier slots), so
  * this needs comfortably more per-Category density than `buildFullPool`'s
- * exact 1-per-Subsubcategory (which is deliberately zero-slack for `mixed`
- * mode, where every slot has a distinct Category): 70 text-easy Items give
- * 6 slots of 10 (60 needed) 10 Items of headroom.
+ * exact 1-per-Subsubcategory (which is deliberately zero-slack for 8
+ * distinct picks, one per slot): 70 text-easy Items give 6 slots of 10 (60
+ * needed) 10 Items of headroom.
  */
 function buildSingleCategoryPool() {
   return buildPoolFixture({
@@ -43,8 +43,7 @@ function buildSingleCategoryPool() {
 function baseRequest(overrides: Partial<QuizRequest> = {}): QuizRequest {
   return {
     locale: "nl",
-    quizMode: "mixed",
-    categoryPicks: new Array(SLOT_COUNT).fill(undefined) as CategoryPick[],
+    categoryPicks: [],
     requestedDifficulty: "easy",
     billingEmail: "player@example.com",
     ...overrides,
@@ -79,11 +78,9 @@ describe("sampleComposition", () => {
     });
   });
 
-  test("customer picks land in their slots", () => {
+  test("8 distinct picks cycle one-to-one onto the 8 slots, in pick order", () => {
     const { pool, categories } = buildFullPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[0] = categories[2].id;
-    picks[3] = categories[5].id;
+    const picks = categories.map((category) => category.id);
 
     const result = sampleComposition({
       request: baseRequest({ categoryPicks: picks }),
@@ -95,43 +92,16 @@ describe("sampleComposition", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    for (const id of result.composition.slots[0]) {
-      expect(itemById(pool, id).categoryId).toBe(categories[2].id);
-    }
-    for (const id of result.composition.slots[3]) {
-      expect(itemById(pool, id).categoryId).toBe(categories[5].id);
-    }
-  });
-
-  test("unassigned slots in mixed mode get Categories that differ from every pick and from each other", () => {
-    const { pool, categories } = buildFullPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[0] = categories[2].id;
-    picks[3] = categories[5].id;
-
-    const result = sampleComposition({
-      request: baseRequest({ categoryPicks: picks }),
-      pool,
-      excludedItemIds: new Set(),
-      random: createSeededRandom(1),
+    result.composition.slots.forEach((slot, slotIndex) => {
+      for (const id of slot) {
+        expect(itemById(pool, id).categoryId).toBe(picks[slotIndex]);
+      }
     });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const categoryPerSlot = result.composition.slots.map((slot) => itemById(pool, slot[0]).categoryId);
-    // Every slot's Category is unique across all 8 slots.
-    expect(new Set(categoryPerSlot).size).toBe(SLOT_COUNT);
-    // The picked slots keep their picks.
-    expect(categoryPerSlot[0]).toBe(categories[2].id);
-    expect(categoryPerSlot[3]).toBe(categories[5].id);
   });
 
-  test("mixed mode rejects duplicate Category picks", () => {
+  test("rejects duplicate Category picks", () => {
     const { pool, categories } = buildFullPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[0] = categories[2].id;
-    picks[3] = categories[2].id;
+    const picks = [categories[2].id, categories[2].id];
 
     expect(() =>
       sampleComposition({
@@ -140,10 +110,24 @@ describe("sampleComposition", () => {
         excludedItemIds: new Set(),
         random: createSeededRandom(1),
       }),
-    ).toThrow(Error);
+    ).toThrow(/distinct/i);
   });
 
-  test("mixed mode with fewer pool Categories than unassigned slots fails with a null-Category shortfall", () => {
+  test("rejects more than 8 Category picks", () => {
+    const { pool, categories } = buildFullPool();
+    const picks = [...categories.map((c) => c.id), "extra-category"];
+
+    expect(() =>
+      sampleComposition({
+        request: baseRequest({ categoryPicks: picks }),
+        pool,
+        excludedItemIds: new Set(),
+        random: createSeededRandom(1),
+      }),
+    ).toThrow(/at most 8/i);
+  });
+
+  test("0 picks with fewer pool Categories than slots fails with a null-Category shortfall", () => {
     // Only 3 distinct Categories in the pool, no picks: slots 0-2 can each
     // get a Category, slot 3 onward can't - a content shortfall, not a
     // caller error.
@@ -167,13 +151,12 @@ describe("sampleComposition", () => {
     expect(result.failure).toEqual({ slotIndex: 3, categoryId: null, shortfall: 5 });
   });
 
-  test("single_category mode uses one Category for all 8 slots", () => {
+  test("a single pick cycles that one Category onto all 8 slots", () => {
     const { pool, categories } = buildSingleCategoryPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[1].id;
+    const picks = [categories[1].id];
 
     const result = sampleComposition({
-      request: baseRequest({ quizMode: "single_category", categoryPicks: picks }),
+      request: baseRequest({ categoryPicks: picks }),
       pool,
       excludedItemIds: new Set(),
       random: createSeededRandom(1),
@@ -189,14 +172,14 @@ describe("sampleComposition", () => {
     }
   });
 
-  test("single_category mode never places the same Item in two slots", () => {
+  test("a single pick never places the same Item in two slots", () => {
     // Repro from issue #34: one Category, ten Subsubcategories, ten Items
-    // per (kind, Difficulty) - exactly enough for one slot's quota. In
-    // single_category mode all 6 text slots share this one Category.
-    // Before the fix, sampleComposition never excluded Items already
-    // placed by earlier slots of the same Composition, so slot 0 and
-    // slot 1 drew from the same untouched 10-Item pool and ended up with
-    // the exact same Items (`ok: true`, no error, no repeat detected).
+    // per (kind, Difficulty) - exactly enough for one slot's quota. A single
+    // pick cycles onto all 8 slots, 6 of them "text", sharing this one
+    // Category. Before the fix, sampleComposition never excluded Items
+    // already placed by earlier slots of the same Composition, so slot 0
+    // and slot 1 drew from the same untouched 10-Item pool and ended up
+    // with the exact same Items (`ok: true`, no error, no repeat detected).
     // After the fix, that repeat is a genuine content shortfall - the
     // pool has nothing left to give slot 1 without repeating slot 0's
     // Items - not a silently duplicated slot.
@@ -207,12 +190,10 @@ describe("sampleComposition", () => {
       itemsPerKindPerDifficulty: 10,
     });
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[0] = categories[0].id;
+    const picks = [categories[0].id];
 
     const result = sampleComposition({
       request: baseRequest({
-        quizMode: "single_category",
         categoryPicks: picks,
         requestedDifficulty: "easy",
       }),
@@ -236,19 +217,6 @@ describe("sampleComposition", () => {
     }
   });
 
-  test("single_category mode throws when no Category is picked", () => {
-    const { pool } = buildFullPool();
-
-    expect(() =>
-      sampleComposition({
-        request: baseRequest({ quizMode: "single_category" }),
-        pool,
-        excludedItemIds: new Set(),
-        random: createSeededRandom(1),
-      }),
-    ).toThrow(Error);
-  });
-
   test("no two Items in a slot share a Subsubcategory", () => {
     // 10 Subsubcategories with 7 Items each at "easy" so the fill has to
     // choose among several candidates per Subsubcategory, with enough
@@ -261,11 +229,10 @@ describe("sampleComposition", () => {
       itemsPerKindPerDifficulty: 70,
     });
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    const picks = [categories[0].id];
 
     const result = sampleComposition({
-      request: baseRequest({ quizMode: "single_category", categoryPicks: picks }),
+      request: baseRequest({ categoryPicks: picks }),
       pool,
       excludedItemIds: new Set(),
       random: createSeededRandom(7),
@@ -282,14 +249,12 @@ describe("sampleComposition", () => {
 
   test("requested Difficulty easy/medium/hard yields only Items of that Difficulty", () => {
     const { pool, categories } = buildSingleCategoryPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    const picks = [categories[0].id];
 
     const difficulties: Difficulty[] = ["easy", "medium", "hard"];
     for (const difficulty of difficulties) {
       const result = sampleComposition({
         request: baseRequest({
-          quizMode: "single_category",
           categoryPicks: picks,
           requestedDifficulty: difficulty,
         }),
@@ -311,15 +276,13 @@ describe("sampleComposition", () => {
 
   test("mixed Difficulty yields 4/3/3 per slot, with the level getting 4 varying across seeds", () => {
     const { pool, categories } = buildSingleCategoryPool();
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    const picks = [categories[0].id];
 
     const extraLevels = new Set<Difficulty>();
 
     for (let seed = 1; seed <= 15; seed++) {
       const result = sampleComposition({
         request: baseRequest({
-          quizMode: "single_category",
           categoryPicks: picks,
           requestedDifficulty: "mixed",
         }),
@@ -369,11 +332,10 @@ describe("sampleComposition", () => {
       pool.filter((item) => item.kind === "text" && item.difficulty === "easy").slice(0, 2).map((i) => i.id),
     );
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    const picks = [categories[0].id];
 
     const result = sampleComposition({
-      request: baseRequest({ quizMode: "single_category", categoryPicks: picks }),
+      request: baseRequest({ categoryPicks: picks }),
       pool,
       excludedItemIds: excluded,
       random: createSeededRandom(3),
@@ -407,11 +369,10 @@ describe("sampleComposition", () => {
       enOnlyIds.has(item.id) ? { ...item, locales: ["en"] } : item,
     );
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[4] = categories[0].id;
+    const picks = [categories[0].id];
 
     const result = sampleComposition({
-      request: baseRequest({ quizMode: "single_category", categoryPicks: picks, locale: "nl" }),
+      request: baseRequest({ categoryPicks: picks, locale: "nl" }),
       pool: poolWithLocaleGap,
       excludedItemIds: new Set(),
       random: createSeededRandom(2),
@@ -456,11 +417,10 @@ describe("sampleComposition", () => {
       return keptMusicEasyIds.has(item.id);
     });
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[7] = categories[0].id;
+    const picks = [categories[0].id];
 
     const result = sampleComposition({
-      request: baseRequest({ quizMode: "single_category", categoryPicks: picks }),
+      request: baseRequest({ categoryPicks: picks }),
       pool,
       excludedItemIds: new Set(),
       random: createSeededRandom(1),
@@ -543,14 +503,14 @@ describe("sampleComposition", () => {
   });
 
   test("position order within a slot is randomised, not pool order", () => {
-    // `mixed` mode (rather than `single_category`) so slot 0's Category is
-    // exclusive to it - the other 7 slots draw distinct Categories from the
-    // pool's remaining 7, decoupling this assertion from any other slot's
-    // exclusions and keeping the pool-order comparison exact.
+    // 8 distinct picks (rather than a single pick cycled onto every slot) so
+    // slot 0's Category is exclusive to it - the other 7 slots draw distinct
+    // Categories from the pool's remaining 7, decoupling this assertion from
+    // any other slot's exclusions and keeping the pool-order comparison
+    // exact.
     const { pool, categories } = buildFullPool();
 
-    const picks: CategoryPick[] = new Array(SLOT_COUNT).fill(undefined);
-    picks[0] = categories[0].id;
+    const picks = categories.map((category) => category.id);
 
     const poolOrderTextEasy = pool
       .filter((item) => item.kind === "text" && item.difficulty === "easy" && item.categoryId === categories[0].id)

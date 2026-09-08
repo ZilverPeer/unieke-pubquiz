@@ -10,8 +10,7 @@ import { retryQuiz } from "./retry-quiz";
 function buildQuiz(overrides: Partial<QuizRecord> = {}): QuizRecord {
   const config: QuizConfig = {
     locale: "nl",
-    quizMode: "mixed",
-    categoryPicks: new Array(8).fill(undefined),
+    categoryPicks: [],
     requestedDifficulty: "mixed",
   };
   return {

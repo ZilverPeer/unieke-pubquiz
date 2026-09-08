@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseOrderPayload } from "./parse-order";
 
-// Recorded real WooCommerce payload (ticket #37) -- one line item, quantity
-// 1, quiz mode single_category, three Category picks (slots 1-3, ids "1",
-// "3", "5") plus locale/difficulty/mode meta -- see shop/README.md "The
-// webhook".
+// Recorded real WooCommerce payload (ticket #37, re-recorded for #71 now
+// that the checkout no longer sends a mode meta key) -- one line item,
+// quantity 1, three Category picks in pick order (ids "1", "3", "5") plus
+// locale/difficulty meta -- see shop/README.md "The webhook".
 const FIXTURE_PATH = join(process.cwd(), "shop/fixtures/order-updated-processing.json");
 
 function loadFixtureBody(): Record<string, unknown> {
@@ -61,9 +61,8 @@ describe("parseOrderPayload", () => {
     expect(lineItem.quantity).toBe(1);
     expect(lineItem.config).toEqual({
       locale: "nl",
-      quizMode: "single_category",
       requestedDifficulty: "mixed",
-      categoryPicks: ["1", "3", "5", undefined, undefined, undefined, undefined, undefined],
+      categoryPicks: ["1", "3", "5"],
     });
     expect(lineItemErrors.size).toBe(0);
   });
@@ -81,7 +80,22 @@ describe("parseOrderPayload", () => {
     expect(input.lineItems[0].config.locale).toBe("nl");
   });
 
-  it("records a parse error and drops the pick for an unknown Category id, but keeps the rest of the config", () => {
+  it("ignores a pubquiz_mode meta key, still sent by the live shop until ticket #72 replaces the field group", () => {
+    const body = loadFixtureBody();
+    const lineItems = cloneLineItems(body);
+    lineItems[0] = withMeta(lineItems[0], "pubquiz_mode", "single_category");
+
+    const { input, lineItemErrors } = parseOrderPayload({ ...body, line_items: lineItems }, EXISTING_CATEGORY_IDS);
+
+    expect(input.lineItems[0].config).toEqual({
+      locale: "nl",
+      requestedDifficulty: "mixed",
+      categoryPicks: ["1", "3", "5"],
+    });
+    expect(lineItemErrors.size).toBe(0);
+  });
+
+  it("records a parse error and drops an unknown Category id from the picks, keeping the rest in order", () => {
     const body = loadFixtureBody();
     const lineItems = cloneLineItems(body);
     lineItems[0] = withMeta(lineItems[0], "pubquiz_category_1", "999");
@@ -89,9 +103,32 @@ describe("parseOrderPayload", () => {
     const { input, lineItemErrors } = parseOrderPayload({ ...body, line_items: lineItems }, EXISTING_CATEGORY_IDS);
 
     const [lineItem] = input.lineItems;
-    expect(lineItem.config.categoryPicks[0]).toBeUndefined();
-    expect(lineItem.config.categoryPicks[1]).toBe("3");
+    expect(lineItem.config.categoryPicks).toEqual(["3", "5"]);
     expect(lineItemErrors.get(lineItem.wooLineItemId)).toMatch(/unknown category id "999"/i);
+  });
+
+  it("records a parse error and drops a duplicate Category id from the picks, keeping the first occurrence", () => {
+    const body = loadFixtureBody();
+    const lineItems = cloneLineItems(body);
+    lineItems[0] = withMeta(lineItems[0], "pubquiz_category_2", "1");
+
+    const { input, lineItemErrors } = parseOrderPayload({ ...body, line_items: lineItems }, EXISTING_CATEGORY_IDS);
+
+    const [lineItem] = input.lineItems;
+    expect(lineItem.config.categoryPicks).toEqual(["1", "5"]);
+    expect(lineItemErrors.get(lineItem.wooLineItemId)).toMatch(/duplicate category id "1"/i);
+  });
+
+  it("stops collecting picks at the first missing key, ignoring any later key even if present", () => {
+    const body = loadFixtureBody();
+    const lineItems = cloneLineItems(body);
+    lineItems[0] = withMeta(lineItems[0], "pubquiz_category_2", undefined);
+
+    const { input, lineItemErrors } = parseOrderPayload({ ...body, line_items: lineItems }, EXISTING_CATEGORY_IDS);
+
+    const [lineItem] = input.lineItems;
+    expect(lineItem.config.categoryPicks).toEqual(["1"]);
+    expect(lineItemErrors.size).toBe(0);
   });
 
   it("records a parse error for a missing Locale meta key", () => {

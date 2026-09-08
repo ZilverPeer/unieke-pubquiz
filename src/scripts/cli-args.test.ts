@@ -9,8 +9,6 @@ describe("parseGenerateArgs", () => {
     const options = parseGenerateArgs([
       "--locale",
       "nl",
-      "--mode",
-      "mixed",
       "--difficulty",
       "hard",
       "--email",
@@ -22,42 +20,34 @@ describe("parseGenerateArgs", () => {
     ]);
 
     expect(options.locale).toBe("nl");
-    expect(options.quizMode).toBe("mixed");
     expect(options.requestedDifficulty).toBe("hard");
     expect(options.billingEmail).toBe("erik@example.com");
     expect(options.seed).toBe(42);
     expect(options.out).toBe("content/generated/test-run");
-    expect(options.categoryPicks).toEqual(new Array(8).fill(undefined));
+    expect(options.categoryPicks).toEqual([]);
   });
 
-  it("assigns repeated --pick flags to their slots", () => {
+  it("collects repeated --pick flags in order", () => {
     const options = parseGenerateArgs([
       "--locale",
       "en",
-      "--mode",
-      "mixed",
       "--difficulty",
       "mixed",
       "--email",
       "erik@example.com",
       "--pick",
-      "0=3",
+      "3",
       "--pick",
-      "7=5",
+      "5",
     ]);
 
-    const expected = new Array(8).fill(undefined);
-    expected[0] = "3";
-    expected[7] = "5";
-    expect(options.categoryPicks).toEqual(expected);
+    expect(options.categoryPicks).toEqual(["3", "5"]);
   });
 
   it("defaults seed to an integer within the 32-bit range and out to a timestamped folder under content/generated", () => {
     const options = parseGenerateArgs([
       "--locale",
       "nl",
-      "--mode",
-      "mixed",
       "--difficulty",
       "mixed",
       "--email",
@@ -72,74 +62,40 @@ describe("parseGenerateArgs", () => {
 
   it("throws a clear message for an invalid --locale", () => {
     expect(() =>
-      parseGenerateArgs([
-        "--locale",
-        "fr",
-        "--mode",
-        "mixed",
-        "--difficulty",
-        "mixed",
-        "--email",
-        "erik@example.com",
-      ]),
+      parseGenerateArgs(["--locale", "fr", "--difficulty", "mixed", "--email", "erik@example.com"]),
     ).toThrow(/--locale/);
   });
 
-  it("throws when --mode is missing", () => {
+  it("throws when --locale is missing", () => {
     expect(() =>
-      parseGenerateArgs(["--locale", "nl", "--difficulty", "mixed", "--email", "erik@example.com"]),
-    ).toThrow(/--mode/);
+      parseGenerateArgs(["--difficulty", "mixed", "--email", "erik@example.com"]),
+    ).toThrow(/--locale/);
   });
 
-  it("throws when a --pick slot is out of the 0-7 range", () => {
+  it("throws when more than 8 --pick flags are given", () => {
+    const argv = ["--locale", "nl", "--difficulty", "mixed", "--email", "erik@example.com"];
+    for (let i = 0; i < 9; i++) {
+      argv.push("--pick", String(i + 1));
+    }
+
+    expect(() => parseGenerateArgs(argv)).toThrow(/at most 8/i);
+  });
+
+  it("throws when the same --pick category id is given twice", () => {
     expect(() =>
       parseGenerateArgs([
         "--locale",
         "nl",
-        "--mode",
-        "mixed",
         "--difficulty",
         "mixed",
         "--email",
         "erik@example.com",
         "--pick",
-        "8=3",
-      ]),
-    ).toThrow(/0 and 7/);
-  });
-
-  it("throws when single_category mode has no --pick", () => {
-    expect(() =>
-      parseGenerateArgs([
-        "--locale",
-        "nl",
-        "--mode",
-        "single_category",
-        "--difficulty",
-        "mixed",
-        "--email",
-        "erik@example.com",
-      ]),
-    ).toThrow(/single_category/);
-  });
-
-  it("throws when single_category mode has more than one --pick", () => {
-    expect(() =>
-      parseGenerateArgs([
-        "--locale",
-        "nl",
-        "--mode",
-        "single_category",
-        "--difficulty",
-        "mixed",
-        "--email",
-        "erik@example.com",
+        "3",
         "--pick",
-        "0=1",
-        "--pick",
-        "1=2",
+        "3",
       ]),
-    ).toThrow(/single_category/);
+    ).toThrow(/distinct/i);
   });
 });
 
@@ -148,8 +104,6 @@ describe("parseScriptArgs", () => {
     const command = parseScriptArgs([
       "--locale",
       "nl",
-      "--mode",
-      "mixed",
       "--difficulty",
       "hard",
       "--email",

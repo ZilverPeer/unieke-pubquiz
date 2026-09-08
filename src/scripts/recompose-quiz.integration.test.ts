@@ -9,7 +9,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CategoryPick, QuizConfig } from "@/domain";
+import type { QuizConfig } from "@/domain";
 import { DELIVERABLE_FILES, DOWNLOAD_VALIDITY_DAYS } from "@/domain";
 import type { Deliverer } from "@/deliver";
 import {
@@ -54,12 +54,11 @@ function freshEmail(prefix: string): string {
   return cleanup.trackEmail(`${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@example.com`);
 }
 
-const FULLY_RANDOM_PICKS: CategoryPick[] = new Array(8).fill(undefined);
+const FULLY_RANDOM_PICKS: string[] = [];
 
 function buildConfig(): QuizConfig {
   return {
     locale: "nl",
-    quizMode: "mixed",
     categoryPicks: FULLY_RANDOM_PICKS,
     requestedDifficulty: "mixed",
   };
@@ -165,7 +164,6 @@ describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => 
     const { compositionId } = await contentRepository.persistComposition({
       billingEmail: freshEmail("recompose-orphan"),
       locale: "nl",
-      quizMode: "mixed",
       requestedDifficulty: "mixed",
       seed: 1,
       composition: { slots: new Array(8).fill([]) },

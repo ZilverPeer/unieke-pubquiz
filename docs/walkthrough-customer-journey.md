@@ -128,17 +128,17 @@ curl.exe -s -c cookies.txt -b cookies.txt "http://localhost:45330/mijn-account/d
 
 ## Placing a failing order on purpose
 
-Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a `single_category` quiz whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's dropdown, which only ever offers real Category ids):
+Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a single pick (which cycles onto all 8 slots) whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's dropdown, which only ever offers real Category ids):
 
 ```powershell
-npx tsx scripts/shop/place-order.ts --email failing-order@example.com --locale nl --difficulty easy --mode single_category --pick 0=999999
+npx tsx scripts/shop/place-order.ts --email failing-order@example.com --locale nl --difficulty easy --pick 999999
 ```
 
 This places a paid order directly (skipping checkout). Watch Mailpit: instead of a completed-order mail, an operator alert arrives, **"[Pubquiz] Order #<n> needs attention"**, with the private note's text, e.g.:
 
 > A private order note starting with "[pubquiz]" was added to order #<n>:
 >
-> [pubquiz] line item <id>: unknown Category id "999999" at slot 0
+> [pubquiz] line item <id>: unknown Category id "999999" at pick 1
 
 The order itself stays `processing` forever (WooCommerce never sees a reason to move it) -- no completed mail, no download links. Check the status directly if you like:
 

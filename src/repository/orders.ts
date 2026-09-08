@@ -8,7 +8,7 @@
  * `pending`. Status transitions are enforced against QUIZ_STATUS_TRANSITIONS.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CategoryPick, OrderRecord, QuizConfig, QuizRecord, QuizStatus } from "@/domain";
+import type { OrderRecord, QuizConfig, QuizRecord, QuizStatus } from "@/domain";
 import { QUIZ_STATUS_TRANSITIONS } from "@/domain";
 import type { Database, Json } from "./database.types";
 
@@ -59,12 +59,8 @@ function toOrderRecord(row: OrderRow): OrderRecord {
   };
 }
 
-function toCategoryPicks(value: Json): CategoryPick[] {
-  // jsonb has no "undefined": a CategoryPick[]'s undefined entries
-  // (unassigned slots) come back from Postgres as null. Convert back on the
-  // way out so QuizRecord matches the domain shape (QuizConfig.categoryPicks
-  // is `string | undefined`, not `string | null`).
-  return (value as (string | null)[]).map((pick) => pick ?? undefined);
+function toCategoryPicks(value: Json): string[] {
+  return value as string[];
 }
 
 function toQuizRecord(row: QuizRow): QuizRecord {
@@ -75,7 +71,6 @@ function toQuizRecord(row: QuizRow): QuizRecord {
     sequence: row.sequence,
     config: {
       locale: row.locale,
-      quizMode: row.quiz_mode,
       categoryPicks: toCategoryPicks(row.category_picks),
       requestedDifficulty: row.requested_difficulty,
     },
@@ -113,7 +108,6 @@ export async function upsertOrder(
       woo_line_item_id: lineItem.wooLineItemId,
       sequence,
       locale: lineItem.config.locale,
-      quiz_mode: lineItem.config.quizMode,
       requested_difficulty: lineItem.config.requestedDifficulty,
       category_picks: lineItem.config.categoryPicks as Database["public"]["Tables"]["quizzes"]["Insert"]["category_picks"],
     })),
