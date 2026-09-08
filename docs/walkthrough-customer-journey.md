@@ -1,0 +1,159 @@
+# Walkthrough: the customer journey in the local shop (ticket #59)
+
+For Erik, to judge the shop as a customer would experience it. Every command below is the exact PowerShell form -- run them from a PowerShell prompt in the repo root. `curl.exe` (not the `curl` alias for `Invoke-WebRequest`) is used for every scripted HTTP step, so the browser steps have a scriptable equivalent when a browser isn't available.
+
+## The one command
+
+```powershell
+npm run loop:up
+```
+
+Starts the local Supabase stack (unless already running -- never resets it), the shop (wp-env, Mailpit, the cron ticker), and the app with the pg-boss worker. Safe to run again while everything is already up (see `docs/runbook-local-loop.md`). It prints, at the end:
+
+- **Shop:** http://localhost:45330
+- **Mailpit:** http://127.0.0.1:45332
+- **App:** http://localhost:3000 (the download route; you never navigate here directly except via a download link)
+- the app log path (`.local/next-dev.log`), if anything looks stuck
+
+When you're done: `npm run loop:down` (see the end of this document).
+
+## The product page
+
+Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three required dropdowns above the price:
+
+- **Taal** -- Nederlands / Engels
+- **Moeilijkheid** -- Makkelijk / Gemiddeld / Moeilijk / Gemengd
+- **Soort quiz** -- Gemengd / Eén categorie
+
+Picking **Eén categorie** reveals **Categorie 1**, a dropdown of the seeded Categories' Dutch names (currently Sport, Geschiedenis, Muziek, Aardrijkskunde, Wetenschap, Film en TV, Literatuur, Algemene Kennis -- whatever the local Supabase stack's seed has). Pick a value for each visible dropdown, then click **Toevoegen aan winkelwagen**.
+
+**Curl equivalent** (a fresh cookie jar per attempt keeps the cart session; `14` is the Pubquiz product id, confirm with `npm run shop:up`'s own "Product: #14" line if it's ever different locally):
+
+```powershell
+curl.exe -s -c cookies.txt -b cookies.txt `
+  -d "quantity=1" -d "add-to-cart=14" -d "wapf_field_groups=14" `
+  -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
+  -d "wapf[field_mode]=single_category" -d "wapf[field_category_1]=1" `
+  "http://localhost:45330/product/pubquiz/"
+```
+
+## Checkout with the test gateway
+
+Click through to **Winkelwagen** then **Naar de kassa** (or go straight to http://localhost:45330/afrekenen/). The checkout form asks only for **Voornaam**, **Achternaam** and **E-mailadres** -- no address fields. Below that, a checkbox: **Een account aanmaken?** -- tick it once (see "My Account downloads" below) to see that path too.
+
+**Use a fresh e-mail address every time.** The no-repeat rule means Compositions never reuse the same Item pool for the same billing email across orders -- reusing an address doesn't break anything, it's just less interesting to look at.
+
+The only payment method is **Test payment (local only)** (`pubquiz_test_gateway`), selected by default -- it always succeeds. Click **Plaats bestelling**.
+
+**Curl equivalent**, continuing the same cookie jar (scrape the checkout nonce first, then submit):
+
+```powershell
+curl.exe -s -c cookies.txt -b cookies.txt "http://localhost:45330/afrekenen/" -o checkout.html
+$nonce = (Select-String -Path checkout.html -Pattern 'woocommerce-process-checkout-nonce" value="([a-f0-9]+)"').Matches[0].Groups[1].Value
+$email = "you-$(Get-Date -UFormat %s)@example.com"
+
+curl.exe -s -c cookies.txt -b cookies.txt `
+  -d "billing_first_name=Erik" -d "billing_last_name=Test" `
+  -d "billing_email=$email" -d "billing_country=NL" `
+  -d "payment_method=pubquiz_test_gateway" `
+  -d "woocommerce-process-checkout-nonce=$nonce" -d "_wp_http_referer=/afrekenen/" `
+  "http://localhost:45330/?wc-ajax=checkout"
+```
+
+The JSON response carries `"result":"success"` and a `redirect` URL -- the order-received page below. Add `-d "createaccount=1"` to also create an account (see "My Account downloads").
+
+## The order-received page
+
+Redirects to `http://localhost:45330/afrekenen/order-received/<order id>/?key=...`. It reads, in Dutch:
+
+> Bedankt. Je bestelling is ontvangen.
+>
+> Je quiz wordt gemaakt. Je ontvangt binnen enkele minuten een e-mail met de downloadlink.
+
+followed by the order summary (product, your picks, the total).
+
+## The processing mail
+
+Open Mailpit (http://127.0.0.1:45332) -- or, scripted:
+
+```powershell
+curl.exe -s http://127.0.0.1:45332/api/v1/messages
+```
+
+to list messages and get an `ID`, then:
+
+```powershell
+curl.exe -s "http://127.0.0.1:45332/api/v1/message/<message id>"
+```
+
+for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij Pubquiz-wt-shop is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Soort quiz/Categorie N, in Dutch, matching what you picked).
+
+If you ticked **Een account aanmaken?**, a second mail arrives: **"Je account bij Pubquiz-wt-shop is aangemaakt!"**, naming your username and a password-reset link (WooCommerce never mails a plaintext password) -- you don't need it for this walkthrough, since checkout already logs the new account in for the rest of your browser session.
+
+A third mail, **"[Pubquiz-wt-shop]: nieuwe bestelling #<n> ontvangen"**, goes to the shop admin (also routed to Mailpit locally) -- not customer-facing, safe to ignore.
+
+## Waiting for generation
+
+Do nothing else. `npm run shop:up`'s cron ticker keeps WordPress's cron ticking every 5 seconds, so the `order.updated` webhook reaches the app worker on its own, and generation typically finishes within well under a minute. If nothing has happened after a minute or two, see `docs/runbook-local-loop.md` "Troubleshooting".
+
+## The completed mail
+
+A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling bij Pubquiz-wt-shop is nu afgerond"**. It repeats the order summary and adds four download links, one per Deliverable, each with a Dutch label:
+
+- **Quizmaster-script** (`quizmaster.pdf`)
+- **Beeldronde hand-out** (`picture-handout.pdf`)
+- **Antwoordenblad** (`answer-sheet.pdf`)
+- **Muziekronde** (`music-round.mp3`)
+
+Each link is `http://localhost:3000/download/<token>/<file>`.
+
+## Downloading the files
+
+Click each link in your browser, or:
+
+```powershell
+curl.exe -o quizmaster.pdf "http://localhost:3000/download/<token>/quizmaster.pdf"
+curl.exe -o picture-handout.pdf "http://localhost:3000/download/<token>/picture-handout.pdf"
+curl.exe -o answer-sheet.pdf "http://localhost:3000/download/<token>/answer-sheet.pdf"
+curl.exe -o music-round.mp3 "http://localhost:3000/download/<token>/music-round.mp3"
+```
+
+All four are real files (a script and answer-sheet PDF around 15-30 KB, a picture hand-out PDF a few hundred KB depending on the images sampled, an MP3 under a megabyte).
+
+## My Account downloads (an account created at checkout)
+
+If you ticked **Een account aanmaken?**, the same download links also show up under **Mijn account -> Downloads** (http://localhost:45330/mijn-account/downloads/) for as long as your browser session (or cookie jar) stays logged in from checkout -- no separate login step needed right after placing the order. The page lists, per product: **Product / Resterende downloads / Vervalt / Download** -- each of the four files with **&infin;** (unlimited) and **Nooit** (never expires).
+
+**Curl equivalent**, same cookie jar as the checkout call that had `-d "createaccount=1"`:
+
+```powershell
+curl.exe -s -c cookies.txt -b cookies.txt "http://localhost:45330/mijn-account/downloads/" -o downloads.html
+```
+
+## Placing a failing order on purpose
+
+Two ways to make generation fail on purpose (both documented in `shop/README.md`/`docs/runbook-local-loop.md` "A failing order"): a `single_category` quiz whose Category has too few Items for the requested difficulty/amount, or -- simplest to reproduce on demand -- an unknown Category id, via the order script (bypasses the product page's dropdown, which only ever offers real Category ids):
+
+```powershell
+npx tsx scripts/shop/place-order.ts --email failing-order@example.com --locale nl --difficulty easy --mode single_category --pick 0=999999
+```
+
+This places a paid order directly (skipping checkout). Watch Mailpit: instead of a completed-order mail, an operator alert arrives, **"[Pubquiz] Order #<n> needs attention"**, with the private note's text, e.g.:
+
+> A private order note starting with "[pubquiz]" was added to order #<n>:
+>
+> [pubquiz] line item <id>: unknown Category id "999999" at slot 0
+
+The order itself stays `processing` forever (WooCommerce never sees a reason to move it) -- no completed mail, no download links. Check the status directly if you like:
+
+```powershell
+npx wp-env run cli -- wp wc shop_order get <order id> --field=status --user=admin
+```
+
+## Stopping everything
+
+```powershell
+npm run loop:down
+```
+
+Stops the app (and its worker), the shop (wp-env, Mailpit, the cron ticker), and the Supabase stack -- tolerant of anything already stopped, always exits successfully. Data is preserved; `npm run loop:up` picks up where you left off.

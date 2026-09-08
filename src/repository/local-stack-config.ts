@@ -16,7 +16,12 @@ import type { RepositoryConfig } from "./client";
 const DEMO_SERVICE_ROLE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
-function parseStatusEnv(output: string): Record<string, string> {
+/**
+ * Parses `KEY="value"` (or `KEY=value`) lines, one per line -- the shape
+ * `supabase status -o env` prints. Exported so scripts/loop/lib/supabase-status.ts
+ * (ticket #59) can reuse the exact same parser instead of a second copy.
+ */
+export function parseStatusEnv(output: string): Record<string, string> {
   const values: Record<string, string> = {};
   for (const line of output.split(/\r?\n/)) {
     const match = /^([A-Z0-9_]+)="?(.*?)"?$/.exec(line.trim());
