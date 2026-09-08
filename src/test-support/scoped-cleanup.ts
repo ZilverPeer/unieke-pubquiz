@@ -21,6 +21,12 @@
  * compositions cascade-deletes composition_items, and seed Items are never
  * touched), then any deliverables bucket objects for the quiz ids
  * involved.
+ *
+ * `trackItemId` (ticket #88, additive): the admin Items suite creates its
+ * own Items directly (not reachable from a billing email at all), so it
+ * tracks the ids it creates and cleanup() deletes their item_translations
+ * row(s) first, then the item row itself -- never a seeded Item, since
+ * only ids this suite created are ever tracked.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/repository/database.types";
@@ -39,9 +45,16 @@ export interface ScopedCleanup {
    */
   trackQuizId(quizId: string): string;
   /**
-   * Deletes every row/object reachable from the tracked emails and quiz
-   * ids, in FK-safe order, then clears tracking. Safe to call with
-   * nothing tracked (a no-op).
+   * Tracks an Item id this suite created directly (ticket #88), so
+   * cleanup() deletes its translation row(s) and the Item row itself.
+   * Returns the id unchanged, for the same inline-wrapping convenience as
+   * trackEmail/trackQuizId.
+   */
+  trackItemId(itemId: string): string;
+  /**
+   * Deletes every row/object reachable from the tracked emails, quiz ids
+   * and Item ids, in FK-safe order, then clears tracking. Safe to call
+   * with nothing tracked (a no-op).
    */
   cleanup(): Promise<void>;
 }
@@ -51,6 +64,7 @@ const DELIVERABLES_BUCKET = "deliverables";
 export function createScopedCleanup(db: SupabaseClient<Database>): ScopedCleanup {
   const emails = new Set<string>();
   const quizIds = new Set<string>();
+  const itemIds = new Set<string>();
 
   function trackEmail(email: string): string {
     emails.add(email);
@@ -60,6 +74,11 @@ export function createScopedCleanup(db: SupabaseClient<Database>): ScopedCleanup
   function trackQuizId(quizId: string): string {
     quizIds.add(quizId);
     return quizId;
+  }
+
+  function trackItemId(itemId: string): string {
+    itemIds.add(itemId);
+    return itemId;
   }
 
   async function resolveQuizIds(emailList: string[]): Promise<Set<string>> {
@@ -89,8 +108,17 @@ export function createScopedCleanup(db: SupabaseClient<Database>): ScopedCleanup
     }
   }
 
+  async function removeItems(): Promise<void> {
+    if (itemIds.size === 0) return;
+    const ids = [...itemIds];
+    const { error: translationsError } = await db.from("item_translations").delete().in("item_id", ids);
+    if (translationsError) throw translationsError;
+    const { error: itemsError } = await db.from("items").delete().in("id", ids);
+    if (itemsError) throw itemsError;
+  }
+
   async function cleanup(): Promise<void> {
-    if (emails.size === 0 && quizIds.size === 0) return;
+    if (emails.size === 0 && quizIds.size === 0 && itemIds.size === 0) return;
     const emailList = [...emails];
 
     const allQuizIds = await resolveQuizIds(emailList);
@@ -106,10 +134,12 @@ export function createScopedCleanup(db: SupabaseClient<Database>): ScopedCleanup
       const { error: compositionsError } = await db.from("compositions").delete().in("billing_email", emailList);
       if (compositionsError) throw compositionsError;
     }
+    await removeItems();
 
     emails.clear();
     quizIds.clear();
+    itemIds.clear();
   }
 
-  return { trackEmail, trackQuizId, cleanup };
+  return { trackEmail, trackQuizId, trackItemId, cleanup };
 }

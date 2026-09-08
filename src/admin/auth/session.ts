@@ -31,3 +31,38 @@ export async function requireOperator(): Promise<OperatorSession | null> {
 
   return { email: user.email };
 }
+
+/**
+ * Thrown by assertOperator() when the session is not an allowlisted
+ * operator, so a server action can refuse the write without redirecting
+ * (a server action can't `redirect()` mid-mutation the way a page render
+ * can).
+ */
+export class NotAnOperatorError extends Error {
+  constructor() {
+    super("Not an allowlisted operator");
+    this.name = "NotAnOperatorError";
+  }
+}
+
+/**
+ * Re-check for area server actions (spec 4 admin tickets, #87/#88/#92/#93,
+ * additive): the shell layout already guards page renders with
+ * requireOperator(), but a server action is a separate request and must
+ * re-check for itself rather than trust that the page that rendered its
+ * form was actually guarded. Throws NotAnOperatorError instead of
+ * redirecting, since a form action has no natural "redirect to login"
+ * moment mid-mutation.
+ *
+ * A thin wrapper around requireOperator() so every area's actions.ts can
+ * take an injectable `deps.assertOperator` (defaulting to this real
+ * implementation), letting integration tests bypass the Supabase Auth
+ * session entirely by passing a stub (see admin-common brief "Tests").
+ */
+export async function assertOperator(): Promise<OperatorSession> {
+  const operator = await requireOperator();
+  if (!operator) {
+    throw new NotAnOperatorError();
+  }
+  return operator;
+}
