@@ -23,15 +23,30 @@ Erik's walkthrough shop instance (main checkout, 670d5ccc) was still up; stopped
 - #84: a3b795011a43996e9
 - #85: ab938f2e9c22fa25c
 - #86: ab2495ee12130c602
+- PR 99 reviewers: standards a22cbb11155bcfdfe, spec ad9c5c4cce7e1ba9c
+- PR 100 reviewers: standards a27b75908974c6d2f, spec afc55313fadfc1bff
 
 ## Per ticket
 
 (filled at PR, review and merge)
+
+### #84 (PR 99)
+
+- 17:53 PR opened (8207bb1). Interface gap the implementer reported: the retry command printed a literal `<quiz id>` placeholder because the brief's input list omitted the Quiz id. Sent as a HARD immediately (fix round 1 running while the reviews run); reviewers told not to re-report it.
+- 17:56 both reviewers dispatched. Spec reviewer does no live order: the worker on 3000 runs master, not the branch; the alert-mail path is proven on master at wave end.
+
+### #86 (PR 100)
+
+- 17:56 PR opened (7e8b5b6). Reviewers dispatched 17:58; Spec reviewer uses a second review clone if the first is busy with PR 99.
 
 ## Drift log
 
 (one line per deviation: what the agent did, what the brief said, the fix)
 
 ## Observations for the retro
+
+- 18:02: both Standards reviews (PR 99, PR 100) flagged HARD "no red-first evidence in the PR body"; both implementers had put it in their chat report to the orchestrator only. Fixed at the source: the implement skill now says the PR body carries the report including the red evidence. Fix rounds add it to the two PR bodies.
+
+- 17:54 check-in: all four on plan. The #83 `loop:up` reused the app already listening on 3000: Erik's own `next dev` (with worker) from the main checkout, left from his walkthrough (only the shop had been stopped). Harmless for a shop-and-docs ticket; the orchestrator stops it with `loop:down` from the main checkout at the end of the wave.
 
 - Ticket bodies written with the Write tool and published with `gh issue create -R`; a bash heredoc in this environment breaks on the ticket prose, and `gh` outside the repo directory needs `-R`.
