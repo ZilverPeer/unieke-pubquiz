@@ -3,8 +3,14 @@ import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { requireOperator } from "@/admin/auth/session";
 import { setLocale } from "./locale/actions";
-import { signOut } from "./login/actions";
+import { signOut } from "../login/actions";
 
+// The (shell) route group (spec 4, ticket #85 fix round 1) keeps this guard
+// off /admin/login: requireOperator() below redirects to /admin/login on no
+// session, so if this layout also wrapped the login page itself, that
+// redirect would target its own route and loop forever. Route groups don't
+// affect the URL, so /admin, /admin/categories etc. are unchanged; only
+// /admin/login sits outside this group now (src/app/admin/login/layout.tsx).
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const locale = await getLocale();
   const messages = await getMessages();
