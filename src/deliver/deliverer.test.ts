@@ -198,7 +198,7 @@ describe("createDeliverer", () => {
     server.close();
   });
 
-  test("attaches the four download URLs to the line item as meta_data via PUT", async () => {
+  test("attaches the zip download URL to the line item as one meta_data entry via PUT", async () => {
     stub.seedOrder({ id: 999, status: "processing", line_items: [{ id: 1, meta_data: [] }] });
     const order = fakeOrderRecord({ wooOrderId: 999 });
     const quiz = fakeQuiz({ id: "quiz-1", wooLineItemId: 1, status: "delivered" });
@@ -207,12 +207,7 @@ describe("createDeliverer", () => {
     const deliverer = createDeliverer(config, lookup);
     await deliverer.deliverQuiz({
       quizId: "quiz-1",
-      files: [
-        { file: "quizmaster.pdf", url: "http://localhost:3000/download/tok/quizmaster.pdf" },
-        { file: "picture-handout.pdf", url: "http://localhost:3000/download/tok/picture-handout.pdf" },
-        { file: "answer-sheet.pdf", url: "http://localhost:3000/download/tok/answer-sheet.pdf" },
-        { file: "music-round.mp3", url: "http://localhost:3000/download/tok/music-round.mp3" },
-      ],
+      url: "http://localhost:3000/download/tok/quiz.zip",
     });
 
     const putRequests = stub.requests.filter(
@@ -227,18 +222,7 @@ describe("createDeliverer", () => {
       line_items: [
         {
           id: 1,
-          meta_data: [
-            { key: downloadMetaKey(0, "quizmaster.pdf"), value: "http://localhost:3000/download/tok/quizmaster.pdf" },
-            {
-              key: downloadMetaKey(0, "picture-handout.pdf"),
-              value: "http://localhost:3000/download/tok/picture-handout.pdf",
-            },
-            {
-              key: downloadMetaKey(0, "answer-sheet.pdf"),
-              value: "http://localhost:3000/download/tok/answer-sheet.pdf",
-            },
-            { key: downloadMetaKey(0, "music-round.mp3"), value: "http://localhost:3000/download/tok/music-round.mp3" },
-          ],
+          meta_data: [{ key: downloadMetaKey(0), value: "http://localhost:3000/download/tok/quiz.zip" }],
         },
       ],
     });
@@ -265,7 +249,7 @@ describe("createDeliverer", () => {
     );
 
     const deliverer = createDeliverer(config, lookup);
-    await deliverer.deliverQuiz({ quizId: "quiz-a", files: [] });
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
 
     const statusUpdates = stub.requests.filter(
       (request) => request.method === "PUT" && (request.body as { status?: string }).status !== undefined,
@@ -290,14 +274,14 @@ describe("createDeliverer", () => {
     const lookup = fakeOrderLookup(quizzes, order);
     const deliverer = createDeliverer(config, lookup);
 
-    await deliverer.deliverQuiz({ quizId: "quiz-a", files: [] });
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
     expect(stub.requests.some((r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed")).toBe(
       false,
     );
 
     // Second Quiz now also delivered.
     quizzes.set("quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 2, status: "delivered" }));
-    await deliverer.deliverQuiz({ quizId: "quiz-b", files: [] });
+    await deliverer.deliverQuiz({ quizId: "quiz-b", url: "http://localhost:3000/download/b/quiz.zip" });
 
     const completions = stub.requests.filter(
       (r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed",
@@ -326,7 +310,7 @@ describe("createDeliverer", () => {
     const lookup = fakeOrderLookup(quizzes, order);
     const deliverer = createDeliverer(config, lookup);
 
-    await deliverer.deliverQuiz({ quizId: "quiz-a", files: [] });
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
 
     const completions = stub.requests.filter(
       (r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed",
@@ -340,15 +324,15 @@ describe("createDeliverer", () => {
     const quiz = fakeQuiz({ id: "quiz-1", wooLineItemId: 1, status: "delivered" });
     const lookup = fakeOrderLookup(new Map([["quiz-1", quiz]]), order);
     const deliverer = createDeliverer(config, lookup);
-    const files = [{ file: "quizmaster.pdf" as const, url: "http://localhost:3000/a" }];
+    const url = "http://localhost:3000/download/tok/quiz.zip";
 
-    await deliverer.deliverQuiz({ quizId: "quiz-1", files });
+    await deliverer.deliverQuiz({ quizId: "quiz-1", url });
     const completionsAfterFirst = stub.requests.filter(
       (r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed",
     );
     expect(completionsAfterFirst).toHaveLength(1); // single Quiz, single-line order: completes on first delivery
 
-    await deliverer.deliverQuiz({ quizId: "quiz-1", files });
+    await deliverer.deliverQuiz({ quizId: "quiz-1", url });
 
     const finalOrder = await new Promise<WooOrder>((resolve) => {
       const req = httpRequest(
@@ -378,13 +362,8 @@ describe("createDeliverer", () => {
     ]);
     const lookup = fakeOrderLookup(quizzes, order);
     const deliverer = createDeliverer(config, lookup);
-    const filesFor = (label: string) =>
-      (["quizmaster.pdf", "picture-handout.pdf", "answer-sheet.pdf", "music-round.mp3"] as const).map((file) => ({
-        file,
-        url: `http://localhost:3000/download/${label}/${file}`,
-      }));
 
-    await deliverer.deliverQuiz({ quizId: "quiz-a", files: filesFor("a") });
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
 
     // Order isn't complete yet -- quiz-b is still pending.
     expect(stub.requests.some((r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed")).toBe(
@@ -393,7 +372,7 @@ describe("createDeliverer", () => {
 
     // Second Quiz now also delivered.
     quizzes.set("quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 1, sequence: 1, status: "delivered" }));
-    await deliverer.deliverQuiz({ quizId: "quiz-b", files: filesFor("b") });
+    await deliverer.deliverQuiz({ quizId: "quiz-b", url: "http://localhost:3000/download/b/quiz.zip" });
 
     const finalOrder = await new Promise<WooOrder>((resolve) => {
       const req = httpRequest(
@@ -407,13 +386,56 @@ describe("createDeliverer", () => {
       req.end();
     });
     const keys = finalOrder.line_items[0].meta_data.map((m) => m.key);
-    expect(new Set(keys).size).toBe(8); // eight distinct meta entries: 4 files x 2 Quizzes, no clobbering
-    expect(keys).toEqual(expect.arrayContaining([downloadMetaKey(0, "quizmaster.pdf"), downloadMetaKey(1, "quizmaster.pdf")]));
+    expect(new Set(keys).size).toBe(2); // one meta entry per Quiz, no clobbering
+    expect(keys).toEqual(expect.arrayContaining([downloadMetaKey(0), downloadMetaKey(1)]));
 
     const completions = stub.requests.filter(
       (r) => r.method === "PUT" && (r.body as { status?: string }).status === "completed",
     );
     expect(completions).toHaveLength(1); // completes only after both Quizzes of the shared line item are delivered
+  });
+
+  test("two Quizzes on two different line items (both quizzes.sequence 0) get order-wide, not per-line-item, download keys", async () => {
+    // Reproduces the collision found empirically against the running local
+    // loop (ticket #73, PR review round 2): two Quizzes, one per line item,
+    // both with quizzes.sequence 0 (the field restarts per line item) --
+    // the meta key (and, downstream, the zip file name) must still be
+    // distinct: pubquiz_download_1 and pubquiz_download_2, in
+    // listQuizzesByOrderId order, not both pubquiz_download_1.
+    stub.seedOrder({
+      id: 999,
+      status: "processing",
+      line_items: [
+        { id: 1, meta_data: [] },
+        { id: 2, meta_data: [] },
+      ],
+    });
+    const order = fakeOrderRecord({ wooOrderId: 999 });
+    const quizzes = new Map<string, QuizRecord>([
+      ["quiz-a", fakeQuiz({ id: "quiz-a", wooLineItemId: 1, sequence: 0, status: "delivered" })],
+      ["quiz-b", fakeQuiz({ id: "quiz-b", wooLineItemId: 2, sequence: 0, status: "delivered" })],
+    ]);
+    const lookup = fakeOrderLookup(quizzes, order);
+    const deliverer = createDeliverer(config, lookup);
+
+    await deliverer.deliverQuiz({ quizId: "quiz-a", url: "http://localhost:3000/download/a/quiz.zip" });
+    await deliverer.deliverQuiz({ quizId: "quiz-b", url: "http://localhost:3000/download/b/quiz.zip" });
+
+    const finalOrder = await new Promise<WooOrder>((resolve) => {
+      const req = httpRequest(
+        { hostname: "127.0.0.1", port: new URL(config.baseUrl).port, path: "/wp-json/wc/v3/orders/999", method: "GET" },
+        (res: IncomingMessage) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () => resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))));
+        },
+      );
+      req.end();
+    });
+    const lineItem1Keys = finalOrder.line_items.find((item) => item.id === 1)!.meta_data.map((m) => m.key);
+    const lineItem2Keys = finalOrder.line_items.find((item) => item.id === 2)!.meta_data.map((m) => m.key);
+    expect(lineItem1Keys).toEqual([downloadMetaKey(0)]); // "pubquiz_download_1"
+    expect(lineItem2Keys).toEqual([downloadMetaKey(1)]); // "pubquiz_download_2"
   });
 
   test("noteFailure posts a private order note with the OPERATOR_NOTE_PREFIX and line item id", async () => {
@@ -452,8 +474,8 @@ describe("createDeliverer", () => {
     const lookup = fakeOrderLookup(new Map([["quiz-1", quiz]]), order);
     const deliverer = createDeliverer(config, lookup);
 
-    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", files: [] })).rejects.toThrow(/500/);
-    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", files: [] })).rejects.toThrow(/wc\/v3\/orders\/999/);
+    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", url: "http://localhost:3000/download/a/quiz.zip" })).rejects.toThrow(/500/);
+    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", url: "http://localhost:3000/download/a/quiz.zip" })).rejects.toThrow(/wc\/v3\/orders\/999/);
   });
 
   test("throws with the endpoint on a connection refusal", async () => {
@@ -464,6 +486,6 @@ describe("createDeliverer", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
 
     const deliverer = createDeliverer(config, lookup);
-    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", files: [] })).rejects.toThrow(/wc\/v3\/orders\/999/);
+    await expect(deliverer.deliverQuiz({ quizId: "quiz-1", url: "http://localhost:3000/download/a/quiz.zip" })).rejects.toThrow(/wc\/v3\/orders\/999/);
   });
 });

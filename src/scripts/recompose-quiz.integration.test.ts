@@ -125,7 +125,7 @@ async function countCompositions(billingEmail: string): Promise<number> {
 }
 
 describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => {
-  it("re-renders and re-uploads the same Deliverables without a new Composition row, and calls the deliverer once with four files", async () => {
+  it("re-renders and re-uploads the same zip Deliverable without a new Composition row, and calls the deliverer once with its URL", async () => {
     const { quizId, compositionId, email } = await deliverFreshQuiz("recompose-happy");
 
     const objectsBefore = await listDeliverableObjects(quizId);
@@ -149,8 +149,7 @@ describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => 
     expect(fakeDeliverer.deliverQuiz).toHaveBeenCalledTimes(1);
     const call = (fakeDeliverer.deliverQuiz as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.quizId).toBe(quizId);
-    expect(call.files).toHaveLength(DELIVERABLE_FILES.length);
-    expect(call.files.map((f: { file: string }) => f.file).sort()).toEqual([...DELIVERABLE_FILES].sort());
+    expect(typeof call.url).toBe("string");
 
     const compositionsAfter = await countCompositions(email);
     expect(compositionsAfter).toBe(compositionsBefore);
@@ -217,9 +216,7 @@ describe.skipIf(resolveFfmpeg() === null)("recomposeQuiz (needs ffmpeg)", () => 
     expect(result.exitCode).toBe(0);
     expect(fakeDeliverer.deliverQuiz).toHaveBeenCalledTimes(1);
     const call = (fakeDeliverer.deliverQuiz as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.files.map((f: { url: string }) => f.url.includes(prunedQuiz!.downloadToken!))).toEqual(
-      call.files.map(() => true),
-    );
+    expect(call.url).toContain(prunedQuiz!.downloadToken!);
 
     const objectsAfter = await listDeliverableObjects(quizId);
     expect(objectsAfter.map((o) => o.name).sort()).toEqual([...DELIVERABLE_FILES].sort());
