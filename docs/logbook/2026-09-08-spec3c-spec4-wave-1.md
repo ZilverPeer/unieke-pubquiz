@@ -335,3 +335,13 @@ The implementer proved with WooCommerce's own delivery log and Action Scheduler 
 ## 2026-09-09 16:35 PR 135 (#132) merged; verified on the loop; wave-end checks
 
 PR 135: `isPingRequest` (no signature and body `^webhook_id=\d+$`) answers 200 before the signature check; two unit cases red first (357 unit on master), README paragraph. Read review, merged. Verification on the loop after restarting the app on the merged code: first order update produced `200` (delivery) and `200` (ping) and `pending_delivery` flipped to false; the second update produced exactly one `200`. Leaked-rows check on the reseeded stack: 2640 Items all at the seed timestamp, 8/16/80 category rows, no marker rows, storage 4 pictures + 4 clips + 1 deliverable from the probe order. App and shop stopped; `npm run test:integration` on master running with Supabase up; `loop:down` after it.
+
+## 2026-09-09 16:50 Wave closed
+
+`npm run test:integration` on master 03c1897: 23 files, 144 tests, green. `loop:down` (Supabase stopped), zero containers, no worktrees, no review clones, one wp-env directory left (the loop's own). Check-in cron deleted. Spec issues closed: #1, #36, #55, #69, #80, #82, #97, #98; open bugs: none. Merged this wave: PRs 113-120, 124-126, 128-130, 133-135. Retro with Erik next; then grilling for the storefront design spec, then the deliverable design spec (deployment, payments and real mail last, Erik's ordering of 2026-09-09).
+
+Retro input (for the conversation, not decisions):
+- Drifts logged: 6 (PR 125 reviewer on `.env.local`, #131 twice, #132 twice, #97 agent's cookie fragment). Three agents printed a cookie or token fragment; all local-stack values; rule now in the playbook (header filter and key-line count).
+- Blocks on the permission classifier: copying `.env.local` into review clones (reviewers), `admin:operator` with a password argument, a combined edit-and-probe command. Each cost a round trip to Erik or an orchestrator workaround.
+- Incident: Erik's loop app died 5 s after his `loop:up` (cause not found; started cleanly on a second run); the fail-open feasibility check then let two orders through silently. Worth a follow-up: `loop:up` could re-probe the app 10 s after "is up", and the shop could show an operator-visible warning when the feasibility call fails open.
+- Three issues found by reading logs rather than by tickets (#127, #131, #132): the dev log is worth a scan at every wave end.
