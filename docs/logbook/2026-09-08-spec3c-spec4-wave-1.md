@@ -224,3 +224,8 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - Review: main-session read of the diff (three files, no reviewers dispatched: no page, no stack, 72-line change). Both branches intact, env branch uncached, CLI result cached in module scope, throwing exec not cached, injectable `resolveLocalStackConfigWith({ env, exec })` seam, README sentence about restarting `next dev`/worker after `supabase stop`/`start`. Test stubs a fake `API_URL`/`SERVICE_ROLE_KEY` pair only. No findings.
 - Merge: merge-tree clean, `gh pr merge 124 --merge`, master `npm run check` green (unit 345). Worktree wt-123 removed.
 - Erik's running loop app still has the old code: restart the app (`.local/next-dev.pid`) to feel the speedup.
+
+## Hold 10:40: session usage limit hit (resets 12:40 Europe/Berlin)
+
+- #121 (wt-121) and #96 (wt-96) implementers terminated by HTTP 429 mid-task. #121 was about to run `npm run check` and commit (unit green, route integration case written); #96 had all files in place and was writing the README paragraph. Both worktrees hold uncommitted work; no server on 3096. Nothing lost.
+- Resume plan after the reset: dispatch a fresh implementer per ticket with the same brief plus "the worktree already contains a partial implementation; read `git status`/`git diff`, finish, run `npm run check`, commit and open the PR". Check-in cron fires against no running agents until then: no drift lines.
