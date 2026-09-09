@@ -37,6 +37,10 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 See `.env.example`, `src/app/api/webhooks/woocommerce/README.md`, `src/worker/README.md`, `src/deliver/README.md` and `shop/README.md` for the full detail behind each one.
 
+## Walkthroughs
+
+`docs/walkthrough-customer-journey.md` -- the shop as a customer would experience it, from the product page through checkout, generation and download. `docs/walkthrough-operator.md` -- the `/admin` area as the operator, from login through Categories, Items, bulk import, Coverage and Orders. Both run against `npm run loop:up` (`docs/runbook-local-loop.md`).
+
 ## Public routes
 
 `/api/webhooks/woocommerce` has no session or API key to check -- it verifies its own HMAC signature instead (see `src/app/api/webhooks/woocommerce/README.md`). No auth middleware exists yet (no `src/middleware.ts` or `src/proxy.ts`); when one is added, this route must stay excluded from it.
