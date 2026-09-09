@@ -276,3 +276,9 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - Implementer: no red pair possible (the action already scoped the file error under `errors.file`; the defect was the component not rendering it; no DOM test setup), stated in the PR body; new integration case "refuses a missing file on create and writes nothing" (file 8/8); check and build green; browser check done by reading (no browser tool; the `useActionState` form cannot be posted by curl), server on 3119 stopped by pid.
 - Review: main-session read (27-line diff, mirror of MusicFields: `errors: FieldErrors` from `@/admin/forms`, root-scoped `useTranslations()`, span under the file input; item-form passes live `errors` and drops the "left as-is" paragraph). Keys `pictureItems.errors.file.{required,type,size,notImage}` present in nl and en. No reviewers dispatched. Erik will see the message during his run-through; if it does not render, reopen #119.
 - Merge-tree clean, merged, master check green (unit 355). Worktree wt-119 removed.
+
+## PR 129 merged (#127, Music search) — 60c2062
+
+- Implementer: red `expected [] to deeply equal [ Array(1) ]` on the title search against master's list; items actions integration 8/8; check green; README clause added. Out of scope kept: Music rows show an empty question column in the list.
+- Review: main-session read (17-line repository change: `music_item_details(artist,title)` embedded in the same select, artist/title in the same in-memory match; the passing integration case proves the one-to-one embed returns an object). Test inserts base and detail rows directly, tracked by `trackItemId`. No reviewers dispatched.
+- Merge-tree clean, merged, master check green (unit 355). Worktree wt-127 removed. Remaining: #97 (running), #107 and the #97 Spec review at the stack-free moment.
