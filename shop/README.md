@@ -566,7 +566,8 @@ exercises the exact path a production gateway would.
 `pubquiz-allow-host-webhooks.php` have no such guard since they are meant to
 run in production too (`pubquiz-operator-mail.php` and `pubquiz-downloads.php`
 are also production code, the former gated only by the presence of a
-prefixed private note).
+prefixed private note); `pubquiz-checkout-feasibility.php` (ticket #103) has
+no guard either, for the same reason.
 
 ## Operator mail proof
 
@@ -669,6 +670,49 @@ Dutch-labelled entries and `_wapf_meta`. Its billing email
 (`fixture-buyer@example.com`) must stay exactly what
 `route.integration.test.ts`'s `FIXTURE_BILLING_EMAIL` constant expects --
 that's what every test in that file scopes its cleanup to.
+
+## Checkout feasibility check (spec 5, ticket #103)
+
+`shop/mu-plugins/pubquiz-checkout-feasibility.php` hooks
+`woocommerce_after_checkout_validation` and asks the app's
+`POST /api/feasibility` (ticket #102) whether every Pubquiz cart line can
+actually be generated for the billing email being used, once the email is
+known -- so a shortfall that would have failed generation after payment is
+instead a plain-Dutch checkout notice, e.g. `Quiz 1: Sport (Moeilijk): 10
+vragen te weinig`, naming the cart line and, per Category and Difficulty,
+how many Items are short (several short slots of the same Category and
+Difficulty -- a single Category pick cycles onto all 8 slots -- collapse
+into one segment, the worst-off slot's count). An `invalid` line (an
+unknown Category id, more than 8 picks, a duplicate pick) reads `Quiz <n>:
+deze samenstelling kan niet worden gemaakt.` instead. No new option or
+environment variable: the request URL and signing secret are read from the
+shop's own active `order.updated` webhook record (`setup-shop.php`'s
+`pubquiz_ensure_webhook()`, same lookup) -- its delivery URL with
+`/api/webhooks/woocommerce` replaced by `/api/feasibility`, its secret
+signing the body the same way (`X-Pubquiz-Signature:
+base64(hmac-sha256(rawBody, secret))`).
+
+**Fail open, 3 seconds.** `wp_remote_post( ..., [ 'timeout' => 3 ] )`; no
+webhook found, a `WP_Error`, a non-200, a non-JSON body, or a `lines` array
+whose length doesn't match the request all leave checkout untouched and log
+one `wc_get_logger()` warning under source `pubquiz-feasibility` (status or
+error message only -- never a secret, never an email). Verified locally: on
+a cold dev server the first request timed out at the full 3 s (the route
+compiling for the first time, not a real slowness) -- warm `POST
+/api/feasibility` once (any body, a `401` from a missing signature is
+enough to compile the route) before judging response time. With the app
+stopped outright, the same previously-refused checkout went through and
+`wp-content/uploads/wc-logs/pubquiz-feasibility-<date>-<hash>.log` (viewed
+with `npx wp-env run cli -- sh -c "cat wp-content/uploads/wc-logs/pubquiz-feasibility-*.log"`
+-- `wp-env run cli` does not expand a glob itself, hence the `sh -c` wrapper;
+not `wp wc` -- WooCommerce's file logger has no WP-CLI command of its own)
+held `WARNING request failed: cURL error 7: Failed to connect to
+host.docker.internal port 3000 ...`.
+
+Category and Difficulty labels for the notice come from the product's own
+Advanced Product Fields field group (`Field_Groups::get_field_groups_of_product()`,
+the same choices `setup-field-group.php` attaches and
+`pubquiz-category-dropdown.php` reads client-side), not a second copy.
 
 ## REST credentials
 
