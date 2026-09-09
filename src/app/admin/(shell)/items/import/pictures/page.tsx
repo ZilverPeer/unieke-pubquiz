@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ImportForm } from "./import-form";
-import { ImportNav } from "./import-nav";
+import { ImportNav } from "../import-nav";
+import { PictureImportForm } from "./picture-import-form";
 
-export default async function ImportItemsPage() {
-  const t = await getTranslations("itemsImport");
+export default async function ImportPictureItemsPage() {
+  const t = await getTranslations("pictureImport");
 
   return (
     <div className="flex flex-col gap-4">
@@ -18,13 +18,13 @@ export default async function ImportItemsPage() {
       <p>{t("intro")}</p>
 
       <p>
-        <Link href="/admin/items/import/template" className="underline">
+        <Link href="/admin/items/import/pictures/template" className="underline">
           {t("templateLink")}
         </Link>
       </p>
       <p className="text-gray-500">{t("templateHint")}</p>
 
-      <ImportForm />
+      <PictureImportForm />
     </div>
   );
 }

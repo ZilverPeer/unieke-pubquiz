@@ -9,6 +9,10 @@
     "submit": "Importeren",
     "backToList": "Terug naar de lijst"
   },
+  "kindLinks": {
+    "text": "Tekst-Items importeren",
+    "picture": "Afbeelding-Items importeren"
+  },
   "success": "{count} Items geïmporteerd.",
   "report": {
     "title": "Fouten in het bestand",

@@ -9,6 +9,10 @@
     "submit": "Import",
     "backToList": "Back to the list"
   },
+  "kindLinks": {
+    "text": "Import Text Items",
+    "picture": "Import Picture Items"
+  },
   "success": "{count} Items imported.",
   "report": {
     "title": "Errors in the file",

@@ -68,7 +68,8 @@ export interface RowError {
 
 export type ParseTextItemsCsvResult = { ok: true; rows: TextItemInput[] } | { ok: false; errors: RowError[] };
 
-const PARSE_OPTIONS = {
+/** Shared csv-parse options (ticket #95 also uses these, for the Picture import parser). */
+export const PARSE_OPTIONS = {
   bom: true,
   skip_empty_lines: true,
   trim: true,

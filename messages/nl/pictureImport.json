@@ -1,0 +1,29 @@
+{
+  "title": "Afbeelding-Items importeren",
+  "intro": "Upload een CSV-bestand samen met een zip-bestand van afbeeldingen om meerdere afbeelding-Items in één keer toe te voegen. De kolom \"file\" in de CSV moet exact overeenkomen met de bestandsnaam in de zip. Elke rij en elk bestand wordt gevalideerd; als er één fout is, wordt er niets opgeslagen.",
+  "templateLink": "Download CSV-sjabloon",
+  "templateHint": "Het sjabloon bevat de kolomkoppen en één voorbeeldrij met bestandsnaam \"example.jpg\" en subsubcategoryId \"0\" -- vervang die voorbeeldrij door je eigen rijen voordat je het bestand uploadt.",
+  "form": {
+    "csvLabel": "CSV-bestand",
+    "zipLabel": "Zip-bestand met afbeeldingen",
+    "submit": "Importeren",
+    "backToList": "Terug naar de lijst"
+  },
+  "success": "{count} Items geïmporteerd.",
+  "errors": {
+    "header": "De kolomkoppen komen niet overeen met het sjabloon.",
+    "empty": "Het bestand bevat geen rijen.",
+    "tooManyRows": "Het bestand bevat te veel rijen (maximaal 200).",
+    "parseError": "Het bestand kon niet als CSV worden gelezen.",
+    "csvRequired": "Kies een CSV-bestand.",
+    "csvType": "Kies een geldig CSV-bestand (.csv).",
+    "csvTooLarge": "Het CSV-bestand is te groot (maximaal 1 MB).",
+    "zipRequired": "Kies een zip-bestand.",
+    "zipType": "Kies een geldig zip-bestand (.zip).",
+    "zipTooLarge": "Het zip-bestand is te groot (maximaal 20 MB).",
+    "zipParseError": "Het zip-bestand kon niet worden gelezen.",
+    "fileMissing": "Geen bestand in de zip met deze naam.",
+    "fileUnused": "Het bestand \"{file}\" in de zip wordt door geen enkele rij genoemd.",
+    "fileNotImage": "Dit bestand is geen geldige afbeelding."
+  }
+}

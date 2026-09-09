@@ -19,7 +19,7 @@ import sharp from "sharp";
 import { PICTURE_MAX_EDGE_PX } from "@/domain";
 import type { Difficulty } from "@/domain";
 import type { Database } from "../database.types";
-import { writeItemBase, writeTranslations, type TextItemTranslations } from "./items";
+import { writeItemBase, writeItemBatch, writeTranslations, type TextItemTranslations } from "./items";
 
 const BUCKET = "pictures";
 
@@ -66,19 +66,27 @@ function toTextItemTranslations(translations: PictureItemTranslations): TextItem
 }
 
 /**
- * Resizes to at most PICTURE_MAX_EDGE_PX on the longest edge (`fit:
- * "inside"`, `withoutEnlargement: true` -- a smaller source is never
- * upscaled) and re-encodes as JPEG quality 85. `sharp(...).metadata()`
- * throws first on bytes that are not a real image, translated to
- * PictureNotAnImageError so the caller does not have to know sharp's own
- * error shape.
+ * Throws PictureNotAnImageError when `image` is not real image bytes
+ * (`sharp(...).metadata()` throws first). Extracted from resizeToJpeg
+ * (ticket #95) so the Picture Item bulk import can check every zip entry is
+ * a real image before writing anything, the same check resizeToJpeg itself
+ * still runs first below.
  */
-async function resizeToJpeg(image: Buffer): Promise<Buffer> {
+export async function assertImage(image: Buffer): Promise<void> {
   try {
     await sharp(image).metadata();
   } catch {
     throw new PictureNotAnImageError();
   }
+}
+
+/**
+ * Resizes to at most PICTURE_MAX_EDGE_PX on the longest edge (`fit:
+ * "inside"`, `withoutEnlargement: true` -- a smaller source is never
+ * upscaled) and re-encodes as JPEG quality 85.
+ */
+async function resizeToJpeg(image: Buffer): Promise<Buffer> {
+  await assertImage(image);
   return sharp(image)
     .resize(PICTURE_MAX_EDGE_PX, PICTURE_MAX_EDGE_PX, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 85 })
@@ -124,6 +132,91 @@ export async function createPictureItem(
   }
 
   return { id };
+}
+
+export interface CreatePictureItemsInput {
+  subsubcategoryId: string;
+  difficulty: Difficulty;
+  translations: PictureItemTranslations;
+  image: Buffer;
+}
+
+/**
+ * All-or-nothing batch create for the Picture Item bulk import (spec 4,
+ * ticket #95). Order: writeItemBatch first (kind "picture", so every base
+ * `items` row and its `item_translations` are written or none are, the same
+ * as the single-Item createPictureItem above and the Text import's own
+ * batch write), then one `picture_item_details` insert for every id
+ * (`<id>.jpg`, the same fixed storage path shape createPictureItem uses),
+ * then every image resized and uploaded in order (`upsert: true`,
+ * `contentType: "image/jpeg"`). If the detail insert or any resize/upload
+ * fails, every object already uploaded in this call is removed
+ * (`storage.remove`) and all base ids are deleted (cascading away their
+ * translations and detail rows, the same as a single failed
+ * createPictureItem), then the error is rethrown -- a failure never leaves
+ * a partial batch (rows without objects, or objects without rows) behind.
+ *
+ * The remove and the delete are both attempted regardless of the other's
+ * outcome (a failed `storage.remove` must never skip the base-row delete,
+ * or a partial upload orphans rows too, Standards review on this ticket's
+ * PR): if either the remove or the delete itself fails, the original error
+ * alone would hide that failure, so this throws a new Error naming every
+ * failure (`{ cause: err }`, the original) instead of discarding it; only
+ * when both the remove and the delete succeed is the original `err`
+ * rethrown unchanged (writeItemBatch's own compensating-delete failure
+ * case, fix round 1 PR #118, is the same reasoning for a single failure).
+ */
+export async function createPictureItems(
+  client: SupabaseClient<Database>,
+  inputs: CreatePictureItemsInput[],
+): Promise<string[]> {
+  const ids = await writeItemBatch(
+    client,
+    inputs.map((input) => ({
+      kind: "picture" as const,
+      subsubcategoryId: input.subsubcategoryId,
+      difficulty: input.difficulty,
+      translations: toTextItemTranslations(input.translations),
+    })),
+  );
+
+  const uploadedPaths: string[] = [];
+  try {
+    const detailRows = ids.map((id) => ({ item_id: id, storage_path: `${id}.jpg` }));
+    const { error: detailError } = await client.from("picture_item_details").insert(detailRows);
+    if (detailError) throw detailError;
+
+    for (let i = 0; i < ids.length; i++) {
+      const storagePath = `${ids[i]}.jpg`;
+      const resized = await resizeToJpeg(inputs[i].image);
+      const { error: uploadError } = await client.storage.from(BUCKET).upload(storagePath, resized, {
+        upsert: true,
+        contentType: "image/jpeg",
+      });
+      if (uploadError) throw uploadError;
+      uploadedPaths.push(storagePath);
+    }
+  } catch (err) {
+    let removeError: unknown = null;
+    if (uploadedPaths.length > 0) {
+      const { error } = await client.storage.from(BUCKET).remove(uploadedPaths);
+      removeError = error;
+    }
+    const { error: deleteError } = await client.from("items").delete().in("id", ids);
+
+    if (removeError || deleteError) {
+      const originalMessage = err instanceof Error ? err.message : String(err);
+      const removeMessage = removeError ? (removeError instanceof Error ? removeError.message : String(removeError)) : "none";
+      const deleteMessage = deleteError ? deleteError.message : "none";
+      throw new Error(
+        `createPictureItems: the batch write failed and the rollback also failed -- an orphaned batch of rows or objects may remain. originalError=${originalMessage}; removeError=${removeMessage}; deleteError=${deleteMessage}`,
+        { cause: err },
+      );
+    }
+    throw err;
+  }
+
+  return ids;
 }
 
 /**
