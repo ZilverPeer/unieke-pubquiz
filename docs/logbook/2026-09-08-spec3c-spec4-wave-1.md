@@ -301,3 +301,7 @@ Side findings from the log, filed: #131 (Items list `deleteRow` closes over `bui
 ## 2026-09-09 14:2x Erik's run-through done; shop and app down, Supabase kept; #107 and #131 dispatched
 
 Erik: "most holds, good enough for now". Stopped the loop app by pid (23856) and `npm run shop:down`; Supabase stays up for the agents. Worktrees wt-107 (`ticket-107-seed-sequences`) and wt-131 (`ticket-131-items-delete-closure`) from master 05006d5. #107 is the one agent allowed `db:reset` (at most twice, red and green); #131 warned that the tables reseed underneath it. PR 130 walkthrough check follows on a fresh `loop:up` once #107 has merged.
+
+## 2026-09-09 14:35 PR 133 (#107) merged on a read review
+
+Diff: three `setval(pg_get_serial_sequence(...))` lines at the end of `supabase/seed.sql`, one README paragraph, one integration case. Red evidence in the PR body: `duplicate key value violates unique constraint "categories_pkey"` on the old seed after a reset. Verified on the reseeded database that all three sequences sit at or above `max(id)`; no `Seed 107` marker rows left. Master `npm run check` green (355 unit). wt-107 removed. Next: fresh `loop:up` from master for the PR 130 walkthrough check.
