@@ -1,0 +1,42 @@
+{
+  "title": "Music Item",
+  "form": {
+    "newTitle": "New Music Item",
+    "editTitle": "Edit Music Item"
+  },
+  "fields": {
+    "artist": "Artist",
+    "title": "Title",
+    "file": "Full song (upload)",
+    "filePreview": "Listen before cutting",
+    "start": "Start point (seconds)",
+    "end": "End point (seconds)",
+    "useCurrentTimeStart": "Use current playback time",
+    "useCurrentTimeEnd": "Use current playback time",
+    "currentClip": "Current clip",
+    "locales": "Available in this Locale"
+  },
+  "errors": {
+    "file": {
+      "required": "Upload a full song to cut a clip from.",
+      "type": "This file type is not supported.",
+      "size": "This file is too large."
+    },
+    "range": {
+      "order": "Fill in a start and end point, with the end point after the start point.",
+      "length": "The cut clip must be between 10 and 45 seconds long."
+    },
+    "artist": {
+      "required": "Fill in the artist."
+    },
+    "title": {
+      "required": "Fill in the title."
+    },
+    "translations": {
+      "atLeastOneLocaleRequired": "Tick at least one Locale."
+    },
+    "cut": {
+      "failed": "Cutting the clip failed. Check the file and try again."
+    }
+  }
+}

@@ -330,14 +330,16 @@ export interface ItemDetail {
    * otherwise (ticket #90, additive: getItem did not join this before).
    */
   pictureStoragePath: string | null;
+  /** Music Item detail row (ticket #91, additive); null for Text/Picture Items. */
+  music: { storagePath: string; artist: string; title: string } | null;
 }
 
-/** One Item with both Locale translations and its detail row (Picture's storage_path; Music's detail row is #91's concern). */
+/** One Item with both Locale translations and its detail row (Picture's storage_path, Music's detail row -- tickets #90/#91). */
 export async function getItem(client: SupabaseClient<Database>, id: string): Promise<ItemDetail | null> {
   const { data, error } = await client
     .from("items")
     .select(
-      "id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact), picture_item_details(storage_path)",
+      "id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact), picture_item_details(storage_path), music_item_details(storage_path,artist,title)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -357,6 +359,13 @@ export async function getItem(client: SupabaseClient<Database>, id: string): Pro
     archivedAt: data.archived_at,
     translations,
     pictureStoragePath: data.picture_item_details?.storage_path ?? null,
+    music: data.music_item_details
+      ? {
+          storagePath: data.music_item_details.storage_path,
+          artist: data.music_item_details.artist,
+          title: data.music_item_details.title,
+        }
+      : null,
   };
 }
 
