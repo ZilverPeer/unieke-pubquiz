@@ -251,3 +251,23 @@ describe("deleteNode", () => {
     expect(subcategory?.subsubcategories.some((node) => node.id === subsubcategoryId)).toBe(false);
   });
 });
+
+describe("category id sequence (ticket #107)", () => {
+  // Right after a fresh `npm run db:reset`, the seed's explicit-id inserts
+  // (`overriding system value`) leave the categories/subcategories/
+  // subsubcategories identity sequences at their un-advanced default, so
+  // the very next insert without an explicit id collides with a seeded row
+  // -- see supabase/seed.sql's setval block. This proves the Category path;
+  // subcategories/subsubcategories share the same `generated always as
+  // identity` shape and the same seed fix.
+  it("creates a Category with an id greater than every seeded id, right after a fresh reset", async () => {
+    const { data: existingRows, error: existingRowsError } = await db.from("categories").select("id");
+    if (existingRowsError) throw existingRowsError;
+    const maxExistingId = Math.max(...(existingRows ?? []).map((row) => row.id));
+
+    const marker = `Seed 107 ${Math.random().toString(36).slice(2, 10)}`;
+    const categoryId = await addCategory(marker, marker);
+
+    expect(categoryId).toBeGreaterThan(maxExistingId);
+  });
+});

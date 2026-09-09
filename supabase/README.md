@@ -99,6 +99,10 @@ a translation in only one Locale, so ticket #6's repository tests can prove
 Locale filtering. They're few enough not to threaten the coverage floor in
 either Locale.
 
+Because categories/subcategories/subsubcategories are seeded with explicit
+ids, the seed's last step resyncs each of their identity sequences to
+`max(id)` so the next unseeded insert (e.g. from the admin) doesn't collide.
+
 Run the check:
 
 ```sh
