@@ -269,3 +269,4 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - #127 (Music search): wt-127 (`ticket-127-music-search`), brief `127.md`: embed `music_item_details(artist,title)` in the list query and match `q` against them; one integration case red-first.
 - #97 (operator walkthrough): wt-97 (`ticket-97-operator-walkthrough`), port 3097, brief `97.md`: `docs/walkthrough-operator.md` in the customer-journey style, verified section by section against the running stack (no loop commands, no orders); its Spec review needs a fresh loop, so it waits for the stack-free moment together with #107.
 - Running: #119 (3119), #127, #97 (3097). Queue: #107 at the stack-free moment.
+- Check-in 13:20: no drift. #119 build green, dev server on 3119 up, at the browser check (looking for a browser tool; the brief allows "verified by reading" as the fallback). #127 reading the list test and music helpers. #97 reading the customer walkthrough, runbook and README.
