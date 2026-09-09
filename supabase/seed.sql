@@ -190,4 +190,16 @@ select
 from item_seed
 where kind = 'music';
 
+-- 7. Resync identity sequences ------------------------------------------
+-- The inserts above use explicit ids (`overriding system value`), which
+-- never advance a `generated always as identity` column's sequence. Left
+-- alone, the first insert without an explicit id (e.g. the admin
+-- categories actions, #87) collides with a seeded row. `compositions`
+-- (00004) is not seeded with explicit ids and `items` are uuids, so
+-- neither needs this.
+
+select setval(pg_get_serial_sequence('categories', 'id'), coalesce(max(id), 1), max(id) is not null) from categories;
+select setval(pg_get_serial_sequence('subcategories', 'id'), coalesce(max(id), 1), max(id) is not null) from subcategories;
+select setval(pg_get_serial_sequence('subsubcategories', 'id'), coalesce(max(id), 1), max(id) is not null) from subsubcategories;
+
 commit;
