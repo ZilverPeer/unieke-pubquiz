@@ -30,29 +30,69 @@ export function parseStatusEnv(output: string): Record<string, string> {
   return values;
 }
 
-export function resolveLocalStackConfig(): RepositoryConfig {
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+// The CLI fallback's parsed result, cached in module scope for the life of
+// the process (ticket #123: `npx supabase status -o env` takes 4-5 s, and
+// every admin request/server action/worker job used to pay that cost). The
+// environment branch is never cached -- reading process.env is free, and
+// caching it would freeze a value that could legitimately change between
+// calls (e.g. a test harness re-setting it).
+let cachedCliConfig: RepositoryConfig | null = null;
+
+interface LocalStackConfigDeps {
+  env: Record<string, string | undefined>;
+  exec: (command: string) => string;
+}
+
+/**
+ * The testable core of resolveLocalStackConfig, taking env/exec as
+ * parameters instead of reading process.env/execSync directly. Exported only
+ * for local-stack-config.test.ts to inject a stub -- resolveLocalStackConfig
+ * is still the one public seam every other caller uses.
+ */
+export function resolveLocalStackConfigWith(deps: LocalStackConfigDeps): RepositoryConfig {
+  if (deps.env.SUPABASE_URL && deps.env.SUPABASE_SERVICE_ROLE_KEY) {
     return {
-      url: process.env.SUPABASE_URL,
-      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      url: deps.env.SUPABASE_URL,
+      serviceRoleKey: deps.env.SUPABASE_SERVICE_ROLE_KEY,
     };
   }
 
-  // A single command string (not execFileSync + shell:true) so Node can
-  // resolve `npx` (a .cmd shim) on Windows without the shell-injection
-  // DeprecationWarning; the command is a fixed literal, never built from
-  // user input, so there is no injection concern here.
-  const output = execSync("npx supabase status -o env", {
-    encoding: "utf-8",
-    // The Supabase CLI logs container housekeeping (e.g. "Stopped
-    // services: [...]") to stderr on every invocation; only stdout carries
-    // the env output this function parses.
-    stdio: ["ignore", "pipe", "ignore"],
-  });
+  if (cachedCliConfig) {
+    return cachedCliConfig;
+  }
+
+  const output = deps.exec("npx supabase status -o env");
   const values = parseStatusEnv(output);
 
-  return {
+  cachedCliConfig = {
     url: values.API_URL ?? "http://127.0.0.1:45321",
     serviceRoleKey: values.SERVICE_ROLE_KEY ?? DEMO_SERVICE_ROLE_KEY,
   };
+  return cachedCliConfig;
+}
+
+export function resolveLocalStackConfig(): RepositoryConfig {
+  return resolveLocalStackConfigWith({
+    env: process.env,
+    exec: (command) =>
+      // A single command string (not execFileSync + shell:true) so Node can
+      // resolve `npx` (a .cmd shim) on Windows without the shell-injection
+      // DeprecationWarning; the command is a fixed literal, never built from
+      // user input, so there is no injection concern here.
+      execSync(command, {
+        encoding: "utf-8",
+        // The Supabase CLI logs container housekeeping (e.g. "Stopped
+        // services: [...]") to stderr on every invocation; only stdout
+        // carries the env output this function parses.
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+  });
+}
+
+/**
+ * Test-only: clears the module-scope CLI-fallback cache between test cases.
+ * Not used outside local-stack-config.test.ts.
+ */
+export function __resetLocalStackConfigCache(): void {
+  cachedCliConfig = null;
 }
