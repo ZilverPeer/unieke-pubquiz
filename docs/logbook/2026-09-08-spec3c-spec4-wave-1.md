@@ -253,3 +253,7 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 
 - Spec review (fresh reviewer, clone review-8): red confirmed (4/4 fail on a later line's `feasible` with master's implementation), unit 4/4, route integration 8/8; driver with real loaders: order #30's lines answer feasible, feasible, `{ categoryId "7", hard, shortfall 4 }`; third line moved first is feasible; `route.ts` and `shop/` untouched; README paragraph replaced; CONTEXT.md has no feasibility sentence (nothing to update); check green 349; no rows persisted. Only JUDGEMENT: PR body unit count, corrected by the orchestrator in the PR body (no fix round).
 - Merge-tree clean, merged, master check green (unit 349). Worktree wt-121 removed. Erik's loop app on 3000 still runs the old feasibility code until restarted.
+
+## #119 dispatched
+
+- Worktree wt-119 (`ticket-119-picture-field-errors` from db44d8e), port 3119, brief `119.md`: `PictureFields` gets `errors`, item-form passes it, one integration assertion on the missing-file key (or "already covered"), browser check of the Dutch message.
