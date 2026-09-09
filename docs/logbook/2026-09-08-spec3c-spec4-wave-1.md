@@ -270,3 +270,9 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - #97 (operator walkthrough): wt-97 (`ticket-97-operator-walkthrough`), port 3097, brief `97.md`: `docs/walkthrough-operator.md` in the customer-journey style, verified section by section against the running stack (no loop commands, no orders); its Spec review needs a fresh loop, so it waits for the stack-free moment together with #107.
 - Running: #119 (3119), #127, #97 (3097). Queue: #107 at the stack-free moment.
 - Check-in 13:20: no drift. #119 build green, dev server on 3119 up, at the browser check (looking for a browser tool; the brief allows "verified by reading" as the fallback). #127 reading the list test and music helpers. #97 reading the customer walkthrough, runbook and README.
+
+## PR 128 merged (#119, Picture field errors) — 3f2ea26
+
+- Implementer: no red pair possible (the action already scoped the file error under `errors.file`; the defect was the component not rendering it; no DOM test setup), stated in the PR body; new integration case "refuses a missing file on create and writes nothing" (file 8/8); check and build green; browser check done by reading (no browser tool; the `useActionState` form cannot be posted by curl), server on 3119 stopped by pid.
+- Review: main-session read (27-line diff, mirror of MusicFields: `errors: FieldErrors` from `@/admin/forms`, root-scoped `useTranslations()`, span under the file input; item-form passes live `errors` and drops the "left as-is" paragraph). Keys `pictureItems.errors.file.{required,type,size,notImage}` present in nl and en. No reviewers dispatched. Erik will see the message during his run-through; if it does not render, reopen #119.
+- Merge-tree clean, merged, master check green (unit 355). Worktree wt-119 removed.
