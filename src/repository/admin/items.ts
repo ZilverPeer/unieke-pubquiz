@@ -301,7 +301,14 @@ export async function listItems(
 }
 
 export interface ItemTranslationInput {
-  question: string;
+  /**
+   * `string | null` (widened from `string`, additive, ticket #90): Text
+   * Items always pass a non-empty string; Picture and Music Items have no
+   * question and pass `null` so the column is genuinely `null`, not an
+   * empty string (00003_items.sql's kind-shape comment, CONTEXT.md "Item
+   * storage shape").
+   */
+  question: string | null;
   answer: string;
   fact?: string;
 }
@@ -318,16 +325,21 @@ export interface ItemDetail {
   subsubcategoryId: string;
   archivedAt: string | null;
   translations: Partial<Record<Locale, { question: string; answer: string; fact: string | null }>>;
+  /**
+   * `picture_item_details.storage_path` when `kind === "picture"`, `null`
+   * otherwise (ticket #90, additive: getItem did not join this before).
+   */
+  pictureStoragePath: string | null;
   /** Music Item detail row (ticket #91, additive); null for Text/Picture Items. */
   music: { storagePath: string; artist: string; title: string } | null;
 }
 
-/** One Item with both Locale translations and its detail row (picture_item_details is a later ticket's concern). */
+/** One Item with both Locale translations and its detail row (Picture's storage_path, Music's detail row -- tickets #90/#91). */
 export async function getItem(client: SupabaseClient<Database>, id: string): Promise<ItemDetail | null> {
   const { data, error } = await client
     .from("items")
     .select(
-      "id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact), music_item_details(storage_path,artist,title)",
+      "id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact), picture_item_details(storage_path), music_item_details(storage_path,artist,title)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -346,6 +358,7 @@ export async function getItem(client: SupabaseClient<Database>, id: string): Pro
     subsubcategoryId: String(data.subsubcategory_id),
     archivedAt: data.archived_at,
     translations,
+    pictureStoragePath: data.picture_item_details?.storage_path ?? null,
     music: data.music_item_details
       ? {
           storagePath: data.music_item_details.storage_path,

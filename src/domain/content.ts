@@ -63,3 +63,11 @@ export const MUSIC_CLIP_MIN_SECONDS = 10;
 export const MUSIC_CLIP_MAX_SECONDS = 45;
 /** Largest accepted upload for the full song, in bytes, before cutting. */
 export const MUSIC_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Maximum long edge, in pixels, a Picture Item's uploaded image is resized
+ * to on the server before storage (spec 4, ticket #90; admin-common brief
+ * "Domain constants"). Keeps Storage within the free tier and PDFs
+ * rendering at the same quality regardless of the source upload's size.
+ */
+export const PICTURE_MAX_EDGE_PX = 1600;

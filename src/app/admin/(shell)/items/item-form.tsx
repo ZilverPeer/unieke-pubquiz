@@ -11,16 +11,17 @@
  * assert on that return value).
  *
  * `kind` selects the action pair through ACTIONS and hides/shows the
- * question/answer inputs per Locale. The kind-specific fields
- * (MusicFields, and later PictureFields) are imported and rendered by
- * THIS component, not passed in as JSX: `kindProps` carries only the
- * kind's serializable initial values (fix round on PR 116 -- a
- * `kindFields?: ReactNode` slot built once on the server with
- * `errors={{}}` could never show a validation error after a failed
- * submit, since `errors` only exists inside this client component's own
- * `useActionState`, not in the server page that would have had to
- * rebuild the JSX). Text stays the default so the existing text pages
- * keep working unchanged.
+ * question/answer inputs per Locale (question hides for Picture and Music,
+ * answer hides only for Music -- Picture Items keep an answer, CONTEXT.md
+ * "Item storage shape"). The kind-specific fields (MusicFields,
+ * PictureFields) are imported and rendered by THIS component, not passed
+ * in as JSX: `kindProps` carries only the kind's serializable initial
+ * values (fix round on PR 116 -- a `kindFields?: ReactNode` slot built
+ * once on the server with `errors={{}}` could never show a validation
+ * error after a failed submit, since `errors` only exists inside this
+ * client component's own `useActionState`, not in the server page that
+ * would have had to rebuild the JSX). Text stays the default so the
+ * existing text pages keep working unchanged.
  *
  * Every error value in `errors` is a full message key from the messages
  * root (e.g. "items.errors.subsubcategoryRequired",
@@ -29,6 +30,11 @@
  * scoped to a single namespace -- closes the #88 defect where
  * `useTranslations("items")` was called with a key that already repeated
  * the "items." prefix and so never resolved.
+ *
+ * PictureFields (ticket #90, merged from origin/master) does not yet take
+ * an `errors` prop -- it currently renders no field-level validation
+ * errors of its own, unlike MusicFields. Left as-is: fixing that is
+ * ticket #90's own concern, not folded into this ticket's fix round.
  */
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -39,6 +45,8 @@ import type { SubsubcategoryOption } from "@/repository/admin/items";
 import { createTextItem, updateTextItem } from "./actions";
 import { createMusicItem, updateMusicItem } from "./music-actions";
 import { MusicFields } from "./music-fields";
+import { createPictureItem, updatePictureItem } from "./picture-actions";
+import { PictureFields } from "./picture-fields";
 
 export interface ItemFormLocaleValues {
   question: string;
@@ -63,12 +71,13 @@ export interface MusicKindProps {
   clipUrl?: string;
 }
 
-// Ticket #90 (Picture) adds its own kind==="picture" branch below,
-// rendering `<PictureFields {...kindProps} errors={errors} />` with
-// `PictureKindProps = { imageUrl?: string }` -- same shape, same reason
-// (serializable initial values only, the component itself renders the
-// live `errors`).
-export type ItemFormKindProps = MusicKindProps;
+/** Picture kind's serializable initial values, passed straight through to PictureFields as props (ticket #90). */
+export interface PictureKindProps {
+  /** Signed URL of the currently stored image; only present in edit mode. */
+  imageUrl?: string;
+}
+
+export type ItemFormKindProps = MusicKindProps | PictureKindProps;
 
 export interface ItemFormProps {
   mode: "create" | "edit";
@@ -91,11 +100,11 @@ type ActionPair = [
 /**
  * Kind -> [create, update] action pair, for every kind except "text"
  * (handled by its own branch below so the pre-existing text pages are
- * untouched). Each kind ticket adds its own entry here -- see the
- * items-kind-common brief "Shared files" for why this collides with
- * ticket #90 the same way and how the merge resolves it (keep both sides).
+ * untouched). Each kind ticket adds its own entry here -- items-kind-common
+ * brief "Shared files", resolved by hand across #90/#91 during the merge.
  */
 const ACTIONS: Partial<Record<ItemKind, ActionPair>> = {
+  picture: [createPictureItem, updatePictureItem],
   music: [createMusicItem, updateMusicItem],
 };
 
@@ -125,6 +134,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
   const errors: FieldErrors = state && !state.ok ? state.errors : {};
   const values = initialValues ?? { subsubcategoryId: "", difficulty: "", nl: EMPTY_LOCALE, en: EMPTY_LOCALE };
   const musicProps = kind === "music" ? (kindProps as MusicKindProps | undefined) : undefined;
+  const pictureProps = kind === "picture" ? (kindProps as PictureKindProps | undefined) : undefined;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -213,8 +223,11 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
           />
         </fieldset>
       ) : null}
-      {/* Ticket #90 (Picture) adds its own kind === "picture" branch here,
-          rendering <PictureFields {...(kindProps as PictureKindProps)} errors={errors} /> in its own fieldset. */}
+      {kind === "picture" ? (
+        <fieldset className="flex flex-col gap-2 border p-3">
+          <PictureFields currentImageUrl={pictureProps?.imageUrl} />
+        </fieldset>
+      ) : null}
 
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className="border px-3 py-1">

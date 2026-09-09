@@ -4,11 +4,11 @@ import { getTranslations } from "next-intl/server";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { createMusicSignedUrl } from "@/repository/admin/music-items";
+import { createPictureSignedUrl } from "@/repository/admin/picture-items";
 import { ItemForm, type ItemFormInitialValues, type ItemFormKindProps } from "../item-form";
 
 export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
-  const t = await getTranslations("items");
 
   const client = createSupabaseClient(resolveLocalStackConfig());
   const [item, subsubcategoryOptions] = await Promise.all([
@@ -19,6 +19,17 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
   if (!item) {
     notFound();
   }
+
+  // Per-kind page title (items-kind-common brief; flagged by the Spec
+  // reviewer of PR 115 -- pictureItems.form.editTitle existed but nothing
+  // read it).
+  const [t, tPicture, tMusic] = await Promise.all([
+    getTranslations("items"),
+    getTranslations("pictureItems"),
+    getTranslations("musicItems"),
+  ]);
+  const title =
+    item.kind === "picture" ? tPicture("form.editTitle") : item.kind === "music" ? tMusic("form.editTitle") : t("form.editTitle");
 
   const initialValues: ItemFormInitialValues = {
     subsubcategoryId: item.subsubcategoryId,
@@ -48,12 +59,15 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
       title: item.music.title,
       clipUrl,
     };
+  } else if (item.kind === "picture") {
+    const imageUrl = item.pictureStoragePath ? await createPictureSignedUrl(client, item.pictureStoragePath) : undefined;
+    kindProps = { imageUrl };
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t("form.editTitle")}</h1>
+        <h1 className="text-xl font-semibold">{title}</h1>
         <Link href="/admin/items">{t("form.backToList")}</Link>
       </div>
       <ItemForm
