@@ -318,13 +318,17 @@ export interface ItemDetail {
   subsubcategoryId: string;
   archivedAt: string | null;
   translations: Partial<Record<Locale, { question: string; answer: string; fact: string | null }>>;
+  /** Music Item detail row (ticket #91, additive); null for Text/Picture Items. */
+  music: { storagePath: string; artist: string; title: string } | null;
 }
 
-/** One Item with both Locale translations and its detail row (detail row is a later ticket's concern for Picture/Music). */
+/** One Item with both Locale translations and its detail row (picture_item_details is a later ticket's concern). */
 export async function getItem(client: SupabaseClient<Database>, id: string): Promise<ItemDetail | null> {
   const { data, error } = await client
     .from("items")
-    .select("id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact)")
+    .select(
+      "id, kind, difficulty, subsubcategory_id, archived_at, item_translations(locale,question,answer,fact), music_item_details(storage_path,artist,title)",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -342,6 +346,13 @@ export async function getItem(client: SupabaseClient<Database>, id: string): Pro
     subsubcategoryId: String(data.subsubcategory_id),
     archivedAt: data.archived_at,
     translations,
+    music: data.music_item_details
+      ? {
+          storagePath: data.music_item_details.storage_path,
+          artist: data.music_item_details.artist,
+          title: data.music_item_details.title,
+        }
+      : null,
   };
 }
 

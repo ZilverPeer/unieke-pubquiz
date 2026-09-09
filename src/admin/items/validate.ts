@@ -21,21 +21,41 @@ export interface TextItemFormInput {
   en: LocaleTextInput;
 }
 
-const DIFFICULTIES: ReadonlySet<string> = new Set<Difficulty>(["easy", "medium", "hard"]);
+export const DIFFICULTIES: ReadonlySet<string> = new Set<Difficulty>(["easy", "medium", "hard"]);
+
+/**
+ * The Subsubcategory/Difficulty checks every Item kind's form shares
+ * (additive, ticket #91): reused as-is by validate-music.ts and, later,
+ * validate-picture.ts, so the "choose a valid Subsubcategory/Difficulty"
+ * rule and its message keys live in exactly one place.
+ */
+export function validateSubsubcategoryAndDifficulty(
+  subsubcategoryId: string,
+  difficulty: string,
+  validSubsubcategoryIds: ReadonlySet<string>,
+): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (!subsubcategoryId || !validSubsubcategoryIds.has(subsubcategoryId)) {
+    errors.subsubcategoryId = "items.errors.subsubcategoryRequired";
+  }
+
+  if (!DIFFICULTIES.has(difficulty)) {
+    errors.difficulty = "items.errors.difficultyRequired";
+  }
+
+  return errors;
+}
 
 export function validateTextItem(
   input: TextItemFormInput,
   validSubsubcategoryIds: ReadonlySet<string>,
 ): FieldErrors | null {
-  const errors: FieldErrors = {};
-
-  if (!input.subsubcategoryId || !validSubsubcategoryIds.has(input.subsubcategoryId)) {
-    errors.subsubcategoryId = "items.errors.subsubcategoryRequired";
-  }
-
-  if (!DIFFICULTIES.has(input.difficulty)) {
-    errors.difficulty = "items.errors.difficultyRequired";
-  }
+  const errors: FieldErrors = validateSubsubcategoryAndDifficulty(
+    input.subsubcategoryId,
+    input.difficulty,
+    validSubsubcategoryIds,
+  );
 
   let completeLocales = 0;
   for (const locale of ["nl", "en"] as const) {

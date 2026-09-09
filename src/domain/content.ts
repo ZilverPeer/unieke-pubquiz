@@ -51,3 +51,15 @@ export interface QuizContent {
   locale: Locale;
   rounds: readonly RoundContent[];
 }
+
+// --- Admin: Music Item constants (spec 4, ticket #91) -----------------------
+// Fixed bounds for the operator-chosen clip cut (CONTEXT.md "Music clip"):
+// the clip length after cutting must fall within this range, and the
+// uploaded full song may be at most MUSIC_UPLOAD_MAX_BYTES before cutting.
+
+/** Shortest allowed Music clip length after cutting, in seconds. */
+export const MUSIC_CLIP_MIN_SECONDS = 10;
+/** Longest allowed Music clip length after cutting, in seconds. */
+export const MUSIC_CLIP_MAX_SECONDS = 45;
+/** Largest accepted upload for the full song, in bytes, before cutting. */
+export const MUSIC_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;

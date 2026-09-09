@@ -55,7 +55,12 @@
     "submitCreate": "Create Item",
     "submitUpdate": "Save changes",
     "cancel": "Cancel",
-    "backToList": "Back to the list"
+    "backToList": "Back to the list",
+    "kindLinks": {
+      "text": "Text Item",
+      "picture": "Picture Item",
+      "music": "Music Item"
+    }
   },
   "errors": {
     "subsubcategoryRequired": "Choose a valid Subsubcategory.",
