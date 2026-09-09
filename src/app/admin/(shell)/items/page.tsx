@@ -49,7 +49,10 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
 
   // The current filters as a query string, so a lifecycle action's redirect
   // (used only to attach ?error=inUse -- see deleteRow below) lands back on
-  // this same filtered/paginated view rather than resetting it.
+  // this same filtered/paginated view rather than resetting it. Called once
+  // per row (not inside the inline Server Function itself) because a Server
+  // Function closure may only capture serialisable values, and a function
+  // like buildListUrl is not serialisable.
   function buildListUrl(overrides: Record<string, string | undefined> = {}): string {
     const current: Record<string, string | undefined> = {
       q: query,
@@ -214,6 +217,12 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
               // `archiveItem.bind(null, item.id)` -- see item-lifecycle.tsx's
               // docblock for why a bound two-parameter action would receive
               // the form's FormData in its `deps` slot at runtime.
+              // The inUse redirect target is computed here, once per row,
+              // rather than inside deleteRow: a Server Function closure may
+              // only capture serialisable values, and buildListUrl itself
+              // is a function, not serialisable.
+              const inUseUrl = buildListUrl({ error: "inUse" });
+
               async function archiveRow() {
                 "use server";
                 await archiveItem(item.id);
@@ -227,7 +236,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
               async function deleteRow() {
                 "use server";
                 const result = await deleteItem(item.id);
-                if (!result.ok) redirect(buildListUrl({ error: "inUse" }));
+                if (!result.ok) redirect(inUseUrl);
               }
 
               return (
