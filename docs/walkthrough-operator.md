@@ -161,7 +161,7 @@ URL: `http://localhost:3000/admin/coverage`.
 
 URL: `http://localhost:3000/admin/orders`.
 
-This section describes the retry step from the code and `docs/walkthrough-customer-journey.md`'s failing-order section rather than a fresh order placed for this walkthrough -- placing an order is out of bounds here. Orders 29-31 from an earlier run-through exist on the shared local stack; use whichever real order numbers or billing emails you already have (**verified by reading** for the retry button itself, verified live for the search and detail views below against those existing orders).
+A fresh `loop:up` has no Orders, so steps 2, 3 and 6 need at least one: place one first by following `docs/walkthrough-customer-journey.md` up to and including its checkout (it takes a minute and ends with an order number and the billing email you typed), then use that order number and email below. The retry step is described from the code and the customer-journey walkthrough's failing-order section (**verified by reading**); the search and detail views were verified live against existing orders.
 
 1. Open `/admin/orders`, heading **"Bestellingen"**, one field labelled **"WooCommerce-bestelnummer of e-mailadres"** (placeholder **"Bijvoorbeeld 12345 of klant@voorbeeld.nl"**), button **"Zoeken"**.
 2. Search a real order number (digits only). **Expected result:** a results table (**"Bestelnummer"**, **"E-mailadres"**, **"Bekijken"**) with at most one row, since an order number is unique.
