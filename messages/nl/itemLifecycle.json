@@ -1,0 +1,11 @@
+{
+  "actions": {
+    "archive": "Archiveren",
+    "unarchive": "Herstellen",
+    "delete": "Verwijderen"
+  },
+  "archivedAt": "Gearchiveerd op {date}",
+  "errors": {
+    "inUse": "Dit Item wordt gebruikt in een Compositie en kan niet verwijderd worden."
+  }
+}

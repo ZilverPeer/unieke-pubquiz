@@ -6,9 +6,12 @@ import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { createMusicSignedUrl } from "@/repository/admin/music-items";
 import { createPictureSignedUrl } from "@/repository/admin/picture-items";
 import { ItemForm, type ItemFormInitialValues, type ItemFormKindProps } from "../item-form";
+import { ItemLifecycle } from "../item-lifecycle";
 
-export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
+export default async function EditItemPage({ params, searchParams }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
+  const query = (await searchParams) ?? {};
+  const lifecycleError = (Array.isArray(query.error) ? query.error[0] : query.error) === "inUse";
 
   const client = createSupabaseClient(resolveLocalStackConfig());
   const [item, subsubcategoryOptions] = await Promise.all([
@@ -70,6 +73,7 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
         <h1 className="text-xl font-semibold">{title}</h1>
         <Link href="/admin/items">{t("form.backToList")}</Link>
       </div>
+      <ItemLifecycle item={item} locale="nl" error={lifecycleError} />
       <ItemForm
         mode="edit"
         itemId={id}

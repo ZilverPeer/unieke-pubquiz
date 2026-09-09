@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import type { Difficulty, ItemKind, Locale } from "@/domain";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { listItems, loadCategoryOptions, loadSubcategoryOptions, loadSubsubcategoryOptions } from "@/repository/admin/items";
+import { archiveItem, deleteItem, unarchiveItem } from "./actions";
 
 const PAGE_SIZE = 25;
 
@@ -31,6 +33,7 @@ const DIFFICULTY_KEYS: Record<Difficulty, "form.difficultyEasy" | "form.difficul
 export default async function ItemsPage({ searchParams }: PageProps<"/admin/items">) {
   const params = (await searchParams) ?? {};
   const t = await getTranslations("items");
+  const tl = await getTranslations("itemLifecycle");
 
   const query = first(params.q)?.trim() || undefined;
   const kind = asKind(first(params.kind));
@@ -41,6 +44,31 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
   const subsubcategoryId = first(params.subsubcategoryId) || undefined;
   const includeArchived = first(params.includeArchived) === "1";
   const page = Math.max(1, Number(first(params.page) ?? "1") || 1);
+  const lifecycleError = first(params.error);
+
+  // The current filters as a query string, so a lifecycle action's redirect
+  // (used only to attach ?error=inUse -- see deleteRow below) lands back on
+  // this same filtered/paginated view rather than resetting it.
+  function buildListUrl(overrides: Record<string, string | undefined> = {}): string {
+    const current: Record<string, string | undefined> = {
+      q: query,
+      kind,
+      difficulty,
+      missingLocale,
+      categoryId,
+      subcategoryId,
+      subsubcategoryId,
+      includeArchived: includeArchived ? "1" : undefined,
+      page: page > 1 ? String(page) : undefined,
+    };
+    const merged = { ...current, ...overrides };
+    const usp = new URLSearchParams();
+    for (const [key, value] of Object.entries(merged)) {
+      if (value) usp.set(key, value);
+    }
+    const qs = usp.toString();
+    return qs ? `/admin/items?${qs}` : "/admin/items";
+  }
 
   const client = createSupabaseClient(resolveLocalStackConfig());
   const [{ items, total }, categoryOptions, subcategoryOptions, subsubcategoryOptions] = await Promise.all([
@@ -72,6 +100,8 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
           {t("list.new")}
         </Link>
       </div>
+
+      {lifecycleError === "inUse" ? <p className="text-red-600">{tl("errors.inUse")}</p> : null}
 
       <form method="GET" className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
@@ -175,28 +205,70 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b">
-                <td className="py-2">{item.question ?? "—"}</td>
-                <td className="py-2">{item.answer ?? "—"}</td>
-                <td className="py-2">
-                  {item.categoryName} / {item.subcategoryName} / {item.subsubcategoryName}
-                </td>
-                <td className="py-2">{t(DIFFICULTY_KEYS[item.difficulty])}</td>
-                <td className="py-2">
-                  {(["nl", "en"] as const).map((locale) => (
-                    <span key={locale} className="mr-2">
-                      {locale}
-                      {!item.locales.includes(locale) ? ` (${t("list.missingMark")})` : ""}
-                    </span>
-                  ))}
-                </td>
-                <td className="py-2">
-                  <Link href={`/admin/items/${item.id}`}>{t("list.edit")}</Link>
-                  {item.archivedAt ? <span className="ml-2 text-gray-500">{t("list.archived")}</span> : null}
-                </td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              // Inline Server Functions closing over this row's id, not
+              // `archiveItem.bind(null, item.id)` -- see item-lifecycle.tsx's
+              // docblock for why a bound two-parameter action would receive
+              // the form's FormData in its `deps` slot at runtime.
+              async function archiveRow() {
+                "use server";
+                await archiveItem(item.id);
+              }
+
+              async function unarchiveRow() {
+                "use server";
+                await unarchiveItem(item.id);
+              }
+
+              async function deleteRow() {
+                "use server";
+                const result = await deleteItem(item.id);
+                if (!result.ok) redirect(buildListUrl({ error: "inUse" }));
+              }
+
+              return (
+                <tr key={item.id} className="border-b">
+                  <td className="py-2">{item.question ?? "—"}</td>
+                  <td className="py-2">{item.answer ?? "—"}</td>
+                  <td className="py-2">
+                    {item.categoryName} / {item.subcategoryName} / {item.subsubcategoryName}
+                  </td>
+                  <td className="py-2">{t(DIFFICULTY_KEYS[item.difficulty])}</td>
+                  <td className="py-2">
+                    {(["nl", "en"] as const).map((locale) => (
+                      <span key={locale} className="mr-2">
+                        {locale}
+                        {!item.locales.includes(locale) ? ` (${t("list.missingMark")})` : ""}
+                      </span>
+                    ))}
+                  </td>
+                  <td className="py-2 flex flex-wrap items-center gap-2">
+                    <Link href={`/admin/items/${item.id}`}>{t("list.edit")}</Link>
+                    {item.archivedAt ? (
+                      <form action={unarchiveRow}>
+                        <button type="submit" className="border px-2 py-1">
+                          {tl("actions.unarchive")}
+                        </button>
+                      </form>
+                    ) : (
+                      <form action={archiveRow}>
+                        <button type="submit" className="border px-2 py-1">
+                          {tl("actions.archive")}
+                        </button>
+                      </form>
+                    )}
+                    {!item.archivedAt && item.usageCount === 0 ? (
+                      <form action={deleteRow}>
+                        <button type="submit" className="border px-2 py-1">
+                          {tl("actions.delete")}
+                        </button>
+                      </form>
+                    ) : null}
+                    {item.archivedAt ? <span className="ml-2 text-gray-500">{t("list.archived")}</span> : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

@@ -13,8 +13,12 @@ import { type ActionResult, fail, succeed } from "@/admin/forms";
 import { type LocaleTextInput, type TextItemFormInput, validateTextItem } from "@/admin/items/validate";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import {
+  archiveItem as archiveItemRepo,
   createTextItem as createTextItemRepo,
+  deleteItem as deleteItemRepo,
+  ItemInUseError,
   loadSubsubcategoryOptions,
+  unarchiveItem as unarchiveItemRepo,
   updateTextItem as updateTextItemRepo,
   type TextItemInput,
   type TextItemTranslations,
@@ -114,4 +118,49 @@ export async function updateTextItem(
   const result = await updateTextItemRepo(client, id, repositoryInput);
   deps.revalidateItems(id);
   return succeed(result);
+}
+
+/**
+ * Archive/unarchive/delete (ticket #89). Additive, same `deps` seam as
+ * createTextItem/updateTextItem above: each re-checks the operator and
+ * revalidates the list and edit pages. Archive and unarchive are always
+ * allowed (an Item stays in the no-repeat history regardless of usage);
+ * delete is refused when the Item is used, which the repository's single
+ * delete statement enforces race-safe through the composition_items foreign
+ * key (src/repository/admin/items.ts's deleteItem docblock) -- this action
+ * just maps that refusal to the itemLifecycle.errors.inUse message key.
+ */
+export async function archiveItem(id: string, deps: ActionDeps = defaultDeps): Promise<ActionResult<{ id: string }>> {
+  await deps.assertOperator();
+
+  const client = createSupabaseClient(resolveLocalStackConfig());
+  await archiveItemRepo(client, id);
+  deps.revalidateItems(id);
+  return succeed({ id });
+}
+
+export async function unarchiveItem(id: string, deps: ActionDeps = defaultDeps): Promise<ActionResult<{ id: string }>> {
+  await deps.assertOperator();
+
+  const client = createSupabaseClient(resolveLocalStackConfig());
+  await unarchiveItemRepo(client, id);
+  deps.revalidateItems(id);
+  return succeed({ id });
+}
+
+export async function deleteItem(id: string, deps: ActionDeps = defaultDeps): Promise<ActionResult<{ id: string }>> {
+  await deps.assertOperator();
+
+  const client = createSupabaseClient(resolveLocalStackConfig());
+  try {
+    await deleteItemRepo(client, id);
+  } catch (error) {
+    if (error instanceof ItemInUseError) {
+      return fail({ item: "itemLifecycle.errors.inUse" });
+    }
+    throw error;
+  }
+
+  deps.revalidateItems(id);
+  return succeed({ id });
 }
