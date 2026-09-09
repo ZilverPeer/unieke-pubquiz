@@ -14,7 +14,11 @@
  * the ids the first insert returned, and the error is thrown (the whole
  * batch never leaves a partial trace). PostgreSQL's multi-row INSERT
  * processes rows in the given order and RETURNING reflects that order, so
- * `insertedBases[i]` always corresponds to `rows[i]`.
+ * `insertedBases[i]` always corresponds to `rows[i]`. If that compensating
+ * delete itself fails, the original translationsError alone would hide an
+ * orphaned batch of base rows -- this throws a new Error naming both
+ * failures (`{ cause: translationsError }`) instead of silently discarding
+ * the delete error (fix round 1, PR #118).
  *
  * Row errors from the parser (RowError[]) are encoded into the flat
  * FieldErrors shape ActionResult's failure case already carries, rather
@@ -110,13 +114,19 @@ export async function importTextItems(
 
   const { error: translationsError } = await client.from("item_translations").insert(translationInserts);
   if (translationsError) {
-    await client
+    const { error: compensatingDeleteError } = await client
       .from("items")
       .delete()
       .in(
         "id",
         insertedBases.map((base) => base.id),
       );
+    if (compensatingDeleteError) {
+      throw new Error(
+        `Text Item import: translations insert failed and the compensating delete of the base rows also failed -- an orphaned batch may remain. translationsError=${translationsError.message}; deleteError=${compensatingDeleteError.message}`,
+        { cause: translationsError },
+      );
+    }
     throw translationsError;
   }
 

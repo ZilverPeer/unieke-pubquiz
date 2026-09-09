@@ -16,10 +16,18 @@
  * `useTranslations("itemsImport")` with an already-namespaced key like
  * "items.errors.subsubcategoryRequired" would look up
  * "itemsImport.items.errors.subsubcategoryRequired" and miss.
+ *
+ * The row report's "field" column shows the CSV header column the
+ * operator actually typed (question_nl, fact_en, ...), not
+ * validateTextItem's internal field key (nl.question, en.fact, ...) --
+ * csvColumnForField (src/admin/items/import-csv.ts) is the mapping, kept
+ * next to the header constant since that's the parser's own contract, not
+ * this component's (fix round 1, PR #118).
  */
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 import type { ActionResult, FieldErrors } from "@/admin/forms";
+import { csvColumnForField } from "@/admin/items/import-csv";
 import { importTextItems } from "./actions";
 
 type FormState = ActionResult<{ count: number }> | null;
@@ -103,7 +111,7 @@ export function ImportForm() {
               {rowErrors.map((error) => (
                 <tr key={`${error.row}-${error.field}`} className="border-b">
                   <td className="py-2">{error.row}</td>
-                  <td className="py-2">{error.field}</td>
+                  <td className="py-2">{csvColumnForField(error.field) ?? ""}</td>
                   <td className="py-2 text-red-600">{tMessage(error.message)}</td>
                 </tr>
               ))}

@@ -32,6 +32,32 @@ export const TEXT_ITEM_IMPORT_HEADER = [
   "fact_en",
 ] as const;
 
+/**
+ * validateTextItem's field keys (`nl.question`, `en.answer`, ...) are the
+ * single Text Item form's own field names -- meaningless to an operator
+ * looking at their own CSV file's columns. Maps each to the header column
+ * it came from, so the row report can show what the operator actually
+ * typed (fix round 1, PR #118). Lives next to TEXT_ITEM_IMPORT_HEADER
+ * (the parser's own contract), not in the page component. `translations`
+ * (validateTextItem's "at least one Locale required" error, not tied to
+ * one column) and any other unmapped key -- including the file-level
+ * "header"/"file" pseudo-fields -- have no CSV column and return `null`.
+ */
+const FIELD_TO_HEADER_COLUMN: Partial<Record<string, (typeof TEXT_ITEM_IMPORT_HEADER)[number]>> = {
+  subsubcategoryId: "subsubcategoryId",
+  difficulty: "difficulty",
+  "nl.question": "question_nl",
+  "nl.answer": "answer_nl",
+  "nl.fact": "fact_nl",
+  "en.question": "question_en",
+  "en.answer": "answer_en",
+  "en.fact": "fact_en",
+};
+
+export function csvColumnForField(field: string): string | null {
+  return FIELD_TO_HEADER_COLUMN[field] ?? null;
+}
+
 export interface RowError {
   /** 1-based data row (header excluded); 0 for a file-level error. */
   row: number;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTextItemsCsv, TEXT_ITEM_IMPORT_HEADER } from "./import-csv";
+import { csvColumnForField, parseTextItemsCsv, TEXT_ITEM_IMPORT_HEADER } from "./import-csv";
 
 const VALID_ID = "42";
 const knownIds = new Set([VALID_ID]);
@@ -72,5 +72,22 @@ describe("parseTextItemsCsv", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected success");
     expect(result.rows[0].translations.nl?.fact).toBe("Amsterdam, hoofdstad\nvan NL");
+  });
+});
+
+describe("csvColumnForField", () => {
+  it("maps every validateTextItem field key to its CSV header column", () => {
+    expect(csvColumnForField("subsubcategoryId")).toBe("subsubcategoryId");
+    expect(csvColumnForField("difficulty")).toBe("difficulty");
+    expect(csvColumnForField("nl.question")).toBe("question_nl");
+    expect(csvColumnForField("nl.answer")).toBe("answer_nl");
+    expect(csvColumnForField("en.question")).toBe("question_en");
+    expect(csvColumnForField("en.answer")).toBe("answer_en");
+  });
+
+  it("returns null for a key with no single CSV column", () => {
+    expect(csvColumnForField("translations")).toBeNull();
+    expect(csvColumnForField("header")).toBeNull();
+    expect(csvColumnForField("file")).toBeNull();
   });
 });
