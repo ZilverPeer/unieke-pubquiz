@@ -123,6 +123,18 @@ describe("createPictureItem", () => {
     expect(metadata.height).toBe(300);
   });
 
+  it("refuses a missing file on create and writes nothing", async () => {
+    const subsubcategoryId = await seedSubsubcategoryId();
+    const before = await itemCount();
+
+    const result = await createPictureItem(pictureFormData(subsubcategoryId, null), deps);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected failure");
+    expect(result.errors).toEqual({ file: "pictureItems.errors.file.required" });
+    expect(await itemCount()).toBe(before);
+  });
+
   it("refuses a file with a disallowed MIME type and writes nothing", async () => {
     const subsubcategoryId = await seedSubsubcategoryId();
     const before = await itemCount();
