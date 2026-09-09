@@ -113,10 +113,34 @@ describe("loadPool", () => {
   });
 
   it("returns every matching Item, matching an independent exact count (no silent truncation)", async () => {
+    // An archived Item carrying an nl translation must not inflate the
+    // independent count the way it would loadPool's own result (#111/#112):
+    // create one here, scoped to this test, so the case stays
+    // self-contained on a shared stack.
+    const { data: someItem, error: someItemError } = await db.from("items").select("subsubcategory_id").limit(1).single();
+    if (someItemError) throw someItemError;
+    const { data: archivedItem, error: insertError } = await db
+      .from("items")
+      .insert({
+        kind: "text",
+        subsubcategory_id: someItem.subsubcategory_id,
+        difficulty: "easy",
+        archived_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (insertError) throw insertError;
+    cleanup.trackItemId(archivedItem.id);
+    const { error: translationError } = await db
+      .from("item_translations")
+      .insert({ item_id: archivedItem.id, locale: "nl", question: "Q?", answer: "A" });
+    if (translationError) throw translationError;
+
     const { count, error } = await db
       .from("items")
       .select("id, item_translations!inner(locale)", { count: "exact", head: true })
-      .eq("item_translations.locale", "nl");
+      .eq("item_translations.locale", "nl")
+      .is("archived_at", null);
     if (error) throw error;
 
     const pool = await repository.loadPool("nl");
