@@ -311,3 +311,4 @@ Diff: three `setval(pg_get_serial_sequence(...))` lines at the end of `supabase/
 ## 2026-09-09 15:0x Operator recreated by Erik; #131 resumed; PR 130 walkthrough Spec review dispatched
 
 Erik ran `admin:operator` himself (the orchestrator's run is denied by the classifier). #131 resumed for its red capture on 3131. PR 130 Spec reviewer walks `docs/walkthrough-operator.md` (read with `git show` from the branch) against the fresh loop from master on 3000/45330/45332, rows marked `Walk 130`.
+- 15:05 drift, #131 implementer: after the fix it was dissecting the `/admin/items/new` form's `$ACTION_ID` fields to create its marker Item by curl, a `useActionState` form that cannot be scripted (standing rule). One message: create the row with a tsx driver against the repository, post only the list's plain delete form, keep it short. PR 130 reviewer on brief (walking Categories against the running page and `messages/nl`).
