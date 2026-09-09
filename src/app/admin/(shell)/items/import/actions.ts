@@ -7,18 +7,14 @@
  *
  * Atomicity: the Supabase JS client has no transactions, and a Postgres
  * function is out of scope for this ticket (no migration). Instead: every
- * row is validated first (parseTextItemsCsv), then all base `items` rows
- * are written in one `insert([...]).select("id")` call, then all
- * `item_translations` rows in one `insert([...])` call; if the
- * translations insert fails, the just-inserted base rows are deleted by
- * the ids the first insert returned, and the error is thrown (the whole
- * batch never leaves a partial trace). PostgreSQL's multi-row INSERT
- * processes rows in the given order and RETURNING reflects that order, so
- * `insertedBases[i]` always corresponds to `rows[i]`. If that compensating
- * delete itself fails, the original translationsError alone would hide an
- * orphaned batch of base rows -- this throws a new Error naming both
- * failures (`{ cause: translationsError }`) instead of silently discarding
- * the delete error (fix round 1, PR #118).
+ * row is validated first (parseTextItemsCsv), then the whole batch is
+ * written by writeItemBatch (src/repository/admin/items.ts, extracted in
+ * ticket #95 so the Picture import can reuse the same all-or-nothing write):
+ * one `items` insert with `.select("id")`, then one `item_translations`
+ * insert, with the just-inserted base rows deleted by their returned ids if
+ * the translations insert fails (the whole batch never leaves a partial
+ * trace). See that function's own docblock for the compensating-delete
+ * failure case (fix round 1, PR #118).
  *
  * Row errors from the parser (RowError[]) are encoded into the flat
  * FieldErrors shape ActionResult's failure case already carries, rather
@@ -32,7 +28,7 @@ import { assertOperator } from "@/admin/auth/session";
 import { type ActionResult, fail, succeed } from "@/admin/forms";
 import { parseTextItemsCsv, type RowError } from "@/admin/items/import-csv";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
-import { loadSubsubcategoryOptions } from "@/repository/admin/items";
+import { loadSubsubcategoryOptions, writeItemBatch } from "@/repository/admin/items";
 
 export interface ImportActionDeps {
   assertOperator: typeof assertOperator;
@@ -86,50 +82,16 @@ export async function importTextItems(
 
   const { rows } = parsed;
 
-  const baseInserts = rows.map((row) => ({
-    kind: "text" as const,
-    subsubcategory_id: Number(row.subsubcategoryId),
-    difficulty: row.difficulty,
-  }));
-  const { data: insertedBases, error: baseError } = await client.from("items").insert(baseInserts).select("id");
-  if (baseError) throw baseError;
-
-  const translationInserts: { item_id: string; locale: "nl" | "en"; question: string | null; answer: string; fact: string | null }[] =
-    [];
-  insertedBases.forEach((base, index) => {
-    const row = rows[index];
-    for (const locale of ["nl", "en"] as const) {
-      const translation = row.translations[locale];
-      if (translation) {
-        translationInserts.push({
-          item_id: base.id,
-          locale,
-          question: translation.question,
-          answer: translation.answer,
-          fact: translation.fact ?? null,
-        });
-      }
-    }
-  });
-
-  const { error: translationsError } = await client.from("item_translations").insert(translationInserts);
-  if (translationsError) {
-    const { error: compensatingDeleteError } = await client
-      .from("items")
-      .delete()
-      .in(
-        "id",
-        insertedBases.map((base) => base.id),
-      );
-    if (compensatingDeleteError) {
-      throw new Error(
-        `Text Item import: translations insert failed and the compensating delete of the base rows also failed -- an orphaned batch may remain. translationsError=${translationsError.message}; deleteError=${compensatingDeleteError.message}`,
-        { cause: translationsError },
-      );
-    }
-    throw translationsError;
-  }
+  const insertedIds = await writeItemBatch(
+    client,
+    rows.map((row) => ({
+      kind: "text" as const,
+      subsubcategoryId: row.subsubcategoryId,
+      difficulty: row.difficulty,
+      translations: row.translations,
+    })),
+  );
 
   deps.revalidateItems();
-  return succeed({ count: rows.length });
+  return succeed({ count: insertedIds.length });
 }

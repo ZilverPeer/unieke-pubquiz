@@ -78,3 +78,22 @@ export const TEXT_ITEM_IMPORT_MAX_ROWS = 500;
  * rendering at the same quality regardless of the source upload's size.
  */
 export const PICTURE_MAX_EDGE_PX = 1600;
+
+/**
+ * Row limit for the Picture Item bulk import (spec 4, ticket #95), the
+ * Picture sibling of TEXT_ITEM_IMPORT_MAX_ROWS above. Lower than the Text
+ * limit: each row also carries an image through the zip, so a much smaller
+ * cap keeps a single import comfortably within the free-tier request body
+ * limit (PICTURE_IMPORT_MAX_ZIP_BYTES below) and the server action body
+ * limit (25 MB, next.config.ts).
+ */
+export const PICTURE_ITEM_IMPORT_MAX_ROWS = 200;
+
+/**
+ * Largest accepted zip upload for the Picture Item bulk import (spec 4,
+ * ticket #95), in bytes. Below the server action body limit (25 MB,
+ * next.config.ts) to leave room for the CSV part and multipart overhead;
+ * each entry is separately checked against PICTURE_MAX_FILE_BYTES
+ * (src/admin/items/validate-picture.ts).
+ */
+export const PICTURE_IMPORT_MAX_ZIP_BYTES = 20 * 1024 * 1024;

@@ -5,11 +5,14 @@
  * ActionResult importTextItems returns -- the success count, or a row
  * error report parsed from the flat FieldErrors shape actions.ts encodes
  * ("<field>" for a file-level error, "rows.<n>.<field>" for a row error;
- * see that file's docblock).
+ * see that file's docblock). splitFieldErrors/RowErrorTable (./row-error-
+ * table.tsx) are shared with the Picture import form (ticket #95); this
+ * file only wires them up with its own translators.
  *
  * Two translators, deliberately: `t` is scoped to "itemsImport" for this
- * page's own copy; `tMessage` is unscoped (the whole messages tree) to
- * resolve the fully-qualified message keys FieldErrors carries
+ * page's own copy (and, since the row-error table reuses its `report.*`
+ * labels, for the table too); `tMessage` is unscoped (the whole messages
+ * tree) to resolve the fully-qualified message keys FieldErrors carries
  * ("items.errors.X" from validateTextItem, "itemsImport.errors.X" from
  * this ticket's own file-level errors) -- a namespace-scoped translator
  * can only resolve keys relative to its own namespace, so calling
@@ -26,41 +29,12 @@
  */
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
-import type { ActionResult, FieldErrors } from "@/admin/forms";
+import type { ActionResult } from "@/admin/forms";
 import { csvColumnForField } from "@/admin/items/import-csv";
+import { RowErrorTable, splitFieldErrors } from "./row-error-table";
 import { importTextItems } from "./actions";
 
 type FormState = ActionResult<{ count: number }> | null;
-
-interface FileError {
-  field: string;
-  message: string;
-}
-
-interface RowError {
-  row: number;
-  field: string;
-  message: string;
-}
-
-const ROW_ERROR_KEY = /^rows\.(\d+)\.(.+)$/;
-
-function splitErrors(errors: FieldErrors): { fileErrors: FileError[]; rowErrors: RowError[] } {
-  const fileErrors: FileError[] = [];
-  const rowErrors: RowError[] = [];
-
-  for (const [key, message] of Object.entries(errors)) {
-    const match = ROW_ERROR_KEY.exec(key);
-    if (match) {
-      rowErrors.push({ row: Number(match[1]), field: match[2], message });
-    } else {
-      fileErrors.push({ field: key, message });
-    }
-  }
-
-  rowErrors.sort((a, b) => a.row - b.row || a.field.localeCompare(b.field));
-  return { fileErrors, rowErrors };
-}
 
 export function ImportForm() {
   const t = useTranslations("itemsImport");
@@ -72,7 +46,7 @@ export function ImportForm() {
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(submit, null);
 
-  const { fileErrors, rowErrors } = state && !state.ok ? splitErrors(state.errors) : { fileErrors: [], rowErrors: [] };
+  const { fileErrors, rowErrors } = state && !state.ok ? splitFieldErrors(state.errors) : { fileErrors: [], rowErrors: [] };
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,29 +70,7 @@ export function ImportForm() {
         </div>
       ) : null}
 
-      {rowErrors.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <h2 className="font-semibold">{t("report.title")}</h2>
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b">
-                <th className="py-2">{t("report.row")}</th>
-                <th className="py-2">{t("report.field")}</th>
-                <th className="py-2">{t("report.reason")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rowErrors.map((error) => (
-                <tr key={`${error.row}-${error.field}`} className="border-b">
-                  <td className="py-2">{error.row}</td>
-                  <td className="py-2">{csvColumnForField(error.field) ?? ""}</td>
-                  <td className="py-2 text-red-600">{tMessage(error.message)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+      <RowErrorTable rowErrors={rowErrors} columnForField={csvColumnForField} t={t} tMessage={tMessage} />
     </div>
   );
 }

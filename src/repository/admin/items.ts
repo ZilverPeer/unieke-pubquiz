@@ -482,6 +482,77 @@ export interface TextItemInput {
   translations: TextItemTranslations;
 }
 
+export interface ItemBatchRow {
+  kind: ItemKind;
+  subsubcategoryId: string;
+  difficulty: Difficulty;
+  translations: TextItemTranslations;
+}
+
+/**
+ * All-or-nothing batch write of `items` base rows plus their
+ * `item_translations`, shared by every bulk import (Text ticket #94,
+ * Picture ticket #95, extracted from the Text import's own inline batch
+ * write in this ticket): one `items` insert with `.select("id")` for every
+ * base row, then one `item_translations` insert for every translation row;
+ * if the translations insert fails, the just-inserted base rows are deleted
+ * by the ids the first insert returned. PostgreSQL's multi-row INSERT
+ * processes rows in the given order and RETURNING reflects that order, so
+ * the returned ids are always in `rows` order and `insertedBases[i]`
+ * corresponds to `rows[i]`. If the compensating delete itself fails, the
+ * original translationsError alone would hide an orphaned batch of base
+ * rows -- this throws a new Error naming both failures (`{ cause:
+ * translationsError }`) instead of silently discarding the delete error
+ * (Text import fix round 1, PR #118).
+ */
+export async function writeItemBatch(client: SupabaseClient<Database>, rows: ItemBatchRow[]): Promise<string[]> {
+  const baseInserts = rows.map((row) => ({
+    kind: row.kind,
+    subsubcategory_id: Number(row.subsubcategoryId),
+    difficulty: row.difficulty,
+  }));
+  const { data: insertedBases, error: baseError } = await client.from("items").insert(baseInserts).select("id");
+  if (baseError) throw baseError;
+
+  const translationInserts: { item_id: string; locale: "nl" | "en"; question: string | null; answer: string; fact: string | null }[] =
+    [];
+  insertedBases.forEach((base, index) => {
+    const row = rows[index];
+    for (const locale of ["nl", "en"] as const) {
+      const translation = row.translations[locale];
+      if (translation) {
+        translationInserts.push({
+          item_id: base.id,
+          locale,
+          question: translation.question,
+          answer: translation.answer,
+          fact: translation.fact ?? null,
+        });
+      }
+    }
+  });
+
+  const { error: translationsError } = await client.from("item_translations").insert(translationInserts);
+  if (translationsError) {
+    const { error: compensatingDeleteError } = await client
+      .from("items")
+      .delete()
+      .in(
+        "id",
+        insertedBases.map((base) => base.id),
+      );
+    if (compensatingDeleteError) {
+      throw new Error(
+        `writeItemBatch: translations insert failed and the compensating delete of the base rows also failed -- an orphaned batch may remain. translationsError=${translationsError.message}; deleteError=${compensatingDeleteError.message}`,
+        { cause: translationsError },
+      );
+    }
+    throw translationsError;
+  }
+
+  return insertedBases.map((base) => base.id);
+}
+
 export async function createTextItem(
   client: SupabaseClient<Database>,
   input: TextItemInput,
