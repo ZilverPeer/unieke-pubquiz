@@ -128,6 +128,25 @@ describe("handleWebhook", () => {
     expect(deps.orderRepository.upsertOrder).not.toHaveBeenCalled();
   });
 
+  it("200s and persists nothing for an unsigned WooCommerce webhook ping (webhook_id=N)", async () => {
+    const deps = buildDeps();
+
+    const result = await handleWebhook("webhook_id=1", null, toWebhookDeps(deps));
+
+    expect(result.status).toBe(200);
+    expect(deps.orderRepository.upsertOrder).not.toHaveBeenCalled();
+    expect(deps.enqueueQuizJob).not.toHaveBeenCalled();
+  });
+
+  it("401s an unsigned body that merely resembles a ping", async () => {
+    const deps = buildDeps();
+
+    const result = await handleWebhook("webhook_id=1&x=2", null, toWebhookDeps(deps));
+
+    expect(result.status).toBe(401);
+    expect(deps.orderRepository.upsertOrder).not.toHaveBeenCalled();
+  });
+
   it("200s and persists nothing when the order status is not processing", async () => {
     const body = { ...loadFixtureBody(), status: "on-hold" };
     const rawBody = JSON.stringify(body);
