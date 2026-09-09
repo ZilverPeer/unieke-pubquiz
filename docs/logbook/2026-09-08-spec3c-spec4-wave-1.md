@@ -202,3 +202,7 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - #95 dispatched 07:48 (wt-95, ticket-95-items-picture-import from 07601f7, port 3095, brief 95.md). #96 waits for #95 (zip pattern), #107 waits for a stack-free moment (needs db:reset), #97 last.
 - Check-in 07:58: no drift. #95 extracted writeItemBatch into items.ts (Text import 4/4 green as regression), adding assertImage and createPictureItems to picture-items.ts. Erik's store run-through: npm run loop:up at 07:52 (shop 45330, Mailpit 45332, app with worker on 3000, product #10); Supabase shared with #95, loop:down deferred until #95 finishes.
 - Check-in 07:57 (the previous line's 07:58 was an estimate; that check-in was 07:49): no drift. #95 verified on 3095, stopped the server by pid (14428, port proven closed), running npm run check and build before the push. Run-through: 3 mails in Mailpit.
+
+## PR 120 reported (2026-09-09 08:02)
+
+- #95 head f25f2b3 (PR 120): unit 342, picture import 5/5, Text import 4/4 regression, build green; red evidence a missing module; dev server 3095 stopped by pid. Reviewers dispatched: Spec in clone review-7 on port 3114 (briefed to stay off 3000/45330/45332 during Erik's run-through), Standards read-only. Known gap admitted in the PR: blank field column for an unreferenced-entry error.
