@@ -26,7 +26,14 @@
  * own Items directly (not reachable from a billing email at all), so it
  * tracks the ids it creates and cleanup() deletes their item_translations
  * row(s) first, then the item row itself -- never a seeded Item, since
- * only ids this suite created are ever tracked.
+ * only ids this suite created are ever tracked. If a Composition (a real
+ * order, or another suite's run on the shared stack) has since referenced
+ * a tracked Item, deleting it would violate composition_items_item_id_fkey
+ * (ticket #112): cleanup() looks up composition_items for the tracked ids
+ * first and, for any that come back referenced, sets `archived_at` on the
+ * Item instead of deleting it (so loadPool never sees it again, per #88's
+ * `archived_at` filter) and leaves the row -- the rest of the batch, and
+ * the translation rows, are still deleted/removed as usual.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/repository/database.types";
@@ -113,8 +120,31 @@ export function createScopedCleanup(db: SupabaseClient<Database>): ScopedCleanup
     const ids = [...itemIds];
     const { error: translationsError } = await db.from("item_translations").delete().in("item_id", ids);
     if (translationsError) throw translationsError;
-    const { error: itemsError } = await db.from("items").delete().in("id", ids);
-    if (itemsError) throw itemsError;
+
+    // A preliminary composition_items lookup (rather than deleting all ids
+    // and catching composition_items_item_id_fkey) so one referenced Item
+    // never aborts the delete of the others in the same batch, and the
+    // unreferenced/referenced split is a single query each way.
+    const { data: referencedRows, error: referencedError } = await db
+      .from("composition_items")
+      .select("item_id")
+      .in("item_id", ids);
+    if (referencedError) throw referencedError;
+    const referencedIds = new Set((referencedRows ?? []).map((row) => row.item_id));
+
+    const unreferencedIds = ids.filter((id) => !referencedIds.has(id));
+    if (unreferencedIds.length > 0) {
+      const { error: itemsError } = await db.from("items").delete().in("id", unreferencedIds);
+      if (itemsError) throw itemsError;
+    }
+
+    if (referencedIds.size > 0) {
+      const { error: archiveError } = await db
+        .from("items")
+        .update({ archived_at: new Date().toISOString() })
+        .in("id", [...referencedIds]);
+      if (archiveError) throw archiveError;
+    }
   }
 
   async function cleanup(): Promise<void> {
