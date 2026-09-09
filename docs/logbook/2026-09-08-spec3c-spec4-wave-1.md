@@ -195,3 +195,7 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 
 - #89 rebased as 6ee6c52 (master's [id]/page.tsx plus the three lifecycle additions; items.ts auto-merged with usageCount and the FK mapping intact; check green, lifecycle 4/4, actions 7/7). merge-tree clean; merged as e3a0802; master npm run check green (unit 327/327); wt-89 removed. PR 118 conflicts only in the list page (tl vs tImport translator line, lifecycle rows vs the import Link); #94 sent the exact resolution.
 - Check-in 07:37: no drift. #94 merged master as e636738 (list page resolved to master plus tImport and the import Link), check green (unit 335), running its two integration suites before the push. No other agent running; 3000/3094/3095 closed. Brief 95.md written (fflate unzip, writeItemBatch extraction into items.ts, createPictureItems with object rollback, shared row-error table, port 3095).
+
+## PR 118 merged (2026-09-09 07:45)
+
+- #94 rebased as e636738 (master's list page plus tImport and the import Link; check green, unit 335; import 4/4 + actions 7/7). merge-tree clean; merged as 07601f7. First master check failed on the new csv-parse dependency missing from the main checkout's node_modules (typecheck TS2307, unit import error); npm ci fixed it, check green (unit 335/335). wt-94 removed (directory needed a second pass). Spec 4 tickets left: #95, #96, #97; #107 held for a stack-free reset; #119 follow-up.
