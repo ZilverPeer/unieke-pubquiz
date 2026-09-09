@@ -237,4 +237,29 @@ describe("listItems", () => {
     const bySearch = await listItems(db, { locale: "nl", query: marker, page: 1, pageSize: 5000 });
     expect(bySearch.items.map((item) => item.id)).toEqual([created.value.id]);
   });
+
+  it("searches Music Items by artist and title (issue #127)", async () => {
+    const subsubcategoryId = await seedSubsubcategoryId();
+    const titleMarker = `Search 127 ${randomUUID().slice(0, 8)}`;
+    const artistMarker = `Artist 127 ${randomUUID().slice(0, 8)}`;
+
+    const { data: itemRow, error: itemError } = await db
+      .from("items")
+      .insert({ kind: "music", subsubcategory_id: Number(subsubcategoryId), difficulty: "medium" })
+      .select("id")
+      .single();
+    if (itemError) throw itemError;
+    cleanup.trackItemId(itemRow.id);
+
+    const { error: detailError } = await db
+      .from("music_item_details")
+      .insert({ item_id: itemRow.id, storage_path: `${itemRow.id}.mp3`, artist: artistMarker, title: titleMarker });
+    if (detailError) throw detailError;
+
+    const byTitle = await listItems(db, { locale: "nl", query: titleMarker, kind: "music", page: 1, pageSize: 5000 });
+    expect(byTitle.items.map((item) => item.id)).toEqual([itemRow.id]);
+
+    const byArtist = await listItems(db, { locale: "nl", query: artistMarker, kind: "music", page: 1, pageSize: 5000 });
+    expect(byArtist.items.map((item) => item.id)).toEqual([itemRow.id]);
+  });
 });
