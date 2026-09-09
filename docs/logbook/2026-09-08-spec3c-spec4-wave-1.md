@@ -199,3 +199,4 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 ## PR 118 merged (2026-09-09 07:45)
 
 - #94 rebased as e636738 (master's list page plus tImport and the import Link; check green, unit 335; import 4/4 + actions 7/7). merge-tree clean; merged as 07601f7. First master check failed on the new csv-parse dependency missing from the main checkout's node_modules (typecheck TS2307, unit import error); npm ci fixed it, check green (unit 335/335). wt-94 removed (directory needed a second pass). Spec 4 tickets left: #95, #96, #97; #107 held for a stack-free reset; #119 follow-up.
+- #95 dispatched 07:48 (wt-95, ticket-95-items-picture-import from 07601f7, port 3095, brief 95.md). #96 waits for #95 (zip pattern), #107 waits for a stack-free moment (needs db:reset), #97 last.
