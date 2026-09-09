@@ -130,6 +130,15 @@ async function downloadHash(storagePath: string): Promise<string> {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+/** Proves a refused create wrote nothing, not just that it returned an error (judgment call, fix round). */
+async function countItemsAndClips(): Promise<{ items: number; clips: number }> {
+  const { count: items, error: itemsError } = await db.from("items").select("id", { count: "exact", head: true });
+  if (itemsError) throw itemsError;
+  const { data: clips, error: clipsError } = await db.storage.from("music-clips").list();
+  if (clipsError) throw clipsError;
+  return { items: items ?? 0, clips: clips.length };
+}
+
 describe("createMusicItem", () => {
   it("cuts and stores the clip, writes the detail row, and appears only in the ticked Locale's pool", async () => {
     const subsubcategoryId = await seedSubsubcategoryId();
@@ -164,6 +173,7 @@ describe("createMusicItem", () => {
 
   it("refuses start after end and writes nothing", async () => {
     const subsubcategoryId = await seedSubsubcategoryId();
+    const before = await countItemsAndClips();
 
     const result = await createMusicItem(
       formData(baseFields(subsubcategoryId, { startSeconds: "30", endSeconds: "20" }), toneSong),
@@ -174,11 +184,15 @@ describe("createMusicItem", () => {
     if (result.ok) throw new Error("expected failure");
     expect(result.errors).toEqual({ endSeconds: "musicItems.errors.range.order" });
 
+    // Not just an error return -- prove nothing was actually written.
+    expect(await countItemsAndClips()).toEqual(before);
+
     await assertNoLeftoverTempDirs();
   }, 30_000);
 
   it("refuses a clip over the maximum length and writes nothing", async () => {
     const subsubcategoryId = await seedSubsubcategoryId();
+    const before = await countItemsAndClips();
 
     const result = await createMusicItem(
       formData(baseFields(subsubcategoryId, { startSeconds: "0", endSeconds: "50" }), toneSong),
@@ -188,6 +202,9 @@ describe("createMusicItem", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected failure");
     expect(result.errors).toEqual({ endSeconds: "musicItems.errors.range.length" });
+
+    // Not just an error return -- prove nothing was actually written.
+    expect(await countItemsAndClips()).toEqual(before);
 
     await assertNoLeftoverTempDirs();
   }, 30_000);
@@ -201,6 +218,8 @@ describe("updateMusicItem", () => {
     cleanup.trackItemId(created.value.id);
     const storagePath = `${created.value.id}.mp3`;
     storagePaths.add(storagePath);
+
+    await assertNoLeftoverTempDirs();
 
     const result = await updateMusicItem(
       created.value.id,
@@ -223,6 +242,8 @@ describe("updateMusicItem", () => {
     const duration = await downloadDurationSeconds(storagePath);
     expect(Math.abs(duration - 30)).toBeLessThanOrEqual(0.5);
 
+    // Check after both the create's cut and the update's re-cut, not only
+    // once at the end (judgment call, fix round).
     await assertNoLeftoverTempDirs();
   }, 30_000);
 
