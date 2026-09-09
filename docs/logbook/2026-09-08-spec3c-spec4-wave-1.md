@@ -238,3 +238,4 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 
 - Implementer (resume run): red `expected true to be false` on the second line's `feasible` in `check-feasibility.test.ts:87`; unit 4/4, route integration 8/8 (7 + 1), check green. PR body says unit 339; the branch runs 349 (verified in wt-121): a misreport, batched for the fix round.
 - Spec review (clone review-8, no server, driver of `checkFeasibility` with order #30's three lines) and Standards review (read-only) dispatched with briefs `125-spec-review.md` and `125-standards-review.md`.
+- Standards review PR 125: no HARD. JUDGEMENT: PR body unit count (339 vs 349); pre-existing test name "answers two lines independently" in `route.integration.test.ts:166` is still accurate (invalid line). Confirmed: one `Set<string>` copied from `loadExcludedItemIds`, never mutated by the sample helpers; ids added across every slot, kind-agnostic; imports from `@/sample` only. Waiting on Spec.
