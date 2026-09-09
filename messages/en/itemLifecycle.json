@@ -1,0 +1,11 @@
+{
+  "actions": {
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "delete": "Delete"
+  },
+  "archivedAt": "Archived on {date}",
+  "errors": {
+    "inUse": "This Item is used in a Composition and cannot be deleted."
+  }
+}
