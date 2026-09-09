@@ -34,6 +34,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
   const params = (await searchParams) ?? {};
   const t = await getTranslations("items");
   const tl = await getTranslations("itemLifecycle");
+  const tImport = await getTranslations("itemsImport");
 
   const query = first(params.q)?.trim() || undefined;
   const kind = asKind(first(params.kind));
@@ -98,6 +99,9 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
         <h1 className="text-xl font-semibold">{t("title")}</h1>
         <Link href="/admin/items/new" className="border px-3 py-1">
           {t("list.new")}
+        </Link>
+        <Link href="/admin/items/import" className="border px-3 py-1">
+          {tImport("listLink")}
         </Link>
       </div>
 

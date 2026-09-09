@@ -65,6 +65,13 @@ export const MUSIC_CLIP_MAX_SECONDS = 45;
 export const MUSIC_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 
 /**
+ * Row limit for the Text Item CSV bulk import (spec 4, ticket #94), sized
+ * for the free tier per #80's "Bulk import" decision. A file with more data
+ * rows than this is refused before any row is validated.
+ */
+export const TEXT_ITEM_IMPORT_MAX_ROWS = 500;
+
+/**
  * Maximum long edge, in pixels, a Picture Item's uploaded image is resized
  * to on the server before storage (spec 4, ticket #90; admin-common brief
  * "Domain constants"). Keeps Storage within the free tier and PDFs
