@@ -31,6 +31,7 @@ const DIFFICULTY_KEYS: Record<Difficulty, "form.difficultyEasy" | "form.difficul
 export default async function ItemsPage({ searchParams }: PageProps<"/admin/items">) {
   const params = (await searchParams) ?? {};
   const t = await getTranslations("items");
+  const tImport = await getTranslations("itemsImport");
 
   const query = first(params.q)?.trim() || undefined;
   const kind = asKind(first(params.kind));
@@ -71,6 +72,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/admin/item
         <Link href="/admin/items/new" className="border px-3 py-1">
           {t("list.new")}
         </Link>
+        <Link href="/admin/items/import" className="border px-3 py-1">{tImport("listLink")}</Link>
       </div>
 
       <form method="GET" className="flex flex-wrap items-end gap-3">

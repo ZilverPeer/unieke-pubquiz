@@ -1,0 +1,28 @@
+{
+  "listLink": "Import from CSV",
+  "title": "Import Text Items",
+  "intro": "Upload a CSV file to add many Text Items at once. Every row is validated the same way as the regular form; if one row fails, nothing is saved.",
+  "templateLink": "Download CSV template",
+  "templateHint": "The template has the column headers and one example row with subsubcategoryId \"0\" -- replace that example row with your own rows before uploading the file.",
+  "form": {
+    "fileLabel": "CSV file",
+    "submit": "Import",
+    "backToList": "Back to the list"
+  },
+  "success": "{count} Items imported.",
+  "report": {
+    "title": "Errors in the file",
+    "row": "Row",
+    "field": "Field",
+    "reason": "Reason"
+  },
+  "errors": {
+    "header": "The column headers do not match the template.",
+    "empty": "The file has no rows.",
+    "tooManyRows": "The file has too many rows (maximum 500).",
+    "parseError": "The file could not be read as CSV.",
+    "fileRequired": "Choose a CSV file.",
+    "fileType": "Choose a valid CSV file (.csv).",
+    "fileTooLarge": "The file is too large (maximum 1 MB)."
+  }
+}

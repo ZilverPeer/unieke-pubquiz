@@ -51,3 +51,10 @@ export interface QuizContent {
   locale: Locale;
   rounds: readonly RoundContent[];
 }
+
+/**
+ * Row limit for the Text Item CSV bulk import (spec 4, ticket #94), sized
+ * for the free tier per #80's "Bulk import" decision. A file with more data
+ * rows than this is refused before any row is validated.
+ */
+export const TEXT_ITEM_IMPORT_MAX_ROWS = 500;

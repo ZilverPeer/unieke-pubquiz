@@ -1,0 +1,28 @@
+{
+  "listLink": "Importeren vanuit CSV",
+  "title": "Tekst-Items importeren",
+  "intro": "Upload een CSV-bestand om meerdere tekst-Items in één keer toe te voegen. Elke rij wordt gevalideerd zoals in het gewone formulier; als één rij mislukt, wordt er niets opgeslagen.",
+  "templateLink": "Download CSV-sjabloon",
+  "templateHint": "Het sjabloon bevat de kolomkoppen en één voorbeeldrij met subsubcategoryId \"0\" -- vervang die voorbeeldrij door je eigen rijen voordat je het bestand uploadt.",
+  "form": {
+    "fileLabel": "CSV-bestand",
+    "submit": "Importeren",
+    "backToList": "Terug naar de lijst"
+  },
+  "success": "{count} Items geïmporteerd.",
+  "report": {
+    "title": "Fouten in het bestand",
+    "row": "Rij",
+    "field": "Veld",
+    "reason": "Reden"
+  },
+  "errors": {
+    "header": "De kolomkoppen komen niet overeen met het sjabloon.",
+    "empty": "Het bestand bevat geen rijen.",
+    "tooManyRows": "Het bestand bevat te veel rijen (maximaal 500).",
+    "parseError": "Het bestand kon niet als CSV worden gelezen.",
+    "fileRequired": "Kies een CSV-bestand.",
+    "fileType": "Kies een geldig CSV-bestand (.csv).",
+    "fileTooLarge": "Het bestand is te groot (maximaal 1 MB)."
+  }
+}
