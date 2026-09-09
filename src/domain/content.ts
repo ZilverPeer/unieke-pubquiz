@@ -97,3 +97,22 @@ export const PICTURE_ITEM_IMPORT_MAX_ROWS = 200;
  * (src/admin/items/validate-picture.ts).
  */
 export const PICTURE_IMPORT_MAX_ZIP_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Row limit for the Music Item bulk import (spec 4, ticket #96), the Music
+ * sibling of PICTURE_ITEM_IMPORT_MAX_ROWS above. Lower still: each row's
+ * matching zip entry is a full song rather than an image, so the row count
+ * is capped well below what MUSIC_IMPORT_MAX_ZIP_BYTES could hold at
+ * MUSIC_UPLOAD_MAX_BYTES per song, leaving headroom rather than sizing the
+ * cap to the theoretical maximum.
+ */
+export const MUSIC_ITEM_IMPORT_MAX_ROWS = 50;
+
+/**
+ * Largest accepted zip upload for the Music Item bulk import (spec 4,
+ * ticket #96), in bytes -- below the server action body limit (25 MB,
+ * next.config.ts) to leave room for the CSV part and multipart overhead.
+ * Each entry is separately checked against MUSIC_UPLOAD_MAX_BYTES. A batch
+ * larger than this goes in several zips (the import page says so).
+ */
+export const MUSIC_IMPORT_MAX_ZIP_BYTES = 20 * 1024 * 1024;

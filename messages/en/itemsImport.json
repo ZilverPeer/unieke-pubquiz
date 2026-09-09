@@ -11,7 +11,8 @@
   },
   "kindLinks": {
     "text": "Import Text Items",
-    "picture": "Import Picture Items"
+    "picture": "Import Picture Items",
+    "music": "Import Music Items"
   },
   "success": "{count} Items imported.",
   "report": {
