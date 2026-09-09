@@ -21,7 +21,51 @@ export interface TextItemFormInput {
   en: LocaleTextInput;
 }
 
-const DIFFICULTIES: ReadonlySet<string> = new Set<Difficulty>(["easy", "medium", "hard"]);
+export const DIFFICULTIES: ReadonlySet<string> = new Set<Difficulty>(["easy", "medium", "hard"]);
+
+/**
+ * The Subsubcategory/Difficulty checks every Item kind's form shares
+ * (additive, ticket #91): reused as-is by validate-music.ts and, later,
+ * validate-picture.ts, so the "choose a valid Subsubcategory/Difficulty"
+ * rule and its message keys live in exactly one place.
+ */
+export function validateSubsubcategoryAndDifficulty(
+  subsubcategoryId: string,
+  difficulty: string,
+  validSubsubcategoryIds: ReadonlySet<string>,
+): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (!subsubcategoryId || !validSubsubcategoryIds.has(subsubcategoryId)) {
+    errors.subsubcategoryId = "items.errors.subsubcategoryRequired";
+  }
+
+  if (!DIFFICULTIES.has(difficulty)) {
+    errors.difficulty = "items.errors.difficultyRequired";
+  }
+
+  return errors;
+}
+
+/**
+ * Shared Subsubcategory rule -- exported (additive) so the Picture and
+ * Music Item validation modules reuse it instead of a second copy
+ * (items-kind-common brief "reuse the Locale rules from validate.ts").
+ */
+export function validateSubsubcategoryId(
+  subsubcategoryId: string,
+  validSubsubcategoryIds: ReadonlySet<string>,
+): string | null {
+  if (!subsubcategoryId || !validSubsubcategoryIds.has(subsubcategoryId)) {
+    return "items.errors.subsubcategoryRequired";
+  }
+  return null;
+}
+
+/** Shared Difficulty rule, same reuse reasoning as validateSubsubcategoryId. */
+export function validateDifficulty(difficulty: string): string | null {
+  return DIFFICULTIES.has(difficulty) ? null : "items.errors.difficultyRequired";
+}
 
 export function validateTextItem(
   input: TextItemFormInput,
@@ -29,13 +73,11 @@ export function validateTextItem(
 ): FieldErrors | null {
   const errors: FieldErrors = {};
 
-  if (!input.subsubcategoryId || !validSubsubcategoryIds.has(input.subsubcategoryId)) {
-    errors.subsubcategoryId = "items.errors.subsubcategoryRequired";
-  }
+  const subsubcategoryError = validateSubsubcategoryId(input.subsubcategoryId, validSubsubcategoryIds);
+  if (subsubcategoryError) errors.subsubcategoryId = subsubcategoryError;
 
-  if (!DIFFICULTIES.has(input.difficulty)) {
-    errors.difficulty = "items.errors.difficultyRequired";
-  }
+  const difficultyError = validateDifficulty(input.difficulty);
+  if (difficultyError) errors.difficulty = difficultyError;
 
   let completeLocales = 0;
   for (const locale of ["nl", "en"] as const) {

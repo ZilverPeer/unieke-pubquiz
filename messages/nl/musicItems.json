@@ -1,0 +1,42 @@
+{
+  "title": "Muziek-Item",
+  "form": {
+    "newTitle": "Nieuw muziek-Item",
+    "editTitle": "Muziek-Item bewerken"
+  },
+  "fields": {
+    "artist": "Artiest",
+    "title": "Titel",
+    "file": "Volledig nummer (upload)",
+    "filePreview": "Beluister voor het knippen",
+    "start": "Startpunt (seconden)",
+    "end": "Eindpunt (seconden)",
+    "useCurrentTimeStart": "Gebruik huidige afspeeltijd",
+    "useCurrentTimeEnd": "Gebruik huidige afspeeltijd",
+    "currentClip": "Huidige clip",
+    "locales": "Beschikbaar in deze taal"
+  },
+  "errors": {
+    "file": {
+      "required": "Upload een volledig nummer om een clip van te knippen.",
+      "type": "Dit bestandstype wordt niet ondersteund.",
+      "size": "Dit bestand is te groot."
+    },
+    "range": {
+      "order": "Vul een startpunt en eindpunt in, met het eindpunt na het startpunt.",
+      "length": "De geknipte clip moet tussen de 10 en 45 seconden lang zijn."
+    },
+    "artist": {
+      "required": "Vul de artiest in."
+    },
+    "title": {
+      "required": "Vul de titel in."
+    },
+    "translations": {
+      "atLeastOneLocaleRequired": "Vink minstens één taal aan."
+    },
+    "cut": {
+      "failed": "Het knippen van de clip is mislukt. Controleer het bestand en probeer het opnieuw."
+    }
+  }
+}

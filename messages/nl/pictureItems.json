@@ -1,0 +1,17 @@
+{
+  "form": {
+    "newTitle": "Nieuw afbeelding-Item",
+    "editTitle": "Afbeelding-Item bewerken",
+    "fileLabel": "Afbeelding",
+    "replaceLabel": "Afbeelding vervangen",
+    "currentImageAlt": "Huidige afbeelding"
+  },
+  "errors": {
+    "file": {
+      "required": "Kies een afbeelding.",
+      "type": "Alleen PNG- of JPEG-bestanden zijn toegestaan.",
+      "size": "Het bestand is groter dan 5 MB.",
+      "notImage": "Dit bestand is geen geldige afbeelding."
+    }
+  }
+}
