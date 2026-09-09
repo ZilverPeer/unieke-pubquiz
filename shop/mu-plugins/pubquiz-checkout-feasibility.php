@@ -134,11 +134,17 @@ function pubquiz_feasibility_line_from_cart_item( array $cart_item ) {
     }
 
     $difficulty_field = pubquiz_feasibility_wapf_field( $cart_item, PUBQUIZ_FEASIBILITY_DIFFICULTY_FIELD_ID );
-    $difficulty        = ( $difficulty_field && is_string( $difficulty_field['raw'] ?? null ) ) ? $difficulty_field['raw'] : '';
+    // An empty/missing Difficulty is skipped, same as a missing locale
+    // above, rather than sent as '': the endpoint's shape validation
+    // rejects an unknown/empty requestedDifficulty with a 400 for the
+    // *whole* request, which would fail every line open, not just this one.
+    if ( ! $difficulty_field || empty( $difficulty_field['raw'] ) || ! is_string( $difficulty_field['raw'] ) ) {
+        return null;
+    }
 
     return [
         'locale'             => $locale_field['raw'],
-        'requestedDifficulty' => $difficulty,
+        'requestedDifficulty' => $difficulty_field['raw'],
         'categoryPicks'      => pubquiz_feasibility_category_picks( $cart_item ),
     ];
 }

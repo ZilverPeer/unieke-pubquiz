@@ -703,7 +703,8 @@ compiling for the first time, not a real slowness) -- warm `POST
 enough to compile the route) before judging response time. With the app
 stopped outright, the same previously-refused checkout went through and
 `wp-content/uploads/wc-logs/pubquiz-feasibility-<date>-<hash>.log` (viewed
-with `npx wp-env run cli -- cat wp-content/uploads/wc-logs/pubquiz-feasibility-*.log`,
+with `npx wp-env run cli -- sh -c "cat wp-content/uploads/wc-logs/pubquiz-feasibility-*.log"`
+-- `wp-env run cli` does not expand a glob itself, hence the `sh -c` wrapper;
 not `wp wc` -- WooCommerce's file logger has no WP-CLI command of its own)
 held `WARNING request failed: cURL error 7: Failed to connect to
 host.docker.internal port 3000 ...`.
