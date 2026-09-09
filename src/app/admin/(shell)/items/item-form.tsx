@@ -31,10 +31,9 @@
  * `useTranslations("items")` was called with a key that already repeated
  * the "items." prefix and so never resolved.
  *
- * PictureFields (ticket #90, merged from origin/master) does not yet take
- * an `errors` prop -- it currently renders no field-level validation
- * errors of its own, unlike MusicFields. Left as-is: fixing that is
- * ticket #90's own concern, not folded into this ticket's fix round.
+ * PictureFields (ticket #90) takes the same `errors: FieldErrors` prop as
+ * MusicFields (ticket #119), passed the live `errors` from this component's
+ * own `useActionState`.
  */
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -225,7 +224,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
       ) : null}
       {kind === "picture" ? (
         <fieldset className="flex flex-col gap-2 border p-3">
-          <PictureFields currentImageUrl={pictureProps?.imageUrl} />
+          <PictureFields currentImageUrl={pictureProps?.imageUrl} errors={errors} />
         </fieldset>
       ) : null}
 
