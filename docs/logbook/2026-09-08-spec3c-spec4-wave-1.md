@@ -206,3 +206,4 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 ## PR 120 reported (2026-09-09 08:02)
 
 - #95 head f25f2b3 (PR 120): unit 342, picture import 5/5, Text import 4/4 regression, build green; red evidence a missing module; dev server 3095 stopped by pid. Reviewers dispatched: Spec in clone review-7 on port 3114 (briefed to stay off 3000/45330/45332 during Erik's run-through), Standards read-only. Known gap admitted in the PR: blank field column for an unreferenced-entry error.
+- PR 120 Standards review: HARD at picture-items.ts createPictureItems rollback (a failed object remove short-circuits before the base-row delete and discards the original error); JUDGEMENT blank field column for fileUnused. Both sent to #95 as fix round 1 with a rollback integration case; Spec review still running against f25f2b3.
