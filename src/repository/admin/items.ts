@@ -195,6 +195,8 @@ export interface ItemListRow {
   /** Every Locale this Item has a translation for. */
   locales: Locale[];
   archivedAt: string | null;
+  /** Number of composition_items rows referencing this Item (ticket #89: decides which lifecycle button the row offers). */
+  usageCount: number;
 }
 
 export interface ListItemsResult {
@@ -280,6 +282,11 @@ export async function listItems(
   const start = (filters.page - 1) * filters.pageSize;
   const page = filtered.slice(start, start + filters.pageSize);
 
+  const usageCountByItemId = await loadUsageCounts(
+    client,
+    page.map((row) => row.id),
+  );
+
   const items: ItemListRow[] = page.map((row) => {
     const chain = chainBySubsubcategoryId.get(String(row.subsubcategory_id));
     const translation = row.item_translations.find((t) => t.locale === filters.locale);
@@ -294,10 +301,39 @@ export async function listItems(
       answer: translation?.answer ?? null,
       locales: row.item_translations.map((t) => t.locale),
       archivedAt: row.archived_at,
+      usageCount: usageCountByItemId.get(row.id) ?? 0,
     };
   });
 
   return { items, total: filtered.length };
+}
+
+// supabase-js sends .in() filters as a GET query string; a page's worth of
+// uuids is small (the admin list page paginates 25 rows), but
+// actions.integration.test.ts's own listItems test asks for pageSize 5000
+// to inspect the whole filtered set in one call, which is enough ids to
+// exceed the URL length limit in one .in() call -- chunk it the same way
+// PostgREST's own row cap is paginated elsewhere in this file.
+const USAGE_LOOKUP_CHUNK_SIZE = 200;
+
+/**
+ * Usage counts (number of composition_items rows) for exactly the given
+ * Item ids, in one grouped query per chunk -- not one query per row
+ * (ticket #89's list page needs this per visible page, never the whole
+ * Item table).
+ */
+async function loadUsageCounts(client: SupabaseClient<Database>, itemIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (itemIds.length === 0) return counts;
+
+  for (let i = 0; i < itemIds.length; i += USAGE_LOOKUP_CHUNK_SIZE) {
+    const chunk = itemIds.slice(i, i + USAGE_LOOKUP_CHUNK_SIZE);
+    const { data, error } = await client.from("composition_items").select("item_id").in("item_id", chunk);
+    if (error) throw error;
+    for (const row of data) counts.set(row.item_id, (counts.get(row.item_id) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 export interface ItemTranslationInput {
@@ -317,6 +353,8 @@ export interface ItemDetail {
   difficulty: Difficulty;
   subsubcategoryId: string;
   archivedAt: string | null;
+  /** Number of composition_items rows referencing this Item (ticket #89: decides which lifecycle button the edit page offers). */
+  usageCount: number;
   translations: Partial<Record<Locale, { question: string; answer: string; fact: string | null }>>;
 }
 
@@ -335,12 +373,15 @@ export async function getItem(client: SupabaseClient<Database>, id: string): Pro
     translations[row.locale] = { question: row.question ?? "", answer: row.answer ?? "", fact: row.fact };
   }
 
+  const usageCount = await countItemUsage(client, id);
+
   return {
     id: data.id,
     kind: data.kind,
     difficulty: data.difficulty,
     subsubcategoryId: String(data.subsubcategory_id),
     archivedAt: data.archived_at,
+    usageCount,
     translations,
   };
 }
@@ -448,6 +489,10 @@ export interface ItemsAdminRepository {
   getItem(id: string): Promise<ItemDetail | null>;
   createTextItem(input: TextItemInput): Promise<{ id: string }>;
   updateTextItem(id: string, input: TextItemInput): Promise<{ id: string }>;
+  countItemUsage(id: string): Promise<number>;
+  archiveItem(id: string): Promise<void>;
+  unarchiveItem(id: string): Promise<void>;
+  deleteItem(id: string): Promise<void>;
 }
 
 export function createItemsAdminRepository(config: RepositoryConfig): ItemsAdminRepository {
@@ -460,5 +505,66 @@ export function createItemsAdminRepository(config: RepositoryConfig): ItemsAdmin
     getItem: (id) => getItem(client, id),
     createTextItem: (input) => createTextItem(client, input),
     updateTextItem: (id, input) => updateTextItem(client, id, input),
+    countItemUsage: (id) => countItemUsage(client, id),
+    archiveItem: (id) => archiveItem(client, id),
+    unarchiveItem: (id) => unarchiveItem(client, id),
+    deleteItem: (id) => deleteItem(client, id),
   };
+}
+
+/**
+ * Item lifecycle: archive, unarchive, delete (spec 4, ticket #89, parent
+ * #80 stories 18-19). Archive/unarchive are always allowed -- an Item stays
+ * in the no-repeat history regardless of usage, archived just hides it from
+ * loadPool (src/repository/pool.ts's `archived_at is null` filter).
+ * countItemUsage only decides which button the UI offers; deleteItem's
+ * guard is the database itself (see below), never this count.
+ */
+export async function countItemUsage(client: SupabaseClient<Database>, id: string): Promise<number> {
+  const { count, error } = await client
+    .from("composition_items")
+    .select("id", { count: "exact", head: true })
+    .eq("item_id", id);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function archiveItem(client: SupabaseClient<Database>, id: string): Promise<void> {
+  const { error } = await client.from("items").update({ archived_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function unarchiveItem(client: SupabaseClient<Database>, id: string): Promise<void> {
+  const { error } = await client.from("items").update({ archived_at: null }).eq("id", id);
+  if (error) throw error;
+}
+
+/** Thrown by deleteItem() when the Item is referenced by any composition_items row. */
+export class ItemInUseError extends Error {
+  constructor(public readonly itemId: string) {
+    super(`Item ${itemId} is referenced by a Composition and cannot be deleted`);
+    this.name = "ItemInUseError";
+  }
+}
+
+const COMPOSITION_ITEMS_ITEM_ID_FK = "composition_items_item_id_fkey";
+
+/**
+ * Deletes an Item's base row -- item_translations and the kind detail row
+ * (picture_item_details/music_item_details) cascade-delete with it (all
+ * three `references items (id) on delete cascade`, migration 00003).
+ * composition_items references items with a plain (non-cascading) foreign
+ * key, migration 00004, so this single delete statement cannot succeed
+ * while any composition_items row still points at the Item: the guard is
+ * the FK itself, race-safe by construction, not a separate count-then-delete
+ * (countItemUsage above only decides which button the UI shows).
+ */
+export async function deleteItem(client: SupabaseClient<Database>, id: string): Promise<void> {
+  const { error } = await client.from("items").delete().eq("id", id);
+  if (error) {
+    if (error.code === "23503" && error.message.includes(COMPOSITION_ITEMS_ITEM_ID_FK)) {
+      throw new ItemInUseError(id);
+    }
+    throw error;
+  }
 }

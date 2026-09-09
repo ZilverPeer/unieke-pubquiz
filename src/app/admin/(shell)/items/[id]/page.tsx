@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { ItemForm, type ItemFormInitialValues } from "../item-form";
+import { ItemLifecycle } from "../item-lifecycle";
 
 export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
@@ -40,6 +41,7 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
         <h1 className="text-xl font-semibold">{t("form.editTitle")}</h1>
         <Link href="/admin/items">{t("form.backToList")}</Link>
       </div>
+      <ItemLifecycle item={item} locale="nl" />
       <ItemForm mode="edit" itemId={id} subsubcategoryOptions={subsubcategoryOptions} initialValues={initialValues} />
     </div>
   );
