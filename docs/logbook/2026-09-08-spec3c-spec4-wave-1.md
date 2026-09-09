@@ -312,3 +312,9 @@ Diff: three `setval(pg_get_serial_sequence(...))` lines at the end of `supabase/
 
 Erik ran `admin:operator` himself (the orchestrator's run is denied by the classifier). #131 resumed for its red capture on 3131. PR 130 Spec reviewer walks `docs/walkthrough-operator.md` (read with `git show` from the branch) against the fresh loop from master on 3000/45330/45332, rows marked `Walk 130`.
 - 15:05 drift, #131 implementer: after the fix it was dissecting the `/admin/items/new` form's `$ACTION_ID` fields to create its marker Item by curl, a `useActionState` form that cannot be scripted (standing rule). One message: create the row with a tsx driver against the repository, post only the list's plain delete form, keep it short. PR 130 reviewer on brief (walking Categories against the running page and `messages/nl`).
+
+## 2026-09-09 15:2x PR 134 (#131) and PR 130 (#97) merged
+
+PR 134: one-line closure fix plus comments in `items/page.tsx`; red evidence 25 `unhandledRejection` lines on a 26-row page, clean log after; the list's delete form exercised live with a `Closure 131` row (created and deleted, none left); in-use redirect by reading (no composition rows on the reseeded stack). Merged on a read review.
+
+PR 130: Spec walk on the fresh loop found one HARD (the Orders section assumed orders 29-31 exist; a fresh stack has none) and confirmed every quoted label, URL, template header and both links; all `useActionState` steps by reading, as expected. Fix applied by the orchestrator on the branch (d36c516): the section now tells the reader to place one order via the customer-journey walkthrough first. Merged. Master `npm run check` green. wt-131 and wt-97 removed. #132 triaged ready-for-agent for this wave.
