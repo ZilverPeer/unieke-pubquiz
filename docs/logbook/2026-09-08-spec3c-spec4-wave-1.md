@@ -150,3 +150,9 @@ Erik stopped the stale app on 3000 with `loop:down`, which also took Supabase, M
 - Verification orders 40 to 42 stay on the stack (test rows, harmless). App on 3000 stopped after the suite; Supabase and the wt-3b shop left running for #103.
 
 Observations for the retro (added): scoped cleanup leaks when a run is killed mid-test (five Items) and cannot delete an Item once a Composition references it: cleanup should archive instead of delete, or the sampler should never see test Items (a `zztest` marker filter is not an option; a dedicated test Subsubcategory would be). Every worktree needs the full `.env.local`; the brief template should say "copy from the main checkout" rather than rely on `shop:up` writing only the shop variables.
+
+## Resume after the usage reset (2026-09-09)
+
+- Docker had restarted overnight: Supabase came back on its own, the wt-3b shop, Mailpit and the cron ticker did not. #103 (shop, spec 5) dispatched in `../Pubquiz-wt-3b` with the sole-agent `loop:up` exception; agent a2318068690467b9b. Check-in cron 88678e52 re-created (every 10 minutes).
+- Retro items applied without waiting for the retro conversation (Erik: "please also implement the retro items"): implement skill sharpened on what counts as red; playbook brief template says the worktree carries a full `.env.local` and that shop setup rotates the REST key; Spec reviewer section documents the `useActionState` path; wave end checks for leaked rows first (commit 72263bf). Cleanup-archives-Items plus #111 filed as #112 and dispatched in `../Pubquiz-wt-112`; agent aba20116494b37cde.
+
