@@ -229,3 +229,7 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 
 - #121 (wt-121) and #96 (wt-96) implementers terminated by HTTP 429 mid-task. #121 was about to run `npm run check` and commit (unit green, route integration case written); #96 had all files in place and was writing the README paragraph. Both worktrees hold uncommitted work; no server on 3096. Nothing lost.
 - Resume plan after the reset: dispatch a fresh implementer per ticket with the same brief plus "the worktree already contains a partial implementation; read `git status`/`git diff`, finish, run `npm run check`, commit and open the PR". Check-in cron fires against no running agents until then: no drift lines.
+
+## Resume 12:4x: #121 and #96 redispatched
+
+- Fresh Sonnet implementers per ticket with resume briefs `121-resume.md` and `96-resume.md` (finish from the worktree's uncommitted state, reproduce red evidence once via `git stash` of the implementation file, merge master since PR 124, open the PR). Same worktrees, same rules.
