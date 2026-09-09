@@ -190,3 +190,7 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 ## PR 116 merged (2026-09-09 07:35)
 
 - #91 final head 9fcef5a: fix round 62e54a6 (kindProps pattern, root-scoped error translation closing the #88 raw-key bug, object-URL cleanup, temp-dir assertion in the renderer test), 37dd75a (row-count and per-action temp-dir assertions), 9fcef5a (hand merge of master over PR 115 with per-kind page titles). Targeted re-review of the form wiring: kind fields rendered inside the client form with live errors, package files identical to master. merge-tree clean; merged as 32990f0; master npm run check green (unit 327/327); wt-91 removed. Follow-up #119 filed: PictureFields renders no field errors (a #90 leftover, not #91's). #89 sent the rebase instruction (one conflict, [id]/page.tsx: master's file plus the ItemLifecycle import, lifecycleError derivation and the JSX line).
+
+## PR 117 merged (2026-09-09 07:42)
+
+- #89 rebased as 6ee6c52 (master's [id]/page.tsx plus the three lifecycle additions; items.ts auto-merged with usageCount and the FK mapping intact; check green, lifecycle 4/4, actions 7/7). merge-tree clean; merged as e3a0802; master npm run check green (unit 327/327); wt-89 removed. PR 118 conflicts only in the list page (tl vs tImport translator line, lifecycle rows vs the import Link); #94 sent the exact resolution.
