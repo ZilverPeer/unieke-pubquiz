@@ -58,3 +58,11 @@ export interface QuizContent {
  * rows than this is refused before any row is validated.
  */
 export const TEXT_ITEM_IMPORT_MAX_ROWS = 500;
+
+/**
+ * Maximum long edge, in pixels, a Picture Item's uploaded image is resized
+ * to on the server before storage (spec 4, ticket #90; admin-common brief
+ * "Domain constants"). Keeps Storage within the free tier and PDFs
+ * rendering at the same quality regardless of the source upload's size.
+ */
+export const PICTURE_MAX_EDGE_PX = 1600;

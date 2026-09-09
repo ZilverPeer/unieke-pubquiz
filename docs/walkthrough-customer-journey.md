@@ -117,6 +117,14 @@ curl.exe -o quiz-2.zip "http://localhost:3000/download/<token 2>/quiz.zip"
 
 Each zip unpacks to the four Deliverables (`quizmaster.pdf`, `picture-handout.pdf`, `answer-sheet.pdf`, `music-round.mp3`; a script and answer-sheet PDF around 15-30 KB, a picture hand-out PDF a few hundred KB depending on the images sampled, an MP3 under a megabyte).
 
+## A refused checkout (spec 5, ticket #103)
+
+Add the exact same Taal/Moeilijkheid/Categorieën combination you just bought to the cart again (a single hard pick, e.g. Sport, cycled onto all 8 rounds -- the no-repeat rule means that email has nothing left in that Category/Difficulty) and go to checkout with the same billing email. Checkout is refused, before payment, with a Dutch notice naming the cart line and how many Items are short:
+
+> Quiz 1: Sport (Moeilijk): 10 vragen te weinig
+
+No order is created. Change the billing e-mail to a fresh address and place the same order again -- it goes through, since the no-repeat rule is scoped per billing email. See `shop/README.md` "Checkout feasibility check" for how the check works and what happens if the app itself is unreachable (checkout still goes through -- the check fails open).
+
 ## A second Quiz in the same order
 
 Because the Pubquiz product is sold individually (spec 3c, #83), the only way to buy more than one Quiz in one order is to configure a *different* combination of Taal/Moeilijkheid/Categorieën and add it as a second cart line -- the identical configuration a second time is refused (see "The product page" above). Add the first configuration, then go back to http://localhost:45330/product/pubquiz/, pick a different Taal, Moeilijkheid or set of Categorieën, and click **Toevoegen aan winkelwagen** again: **Winkelwagen** now shows two lines, each &euro;14,95, no quantity column. Checkout, the mails and the downloads all follow exactly as in the single-order flow above, except the order summary lists both configurations and the completed mail carries two zip rows instead of one:

@@ -1,20 +1,29 @@
 "use client";
 /**
- * Shared Text Item create/edit form (spec 4, ticket #88). A client
- * component (not a plain progressive-enhancement form) because it needs
- * useActionState to read the ActionResult the server action returns --
- * field errors, resolved to message keys here with useTranslations (the
- * shape admin-common's brief describes) -- and to redirect to the list on
- * success itself, since createTextItem/updateTextItem return an
- * ActionResult rather than calling redirect() (the integration suite calls
- * them directly and asserts on that return value).
+ * Shared Item create/edit form (spec 4, ticket #88; extended for Picture
+ * and Music, ticket #90/#91). A client component (not a plain
+ * progressive-enhancement form) because it needs useActionState to read
+ * the ActionResult the server action returns -- field errors, resolved to
+ * message keys here with useTranslations (the shape admin-common's brief
+ * describes) -- and to redirect to the list on success itself, since every
+ * kind's create/update action returns an ActionResult rather than calling
+ * redirect() (the integration suites call them directly and assert on
+ * that return value).
+ *
+ * `submit` dispatches on `kind` through ACTIONS, a small lookup keyed by
+ * ItemKind (items-kind-common brief "Shared files"): Text stays the
+ * fallback default so the existing Text Item pages keep working
+ * unchanged even though `kind` is now a required prop.
  */
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import type { ActionResult } from "@/admin/forms";
+import type { ItemKind } from "@/domain";
 import type { SubsubcategoryOption } from "@/repository/admin/items";
 import { createTextItem, updateTextItem } from "./actions";
+import { createPictureItem, updatePictureItem } from "./picture-actions";
 
 export interface ItemFormLocaleValues {
   question: string;
@@ -32,6 +41,8 @@ export interface ItemFormInitialValues {
 export interface ItemFormProps {
   mode: "create" | "edit";
   itemId?: string;
+  kind: ItemKind;
+  kindFields?: ReactNode;
   subsubcategoryOptions: SubsubcategoryOption[];
   initialValues?: ItemFormInitialValues;
 }
@@ -40,12 +51,20 @@ const EMPTY_LOCALE: ItemFormLocaleValues = { question: "", answer: "", fact: "" 
 
 type FormState = ActionResult<{ id: string }> | null;
 
-export function ItemForm({ mode, itemId, subsubcategoryOptions, initialValues }: ItemFormProps) {
+type CreateAction = (formData: FormData) => Promise<FormState>;
+type UpdateAction = (id: string, formData: FormData) => Promise<FormState>;
+
+const ACTIONS: Partial<Record<ItemKind, [CreateAction, UpdateAction]>> = {
+  picture: [createPictureItem, updatePictureItem],
+};
+
+export function ItemForm({ mode, itemId, kind, kindFields, subsubcategoryOptions, initialValues }: ItemFormProps) {
   const t = useTranslations("items");
   const router = useRouter();
 
   async function submit(_previous: FormState, formData: FormData): Promise<FormState> {
-    return mode === "create" ? createTextItem(formData) : updateTextItem(itemId!, formData);
+    const [createAction, updateAction] = ACTIONS[kind] ?? [createTextItem, updateTextItem];
+    return mode === "create" ? createAction(formData) : updateAction(itemId!, formData);
   }
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(submit, null);
@@ -61,8 +80,6 @@ export function ItemForm({ mode, itemId, subsubcategoryOptions, initialValues }:
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <p className="text-gray-500">{t("form.kindNote")}</p>
-
       {errors.translations ? <p className="text-red-600">{t(errors.translations)}</p> : null}
 
       <label className="flex flex-col gap-1">
@@ -93,16 +110,20 @@ export function ItemForm({ mode, itemId, subsubcategoryOptions, initialValues }:
         <fieldset key={locale} className="flex flex-col gap-2 border p-3">
           <legend>{t(locale === "nl" ? "form.localeNl" : "form.localeEn")}</legend>
 
-          <label className="flex flex-col gap-1">
-            <span>{t("form.question")}</span>
-            <input
-              type="text"
-              name={`${locale}.question`}
-              defaultValue={values[locale].question}
-              className="border px-2 py-1"
-            />
-            {errors[`${locale}.question`] ? <span className="text-red-600">{t(errors[`${locale}.question`])}</span> : null}
-          </label>
+          {kind === "text" ? (
+            <label className="flex flex-col gap-1">
+              <span>{t("form.question")}</span>
+              <input
+                type="text"
+                name={`${locale}.question`}
+                defaultValue={values[locale].question}
+                className="border px-2 py-1"
+              />
+              {errors[`${locale}.question`] ? (
+                <span className="text-red-600">{t(errors[`${locale}.question`])}</span>
+              ) : null}
+            </label>
+          ) : null}
 
           <label className="flex flex-col gap-1">
             <span>{t("form.answer")}</span>
@@ -121,6 +142,8 @@ export function ItemForm({ mode, itemId, subsubcategoryOptions, initialValues }:
           </label>
         </fieldset>
       ))}
+
+      {kindFields ? <fieldset className="flex flex-col gap-2 border p-3">{kindFields}</fieldset> : null}
 
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className="border px-3 py-1">

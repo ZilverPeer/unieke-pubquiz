@@ -40,7 +40,6 @@
   "form": {
     "newTitle": "New Text Item",
     "editTitle": "Edit Item",
-    "kindNote": "Only Text Items can be created for now; Picture and Music kinds follow later.",
     "subsubcategory": "Subsubcategory",
     "subsubcategoryPlaceholder": "Choose a Subsubcategory",
     "difficulty": "Difficulty",
@@ -55,7 +54,12 @@
     "submitCreate": "Create Item",
     "submitUpdate": "Save changes",
     "cancel": "Cancel",
-    "backToList": "Back to the list"
+    "backToList": "Back to the list",
+    "kindLinks": {
+      "text": "Text Item",
+      "picture": "Picture Item",
+      "music": "Music Item"
+    }
   },
   "errors": {
     "subsubcategoryRequired": "Choose a valid Subsubcategory.",
