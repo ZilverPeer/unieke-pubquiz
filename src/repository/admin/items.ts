@@ -212,6 +212,8 @@ interface ItemBaseRow {
   archived_at: string | null;
   created_at: string;
   item_translations: { locale: Locale; question: string | null; answer: string | null }[];
+  /** Null or empty for Text/Picture Items -- only Music Items have a music_item_details row (PostgREST embedded relation, this file's own docblock). */
+  music_item_details: { artist: string; title: string } | null;
 }
 
 /**
@@ -247,7 +249,9 @@ export async function listItems(
   function buildQuery(from: number, to: number) {
     let query = client
       .from("items")
-      .select("id, kind, difficulty, subsubcategory_id, archived_at, created_at, item_translations(locale,question,answer)");
+      .select(
+        "id, kind, difficulty, subsubcategory_id, archived_at, created_at, item_translations(locale,question,answer), music_item_details(artist,title)",
+      );
 
     if (filters.kind) query = query.eq("kind", filters.kind);
     if (filters.difficulty) query = query.eq("difficulty", filters.difficulty);
@@ -274,7 +278,16 @@ export async function listItems(
       const translation = row.item_translations.find((t) => t.locale === filters.locale);
       const question = (translation?.question ?? "").toLowerCase();
       const answer = (translation?.answer ?? "").toLowerCase();
-      if (!question.includes(trimmedQuery) && !answer.includes(trimmedQuery)) return false;
+      const artist = (row.music_item_details?.artist ?? "").toLowerCase();
+      const title = (row.music_item_details?.title ?? "").toLowerCase();
+      if (
+        !question.includes(trimmedQuery) &&
+        !answer.includes(trimmedQuery) &&
+        !artist.includes(trimmedQuery) &&
+        !title.includes(trimmedQuery)
+      ) {
+        return false;
+      }
     }
     return true;
   });
