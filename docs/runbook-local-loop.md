@@ -25,7 +25,7 @@ See `docs/walkthrough-customer-journey.md` (ticket #59): one command,
 npm run loop:up
 ```
 
-starts the whole loop (the Supabase stack, the shop with Mailpit and the cron ticker, and the app with the worker), reusing anything already up and never resetting the database, then prints the shop, Mailpit and app URLs. The walkthrough takes it from there -- the product page, checkout, the mails, the downloads, My Account, and a failing order on purpose. `npm run loop:down` stops everything again.
+starts the whole loop (the Supabase stack, the shop with Mailpit and the cron ticker, and the app with the worker), reusing anything already up and never resetting the database, then prints the shop, Mailpit and app URLs. The walkthrough takes it from there -- the product page, checkout, the mails, the downloads, My Account, and a failing order on purpose. `npm run loop:down` stops everything again. See `docs/walkthrough-operator.md` (ticket #97) for the same kind of walkthrough on the `/admin` area -- login, Categories, all three Item kinds, bulk import, Coverage and Orders.
 
 ### Troubleshooting
 
