@@ -322,3 +322,7 @@ PR 130: Spec walk on the fresh loop found one HARD (the Orders section assumed o
 ## 2026-09-09 15:3x #132 dispatched (wt-132, `ticket-132-webhook-twin`, from bfe0e4a)
 
 Investigate-first brief: count webhooks in both wp-env instances, one probe order update on order 33, match the 200 and the 401 to their senders, then the minimal fix (tests-instance webhook or a mu-plugin double send). Full loop stays up for it. After its merge: wave-end steps.
+
+## 2026-09-09 15:5x Playbook updated from this wave's lessons; wave-end cleanup started
+
+`docs/agents/orchestration.md` gains: the orchestrator prepares review clones with `.env.local` before dispatch; a reseed drops the operator and Erik recreates it; `wp-env` runs from the main checkout while the loop is up; check-in cadence 15 minutes (Erik, today); curl posts plain server forms only; integration files one at a time; red-claim recipes remove branch-only files; header filtering and the key-line count before printing; documentation PRs walked from `git show` against a loop from master. Why: each is a drift or block from this wave (PR 125/126/130 reviews, #131, #132). Review clones 2-9 and eight stale `~/.wp-env` directories being deleted; the active `wp-env-Pubquiz-670d5ccc` and the wt-132 one (created by the #132 implementer running wp-env from its worktree, corrected) stay until the loop goes down.
