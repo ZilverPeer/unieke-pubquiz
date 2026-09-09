@@ -9,6 +9,8 @@
 import { createHmac } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Difficulty } from "@/domain";
+import { ITEMS_PER_SLOT, SLOT_KINDS } from "@/domain";
 import { createRepository, resolveLocalStackConfig } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { createScopedCleanup } from "@/test-support/scoped-cleanup";
@@ -180,4 +182,67 @@ describe("POST /api/feasibility", () => {
     expect(json.lines[1].feasible).toBe(false);
     expect(json.lines[1].invalid).not.toBeNull();
   });
+
+  it(
+    "judges sibling cart lines in cart order: identical lines exceeding the pool refuse the last, not the first (#121)",
+    async () => {
+      // Same (Category, Difficulty) text pool the sampler would draw a
+      // single-pick line's 6 Text Rounds from: whichever is smallest on the
+      // seeded stack, computed here rather than hardcoded (a re-seed can
+      // change the counts).
+      const pool = await repository.loadPool("nl");
+      const textCountByGroup = new Map<string, number>();
+      for (const entry of pool) {
+        if (entry.item.kind !== "text") continue;
+        const key = `${entry.item.categoryId}|${entry.item.difficulty}`;
+        textCountByGroup.set(key, (textCountByGroup.get(key) ?? 0) + 1);
+      }
+      expect(textCountByGroup.size).toBeGreaterThan(0);
+
+      let smallestKey = "";
+      let smallestCount = Infinity;
+      for (const [key, count] of textCountByGroup) {
+        if (count < smallestCount) {
+          smallestKey = key;
+          smallestCount = count;
+        }
+      }
+      const [categoryId, difficulty] = smallestKey.split("|") as [string, Difficulty];
+
+      // A single-pick line's Text Rounds are the 6 SLOT_KINDS entries of
+      // kind "text", each needing ITEMS_PER_SLOT: every successful line
+      // consumes exactly that many Text Items of (categoryId, difficulty)
+      // from the pool. The smallest N of identical lines whose cumulative
+      // consumption must exceed the pool: after N-1 successful lines
+      // (60*(N-1) <= smallestCount), the Nth needs 60 more than the pool
+      // has left.
+      const textNeededPerLine = SLOT_KINDS.filter((kind) => kind === "text").length * ITEMS_PER_SLOT;
+      const lineCount = Math.floor(smallestCount / textNeededPerLine) + 1;
+
+      const email = freshEmail("sibling-lines");
+      const body = JSON.stringify({
+        billingEmail: email,
+        lines: Array.from({ length: lineCount }, () => ({
+          locale: "nl",
+          requestedDifficulty: difficulty,
+          categoryPicks: [categoryId],
+        })),
+      });
+
+      const response = await post(body, sign(body));
+
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as {
+        lines: { feasible: boolean; invalid: string | null; shortfalls: { shortfall: number }[] }[];
+      };
+      expect(json.lines).toHaveLength(lineCount);
+      expect(json.lines[0]).toEqual({ feasible: true, invalid: null, shortfalls: [] });
+      const lastLine = json.lines[lineCount - 1];
+      expect(lastLine.feasible).toBe(false);
+      expect(lastLine.invalid).toBeNull();
+      expect(lastLine.shortfalls.length).toBeGreaterThan(0);
+      expect(lastLine.shortfalls.some((s) => s.shortfall > 0)).toBe(true);
+    },
+    30_000,
+  );
 });
