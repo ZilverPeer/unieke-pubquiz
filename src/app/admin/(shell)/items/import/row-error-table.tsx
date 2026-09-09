@@ -18,6 +18,17 @@
  * originally had: a row's `message` is a fully-qualified key
  * ("items.errors.X", "pictureItems.errors.file.X", "pictureImport.errors.X")
  * that a namespace-scoped translator cannot resolve.
+ *
+ * A row-0 error's `field` is not always a form field: the Picture import's
+ * "unreferenced zip entry" check (fileUnused) has no row to blame, so it
+ * encodes the entry's own file name as `field` instead (`rows.0.<name>`,
+ * see the Picture import action's own docblock). `columnForField` never has
+ * a CSV column for an arbitrary file name, so this table falls back to the
+ * raw field text rather than rendering blank (Standards review, fix round
+ * 1) and passes it through to `tMessage` as the `file` interpolation value
+ * for every row-0 error -- `pictureImport.errors.fileUnused` uses it,
+ * ordinary field keys (which have no `{file}` placeholder) simply ignore
+ * the extra value.
  */
 import type { FieldErrors } from "@/admin/forms";
 
@@ -57,8 +68,8 @@ export interface RowErrorTableProps {
   columnForField: (field: string) => string | null;
   /** Scoped to "itemsImport", for this table's own report.* labels (reused, never duplicated). */
   t: (key: string) => string;
-  /** Unscoped, to resolve a row's fully-qualified message key. */
-  tMessage: (key: string) => string;
+  /** Unscoped, to resolve a row's fully-qualified message key; accepts ICU values for the `{file}` placeholder a row-0 error's message may carry. */
+  tMessage: (key: string, values?: Record<string, string | number>) => string;
 }
 
 export function RowErrorTable({ rowErrors, columnForField, t, tMessage }: RowErrorTableProps) {
@@ -79,8 +90,10 @@ export function RowErrorTable({ rowErrors, columnForField, t, tMessage }: RowErr
           {rowErrors.map((error) => (
             <tr key={`${error.row}-${error.field}`} className="border-b">
               <td className="py-2">{error.row}</td>
-              <td className="py-2">{columnForField(error.field) ?? ""}</td>
-              <td className="py-2 text-red-600">{tMessage(error.message)}</td>
+              <td className="py-2">{columnForField(error.field) ?? error.field}</td>
+              <td className="py-2 text-red-600">
+                {error.row === 0 ? tMessage(error.message, { file: error.field }) : tMessage(error.message)}
+              </td>
             </tr>
           ))}
         </tbody>

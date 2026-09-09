@@ -16,6 +16,7 @@ import { createRepository, resolveLocalStackConfig } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { createScopedCleanup } from "@/test-support/scoped-cleanup";
 import { parsePictureItemsCsv, PICTURE_ITEM_IMPORT_HEADER } from "@/admin/items/import-picture-csv";
+import { createPictureItems, type CreatePictureItemsInput } from "@/repository/admin/picture-items";
 import { importPictureItems } from "./actions";
 import { GET as templateGet } from "./template/route";
 
@@ -227,6 +228,35 @@ describe("importPictureItems", () => {
     expect(await itemCount()).toBe(beforeItems);
     expect(await picturesObjectCount()).toBe(beforeObjects);
     expect(await findByMarker(marker)).toHaveLength(0);
+  });
+});
+
+describe("createPictureItems rollback (repository seam, Standards fix round 1)", () => {
+  it("removes the already-uploaded object and deletes both item rows when a later image is not a real image", async () => {
+    const subsubcategoryId = await seedSubsubcategoryId();
+
+    const beforeItems = await itemCount();
+    const beforeObjects = await picturesObjectCount();
+
+    const inputs: CreatePictureItemsInput[] = [
+      {
+        subsubcategoryId,
+        difficulty: "medium",
+        translations: { nl: { answer: "Eerste" } },
+        image: Buffer.from(await pngBuffer(200, 200)),
+      },
+      {
+        subsubcategoryId,
+        difficulty: "medium",
+        translations: { nl: { answer: "Tweede" } },
+        image: Buffer.from("not an image, just random text bytes"),
+      },
+    ];
+
+    await expect(createPictureItems(db, inputs)).rejects.toThrow();
+
+    expect(await itemCount()).toBe(beforeItems);
+    expect(await picturesObjectCount()).toBe(beforeObjects);
   });
 });
 

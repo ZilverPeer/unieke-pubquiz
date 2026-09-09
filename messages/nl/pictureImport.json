@@ -23,7 +23,7 @@
     "zipTooLarge": "Het zip-bestand is te groot (maximaal 20 MB).",
     "zipParseError": "Het zip-bestand kon niet worden gelezen.",
     "fileMissing": "Geen bestand in de zip met deze naam.",
-    "fileUnused": "Dit bestand in de zip wordt door geen enkele rij genoemd.",
+    "fileUnused": "Het bestand \"{file}\" in de zip wordt door geen enkele rij genoemd.",
     "fileNotImage": "Dit bestand is geen geldige afbeelding."
   }
 }

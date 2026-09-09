@@ -155,6 +155,16 @@ export interface CreatePictureItemsInput {
  * translations and detail rows, the same as a single failed
  * createPictureItem), then the error is rethrown -- a failure never leaves
  * a partial batch (rows without objects, or objects without rows) behind.
+ *
+ * The remove and the delete are both attempted regardless of the other's
+ * outcome (a failed `storage.remove` must never skip the base-row delete,
+ * or a partial upload orphans rows too, Standards review on this ticket's
+ * PR): if either the remove or the delete itself fails, the original error
+ * alone would hide that failure, so this throws a new Error naming every
+ * failure (`{ cause: err }`, the original) instead of discarding it; only
+ * when both the remove and the delete succeed is the original `err`
+ * rethrown unchanged (writeItemBatch's own compensating-delete failure
+ * case, fix round 1 PR #118, is the same reasoning for a single failure).
  */
 export async function createPictureItems(
   client: SupabaseClient<Database>,
@@ -187,12 +197,22 @@ export async function createPictureItems(
       uploadedPaths.push(storagePath);
     }
   } catch (err) {
+    let removeError: unknown = null;
     if (uploadedPaths.length > 0) {
-      const { error: removeError } = await client.storage.from(BUCKET).remove(uploadedPaths);
-      if (removeError) throw removeError;
+      const { error } = await client.storage.from(BUCKET).remove(uploadedPaths);
+      removeError = error;
     }
     const { error: deleteError } = await client.from("items").delete().in("id", ids);
-    if (deleteError) throw deleteError;
+
+    if (removeError || deleteError) {
+      const originalMessage = err instanceof Error ? err.message : String(err);
+      const removeMessage = removeError ? (removeError instanceof Error ? removeError.message : String(removeError)) : "none";
+      const deleteMessage = deleteError ? deleteError.message : "none";
+      throw new Error(
+        `createPictureItems: the batch write failed and the rollback also failed -- an orphaned batch of rows or objects may remain. originalError=${originalMessage}; removeError=${removeMessage}; deleteError=${deleteMessage}`,
+        { cause: err },
+      );
+    }
     throw err;
   }
 

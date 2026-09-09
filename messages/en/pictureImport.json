@@ -23,7 +23,7 @@
     "zipTooLarge": "The zip file is too large (maximum 20 MB).",
     "zipParseError": "The zip file could not be read.",
     "fileMissing": "No file in the zip with this name.",
-    "fileUnused": "This file in the zip is not named by any row.",
+    "fileUnused": "The file \"{file}\" in the zip is not named by any row.",
     "fileNotImage": "This file is not a valid image."
   }
 }
