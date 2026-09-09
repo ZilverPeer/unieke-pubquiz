@@ -318,3 +318,7 @@ Erik ran `admin:operator` himself (the orchestrator's run is denied by the class
 PR 134: one-line closure fix plus comments in `items/page.tsx`; red evidence 25 `unhandledRejection` lines on a 26-row page, clean log after; the list's delete form exercised live with a `Closure 131` row (created and deleted, none left); in-use redirect by reading (no composition rows on the reseeded stack). Merged on a read review.
 
 PR 130: Spec walk on the fresh loop found one HARD (the Orders section assumed orders 29-31 exist; a fresh stack has none) and confirmed every quoted label, URL, template header and both links; all `useActionState` steps by reading, as expected. Fix applied by the orchestrator on the branch (d36c516): the section now tells the reader to place one order via the customer-journey walkthrough first. Merged. Master `npm run check` green. wt-131 and wt-97 removed. #132 triaged ready-for-agent for this wave.
+
+## 2026-09-09 15:3x #132 dispatched (wt-132, `ticket-132-webhook-twin`, from bfe0e4a)
+
+Investigate-first brief: count webhooks in both wp-env instances, one probe order update on order 33, match the 200 and the 401 to their senders, then the minimal fix (tests-instance webhook or a mu-plugin double send). Full loop stays up for it. After its merge: wave-end steps.
