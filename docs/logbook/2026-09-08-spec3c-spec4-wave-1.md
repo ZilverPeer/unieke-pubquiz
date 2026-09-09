@@ -233,3 +233,8 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 ## Resume 12:4x: #121 and #96 redispatched
 
 - Fresh Sonnet implementers per ticket with resume briefs `121-resume.md` and `96-resume.md` (finish from the worktree's uncommitted state, reproduce red evidence once via `git stash` of the implementation file, merge master since PR 124, open the PR). Same worktrees, same rules.
+
+## PR 125 reported (#121) and reviews dispatched
+
+- Implementer (resume run): red `expected true to be false` on the second line's `feasible` in `check-feasibility.test.ts:87`; unit 4/4, route integration 8/8 (7 + 1), check green. PR body says unit 339; the branch runs 349 (verified in wt-121): a misreport, batched for the fix round.
+- Spec review (clone review-8, no server, driver of `checkFeasibility` with order #30's three lines) and Standards review (read-only) dispatched with briefs `125-spec-review.md` and `125-standards-review.md`.
