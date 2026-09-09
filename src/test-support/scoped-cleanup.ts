@@ -30,10 +30,17 @@
  * order, or another suite's run on the shared stack) has since referenced
  * a tracked Item, deleting it would violate composition_items_item_id_fkey
  * (ticket #112): cleanup() looks up composition_items for the tracked ids
- * first and, for any that come back referenced, sets `archived_at` on the
- * Item instead of deleting it (so loadPool never sees it again, per #88's
- * `archived_at` filter) and leaves the row -- the rest of the batch, and
- * the translation rows, are still deleted/removed as usual.
+ * -- after this same call's own tracked Compositions (and the Quizzes/
+ * Orders above them) are already deleted, cascading away their
+ * composition_items rows -- and, for any id that still comes back
+ * referenced (a Composition outside this call's own scope: a real order,
+ * or another suite's fixture, on the shared stack), sets `archived_at` on
+ * the Item instead of deleting it (so loadPool never sees it again, per
+ * #88's `archived_at` filter) and leaves the row. An Item referenced only
+ * by a Composition this same cleanup() call removes is therefore deleted
+ * outright, not archived -- that Composition no longer needs it for the
+ * no-repeat rule, so deleting leaves nothing behind. The rest of the
+ * batch, and the translation rows, are still deleted/removed as usual.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/repository/database.types";
