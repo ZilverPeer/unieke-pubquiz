@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { zipSync } from "fflate";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createRepository, resolveLocalStackConfig } from "@/repository";
 import type { Database } from "@/repository/database.types";
 import { probeDurationSeconds } from "@/repository/admin/music-items";
@@ -63,6 +63,8 @@ async function renderTone(): Promise<void> {
   ]);
   toneBytes = await readFile(tonePath);
 }
+
+beforeAll(renderTone, 60_000);
 
 afterAll(async () => {
   if (fixtureDir) await rm(fixtureDir, { recursive: true, force: true });
@@ -135,7 +137,6 @@ describe("importMusicItems", () => {
   it(
     "creates two Music Items from a zip of two songs and a matching CSV, cutting each to its own range",
     async () => {
-      await renderTone();
       const subsubcategoryId = await seedSubsubcategoryId();
       const marker = uniqueMarker();
       const header = MUSIC_ITEM_IMPORT_HEADER.join(",");
@@ -189,7 +190,6 @@ describe("importMusicItems", () => {
   it(
     "creates nothing when a row's end is before its start, and reports the row",
     async () => {
-      await renderTone();
       const subsubcategoryId = await seedSubsubcategoryId();
       const marker = uniqueMarker();
       const header = MUSIC_ITEM_IMPORT_HEADER.join(",");
