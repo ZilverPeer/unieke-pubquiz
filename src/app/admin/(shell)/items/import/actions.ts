@@ -90,7 +90,8 @@ export async function importTextItems(
   const { data: insertedBases, error: baseError } = await client.from("items").insert(baseInserts).select("id");
   if (baseError) throw baseError;
 
-  const translationInserts: { item_id: string; locale: "nl" | "en"; question: string; answer: string; fact: string | null }[] = [];
+  const translationInserts: { item_id: string; locale: "nl" | "en"; question: string | null; answer: string; fact: string | null }[] =
+    [];
   insertedBases.forEach((base, index) => {
     const row = rows[index];
     for (const locale of ["nl", "en"] as const) {
