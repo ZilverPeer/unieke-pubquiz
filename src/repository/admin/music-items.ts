@@ -21,7 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Difficulty } from "@/domain";
 import { resolveFfmpeg, runFfmpeg } from "@/render/music-round/ffmpeg";
 import type { Database } from "../database.types";
-import { writeItemBase } from "./items";
+import { writeItemBase, writeItemBatch, type TextItemTranslations } from "./items";
 
 const MUSIC_CLIPS_BUCKET = "music-clips";
 
@@ -101,9 +101,11 @@ export async function probeDurationSeconds(path: string): Promise<number> {
  * `pubquiz-music-*` temp directory removed in `finally` (no temp file
  * survives the call, ticket #91's fixed decision). Throws if the cut
  * clip's measured duration drifts from the requested length by more than
- * CUT_DURATION_TOLERANCE_SECONDS.
+ * CUT_DURATION_TOLERANCE_SECONDS. Exported (ticket #96) so the Music Item
+ * bulk import can cut every song before any database write -- see this
+ * module's createMusicItems and the import action's own docblock.
  */
-async function cutClip(song: Buffer, startSeconds: number, endSeconds: number): Promise<Uint8Array> {
+export async function cutClip(song: Buffer, startSeconds: number, endSeconds: number): Promise<Uint8Array> {
   const ffmpegPaths = resolveFfmpeg();
   if (!ffmpegPaths) {
     throw new Error("cutClip requires a working ffmpeg/ffprobe; resolveFfmpeg() returned null");
@@ -200,6 +202,94 @@ export async function createMusicItem(
     await client.from("items").delete().eq("id", id);
     throw error;
   }
+}
+
+export interface CreateMusicItemsInput {
+  subsubcategoryId: string;
+  difficulty: Difficulty;
+  artist: string;
+  title: string;
+  translations: MusicItemTranslations;
+  /** Already cut (the import action calls cutClip for every row before this, ticket #96 "atomicity") -- the full song never reaches this function. */
+  clip: Uint8Array;
+}
+
+/** MusicItemTranslations -> the writeItemBatch/TextItemTranslations shape writeTranslations expects: question and answer are always null for Music Items (artist/title in music_item_details serve that role, this module's own docblock). */
+function toItemBatchTranslations(translations: MusicItemTranslations): TextItemTranslations {
+  const result: TextItemTranslations = {};
+  for (const locale of ["nl", "en"] as const) {
+    const translation = translations[locale];
+    if (translation) result[locale] = { question: null, answer: null, fact: translation.fact };
+  }
+  return result;
+}
+
+/**
+ * All-or-nothing batch write for the Music Item bulk import (ticket #96):
+ * writeItemBatch for the base rows and translations, then one
+ * music_item_details insert for every id, then every already-cut clip
+ * uploaded in order (`upsert: true`) -- the same shape as
+ * createPictureItems (picture-items.ts). If the detail insert or an upload
+ * fails, every object already uploaded is removed and every base id
+ * (cascading away its translations and detail row) is deleted, then the
+ * error is rethrown; if the rollback itself also fails, both errors are
+ * reported together rather than swallowing one (same reasoning as
+ * createPictureItems's own docblock, fix round 1 PR #118).
+ */
+export async function createMusicItems(
+  client: SupabaseClient<Database>,
+  inputs: CreateMusicItemsInput[],
+): Promise<string[]> {
+  const ids = await writeItemBatch(
+    client,
+    inputs.map((input) => ({
+      kind: "music" as const,
+      subsubcategoryId: input.subsubcategoryId,
+      difficulty: input.difficulty,
+      translations: toItemBatchTranslations(input.translations),
+    })),
+  );
+
+  const uploadedPaths: string[] = [];
+  try {
+    const detailRows = ids.map((id, index) => ({
+      item_id: id,
+      storage_path: `${id}.mp3`,
+      artist: inputs[index].artist,
+      title: inputs[index].title,
+    }));
+    const { error: detailError } = await client.from("music_item_details").insert(detailRows);
+    if (detailError) throw detailError;
+
+    for (let i = 0; i < ids.length; i++) {
+      const storagePath = `${ids[i]}.mp3`;
+      const { error: uploadError } = await client.storage
+        .from(MUSIC_CLIPS_BUCKET)
+        .upload(storagePath, inputs[i].clip, { contentType: "audio/mpeg", upsert: true });
+      if (uploadError) throw uploadError;
+      uploadedPaths.push(storagePath);
+    }
+  } catch (err) {
+    let removeError: unknown = null;
+    if (uploadedPaths.length > 0) {
+      const { error } = await client.storage.from(MUSIC_CLIPS_BUCKET).remove(uploadedPaths);
+      removeError = error;
+    }
+    const { error: deleteError } = await client.from("items").delete().in("id", ids);
+
+    if (removeError || deleteError) {
+      const originalMessage = err instanceof Error ? err.message : String(err);
+      const removeMessage = removeError ? (removeError instanceof Error ? removeError.message : String(removeError)) : "none";
+      const deleteMessage = deleteError ? deleteError.message : "none";
+      throw new Error(
+        `createMusicItems: the batch write failed and the rollback also failed -- an orphaned batch of rows or objects may remain. originalError=${originalMessage}; removeError=${removeMessage}; deleteError=${deleteMessage}`,
+        { cause: err },
+      );
+    }
+    throw err;
+  }
+
+  return ids;
 }
 
 export interface UpdateMusicItemInput {

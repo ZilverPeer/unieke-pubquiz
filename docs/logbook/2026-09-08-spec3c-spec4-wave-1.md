@@ -253,3 +253,20 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 
 - Spec review (fresh reviewer, clone review-8): red confirmed (4/4 fail on a later line's `feasible` with master's implementation), unit 4/4, route integration 8/8; driver with real loaders: order #30's lines answer feasible, feasible, `{ categoryId "7", hard, shortfall 4 }`; third line moved first is feasible; `route.ts` and `shop/` untouched; README paragraph replaced; CONTEXT.md has no feasibility sentence (nothing to update); check green 349; no rows persisted. Only JUDGEMENT: PR body unit count, corrected by the orchestrator in the PR body (no fix round).
 - Merge-tree clean, merged, master check green (unit 349). Worktree wt-121 removed. Erik's loop app on 3000 still runs the old feasibility code until restarted.
+
+## #119 dispatched
+
+- Worktree wt-119 (`ticket-119-picture-field-errors` from db44d8e), port 3119, brief `119.md`: `PictureFields` gets `errors`, item-form passes it, one integration assertion on the missing-file key (or "already covered"), browser check of the Dutch message.
+
+## PR 126 merged (#96, Music Item import) — 2102718
+
+- Spec review (clone review-9, port 3115, head 6c535a4 before fix round 1): unit 6/6, music import integration 5/5, Picture import 6/6, music actions 6/6; atomicity provoked with a failing second upload: items 2641 -> 2641, objects 4 -> 4, nothing left for the marker; page, nav, template (exact header and example row), unauthenticated 307 to login; driver import of two songs: count 2, durations 20 and 30 s, signed URL 200 audio/mpeg; every refused case (missing, not audio, unused entry, bad locales, wrong header, 51 rows, 21 MiB zip) creates nothing; check and build green, message key parity, no lockfile change; leftovers clean, server stopped by pid.
+- Findings: HARD inherited: the Items list `q=` search matches only question/answer, so Music Items (null both) are never found by title or artist. Filed as #127 (bug, ready-for-agent), not fixed in this PR. JUDGEMENT: the red-claim recipe in the review brief did not remove branch-only files (`git checkout origin/master -- <dir>` cannot delete files absent on master), so the "fail to import" expectation was wrong for the unit file; the fixture temp-dir leak the reviewer saw was already fixed by fix round 1 (`beforeAll`). Detail-row assertion in test (a) is indirect (download from `<id>.mp3` succeeds).
+- Merge-tree clean, merged at c10a0c1, master check green (unit 355). Worktree wt-96 removed. Spec 4 (#80) tickets are now all merged except #97.
+
+## #127 and #97 dispatched
+
+- #127 (Music search): wt-127 (`ticket-127-music-search`), brief `127.md`: embed `music_item_details(artist,title)` in the list query and match `q` against them; one integration case red-first.
+- #97 (operator walkthrough): wt-97 (`ticket-97-operator-walkthrough`), port 3097, brief `97.md`: `docs/walkthrough-operator.md` in the customer-journey style, verified section by section against the running stack (no loop commands, no orders); its Spec review needs a fresh loop, so it waits for the stack-free moment together with #107.
+- Running: #119 (3119), #127, #97 (3097). Queue: #107 at the stack-free moment.
+- Check-in 13:20: no drift. #119 build green, dev server on 3119 up, at the browser check (looking for a browser tool; the brief allows "verified by reading" as the fallback). #127 reading the list test and music helpers. #97 reading the customer walkthrough, runbook and README.

@@ -1,0 +1,30 @@
+{
+  "title": "Import Music Items",
+  "intro": "Upload a CSV file together with a zip file of songs to add many Music Items at once. The CSV's \"file\" column must exactly match the file name in the zip. Every row and every file is validated; if there is one failure, nothing is saved. One zip holds at most 20 MB of songs -- larger batches go in several zips.",
+  "templateLink": "Download CSV template",
+  "templateHint": "The template has the column headers and one example row with file name \"example.mp3\" and subsubcategoryId \"0\" -- replace that example row with your own rows before uploading the file.",
+  "form": {
+    "csvLabel": "CSV file",
+    "zipLabel": "Zip file of songs",
+    "submit": "Import",
+    "backToList": "Back to the list"
+  },
+  "success": "{count} Items imported.",
+  "errors": {
+    "header": "The column headers do not match the template.",
+    "empty": "The file has no rows.",
+    "tooManyRows": "The file has too many rows (maximum 50).",
+    "parseError": "The file could not be read as CSV.",
+    "csvRequired": "Choose a CSV file.",
+    "csvType": "Choose a valid CSV file (.csv).",
+    "csvTooLarge": "The CSV file is too large (maximum 1 MB).",
+    "zipRequired": "Choose a zip file.",
+    "zipType": "Choose a valid zip file (.zip).",
+    "zipTooLarge": "The zip file is too large (maximum 20 MB).",
+    "zipParseError": "The zip file could not be read.",
+    "fileMissing": "No file in the zip with this name.",
+    "fileUnused": "The file \"{file}\" in the zip is not named by any row.",
+    "fileNotAudio": "This file could not be read as audio.",
+    "locales": "The \"locales\" column must be \"nl\", \"en\" or \"nl;en\"."
+  }
+}

@@ -345,7 +345,14 @@ export interface ItemTranslationInput {
    * storage shape").
    */
   question: string | null;
-  answer: string;
+  /**
+   * `string | null` (widened from `string`, additive, ticket #96): Text
+   * and Picture Items always pass a non-empty string; Music Items have no
+   * answer either (artist/title in music_item_details serve that role,
+   * music-items.ts's own docblock) and pass `null` for the same reason
+   * `question` does above.
+   */
+  answer: string | null;
   fact?: string;
 }
 
@@ -514,8 +521,13 @@ export async function writeItemBatch(client: SupabaseClient<Database>, rows: Ite
   const { data: insertedBases, error: baseError } = await client.from("items").insert(baseInserts).select("id");
   if (baseError) throw baseError;
 
-  const translationInserts: { item_id: string; locale: "nl" | "en"; question: string | null; answer: string; fact: string | null }[] =
-    [];
+  const translationInserts: {
+    item_id: string;
+    locale: "nl" | "en";
+    question: string | null;
+    answer: string | null;
+    fact: string | null;
+  }[] = [];
   insertedBases.forEach((base, index) => {
     const row = rows[index];
     for (const locale of ["nl", "en"] as const) {
