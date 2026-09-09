@@ -25,7 +25,16 @@ function formatDate(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleString(locale === "nl" ? "nl-NL" : "en-GB");
 }
 
-export async function ItemLifecycle({ item, locale }: { item: ItemDetail; locale: Locale }) {
+export async function ItemLifecycle({
+  item,
+  locale,
+  error,
+}: {
+  item: ItemDetail;
+  locale: Locale;
+  /** Set when the edit page's own `?error=inUse` search param is present -- see deleteAction below. */
+  error?: boolean;
+}) {
   const t = await getTranslations("itemLifecycle");
 
   async function archiveAction() {
@@ -41,11 +50,17 @@ export async function ItemLifecycle({ item, locale }: { item: ItemDetail; locale
   async function deleteAction() {
     "use server";
     const result = await deleteItem(item.id);
-    if (result.ok) redirect("/admin/items");
+    if (result.ok) {
+      redirect("/admin/items");
+    }
+    // Refused (ItemInUseError): stay on the edit page and surface the
+    // Dutch/English error, the same ?error=inUse pattern the list page uses.
+    redirect(`/admin/items/${item.id}?error=inUse`);
   }
 
   return (
     <div className="flex flex-wrap items-center gap-3 border p-3">
+      {error ? <p className="w-full text-red-600">{t("errors.inUse")}</p> : null}
       {item.archivedAt ? (
         <span className="text-gray-500">{t("archivedAt", { date: formatDate(item.archivedAt, locale) })}</span>
       ) : null}

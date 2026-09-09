@@ -6,8 +6,10 @@ import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { ItemForm, type ItemFormInitialValues } from "../item-form";
 import { ItemLifecycle } from "../item-lifecycle";
 
-export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
+export default async function EditItemPage({ params, searchParams }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
+  const query = (await searchParams) ?? {};
+  const lifecycleError = (Array.isArray(query.error) ? query.error[0] : query.error) === "inUse";
   const t = await getTranslations("items");
 
   const client = createSupabaseClient(resolveLocalStackConfig());
@@ -41,7 +43,7 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
         <h1 className="text-xl font-semibold">{t("form.editTitle")}</h1>
         <Link href="/admin/items">{t("form.backToList")}</Link>
       </div>
-      <ItemLifecycle item={item} locale="nl" />
+      <ItemLifecycle item={item} locale="nl" error={lifecycleError} />
       <ItemForm mode="edit" itemId={id} subsubcategoryOptions={subsubcategoryOptions} initialValues={initialValues} />
     </div>
   );

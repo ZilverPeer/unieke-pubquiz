@@ -164,10 +164,26 @@ describe("archiveItem / unarchiveItem", () => {
     const poolAfterArchive = await contentRepository.loadPool("nl");
     expect(poolAfterArchive.some((entry) => entry.item.id === itemId)).toBe(false);
 
+    const { data: rowAfterArchive, error: rowAfterArchiveError } = await db
+      .from("items")
+      .select("archived_at")
+      .eq("id", itemId)
+      .single();
+    if (rowAfterArchiveError) throw rowAfterArchiveError;
+    expect(rowAfterArchive.archived_at).not.toBeNull();
+
     const unarchiveResult = await unarchiveItem(itemId, deps);
     expect(unarchiveResult.ok).toBe(true);
 
     const poolAfterUnarchive = await contentRepository.loadPool("nl");
     expect(poolAfterUnarchive.some((entry) => entry.item.id === itemId)).toBe(true);
+
+    const { data: rowAfterUnarchive, error: rowAfterUnarchiveError } = await db
+      .from("items")
+      .select("archived_at")
+      .eq("id", itemId)
+      .single();
+    if (rowAfterUnarchiveError) throw rowAfterUnarchiveError;
+    expect(rowAfterUnarchive.archived_at).toBeNull();
   });
 });
