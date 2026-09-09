@@ -1,0 +1,17 @@
+{
+  "form": {
+    "newTitle": "New Picture Item",
+    "editTitle": "Edit Picture Item",
+    "fileLabel": "Image",
+    "replaceLabel": "Replace image",
+    "currentImageAlt": "Current image"
+  },
+  "errors": {
+    "file": {
+      "required": "Choose an image.",
+      "type": "Only PNG or JPEG files are allowed.",
+      "size": "The file is larger than 5 MB.",
+      "notImage": "This file is not a valid image."
+    }
+  }
+}

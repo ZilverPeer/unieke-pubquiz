@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
+import { createPictureSignedUrl } from "@/repository/admin/picture-items";
 import { ItemForm, type ItemFormInitialValues } from "../item-form";
+import { PictureFields } from "../picture-fields";
 
 export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
@@ -18,6 +20,11 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
   if (!item) {
     notFound();
   }
+
+  const pictureImageUrl =
+    item.kind === "picture" && item.pictureStoragePath
+      ? await createPictureSignedUrl(client, item.pictureStoragePath)
+      : undefined;
 
   const initialValues: ItemFormInitialValues = {
     subsubcategoryId: item.subsubcategoryId,
@@ -40,7 +47,14 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
         <h1 className="text-xl font-semibold">{t("form.editTitle")}</h1>
         <Link href="/admin/items">{t("form.backToList")}</Link>
       </div>
-      <ItemForm mode="edit" itemId={id} subsubcategoryOptions={subsubcategoryOptions} initialValues={initialValues} />
+      <ItemForm
+        mode="edit"
+        itemId={id}
+        kind={item.kind}
+        kindFields={item.kind === "picture" ? <PictureFields currentImageUrl={pictureImageUrl} /> : undefined}
+        subsubcategoryOptions={subsubcategoryOptions}
+        initialValues={initialValues}
+      />
     </div>
   );
 }

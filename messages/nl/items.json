@@ -40,7 +40,6 @@
   "form": {
     "newTitle": "Nieuw tekst-Item",
     "editTitle": "Item bewerken",
-    "kindNote": "Alleen tekst-Items kunnen nu aangemaakt worden; afbeeldingen en muziek volgen later.",
     "subsubcategory": "Subsubcategorie",
     "subsubcategoryPlaceholder": "Kies een subsubcategorie",
     "difficulty": "Moeilijkheidsgraad",
@@ -55,7 +54,12 @@
     "submitCreate": "Item aanmaken",
     "submitUpdate": "Wijzigingen opslaan",
     "cancel": "Annuleren",
-    "backToList": "Terug naar de lijst"
+    "backToList": "Terug naar de lijst",
+    "kindLinks": {
+      "text": "Tekst-Item",
+      "picture": "Afbeelding-Item",
+      "music": "Muziek-Item"
+    }
   },
   "errors": {
     "subsubcategoryRequired": "Kies een geldige subsubcategorie.",
