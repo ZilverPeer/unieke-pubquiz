@@ -211,3 +211,32 @@ Observations for the retro (added): scoped cleanup leaks when a run is killed mi
 - PR 120 fix round 1 pushed as e2da950 (0dd347f + master merge): rollback runs remove and delete unconditionally and throws one Error naming each failure with the original as cause; row-error table falls back to the raw field and interpolates {file} for row 0; picture import 6/6, unit 342. Spec reviewer told to report against e2da950.
 - Run-through finding (Erik, order #30): the feasibility check judged the three cart lines independently, so line 3 (hard, Literatuur) passed at checkout and failed at generation after lines 1-2 consumed 14 Literatuur hard text Items; proven with a dry run against the stack (feasible with order #29 excluded, 2 and 5 short with lines 1-2 excluded too). Filed as a bug (sibling cart lines) and a needs-triage issue (partial-failure customer experience). Admin pages exist at /admin/orders (search by order number or email, retry button on the detail page) and /admin/coverage.
 - Erik: #121 accepted as real (queue it), #122 closed wontfix (all-or-nothing delivery stays; real orders are almost always one Quiz). Operator login for the run-through: operator@example.com, created by admin:operator during setup.
+
+## PR 120 merged (2026-09-09 08:22)
+
+- Spec review of e2da950: no HARD; three-image import measured 1600x1067 / 400x300 / 1600x1600, negative cases created nothing, template exact, unauth 307, check green; build not verifiable in the fresh clone (feasibility route's resolveLocalStackConfig needs the CLI link files, a review-setup gap, build was green in wt-95). Reviewer disclosed printing one signed URL token once. merge-tree clean; merged as 6426af6; master check green (unit 342); wt-95 removed. #121 dispatched (wt-121, brief 121.md, no server); wt-96 being prepared.
+- Erik asked why the admin is custom, slow and plain. Measured on the loop: warm /admin/items, /items/new, /coverage 4.1-5.9 s (4-5 s application code), /admin/orders 0.3 s; cause: resolveLocalStackConfig runs npx supabase status (4.5 s here) on every call when SUPABASE_URL is not in the environment. Filed #123 (memoize per process), ready-for-agent; wt-123 being prepared. Custom admin and plain UI are spec 4 (#80) decisions recorded in CONTEXT.md "Admin UI" and the spec's "UI: Tailwind, plain HTML form elements, no component library".
+- Check-in 08:24: no drift. #121 unit test red then green (15 unit across the two feasibility files), typecheck ok, computing the integration case from ITEMS_PER_SLOT; #96 reading the Picture import and the batch types; #123 reading local-stack-config.ts. Only 3000 listening (Erik's loop).
+
+## PR 124 merged (#123, resolveLocalStackConfig cache) — 608711d
+
+- Implementer report: red `__resetLocalStackConfigCache is not a function` on all three new cases; unit 345/345, typecheck and eslint green.
+- Review: main-session read of the diff (three files, no reviewers dispatched: no page, no stack, 72-line change). Both branches intact, env branch uncached, CLI result cached in module scope, throwing exec not cached, injectable `resolveLocalStackConfigWith({ env, exec })` seam, README sentence about restarting `next dev`/worker after `supabase stop`/`start`. Test stubs a fake `API_URL`/`SERVICE_ROLE_KEY` pair only. No findings.
+- Merge: merge-tree clean, `gh pr merge 124 --merge`, master `npm run check` green (unit 345). Worktree wt-123 removed.
+- Erik's running loop app still has the old code: restart the app (`.local/next-dev.pid`) to feel the speedup.
+
+## Hold 10:40: session usage limit hit (resets 12:40 Europe/Berlin)
+
+- #121 (wt-121) and #96 (wt-96) implementers terminated by HTTP 429 mid-task. #121 was about to run `npm run check` and commit (unit green, route integration case written); #96 had all files in place and was writing the README paragraph. Both worktrees hold uncommitted work; no server on 3096. Nothing lost.
+- Resume plan after the reset: dispatch a fresh implementer per ticket with the same brief plus "the worktree already contains a partial implementation; read `git status`/`git diff`, finish, run `npm run check`, commit and open the PR". Check-in cron fires against no running agents until then: no drift lines.
+
+## Resume 12:4x: #121 and #96 redispatched
+
+- Fresh Sonnet implementers per ticket with resume briefs `121-resume.md` and `96-resume.md` (finish from the worktree's uncommitted state, reproduce red evidence once via `git stash` of the implementation file, merge master since PR 124, open the PR). Same worktrees, same rules.
+
+## PR 125 reported (#121) and reviews dispatched
+
+- Implementer (resume run): red `expected true to be false` on the second line's `feasible` in `check-feasibility.test.ts:87`; unit 4/4, route integration 8/8 (7 + 1), check green. PR body says unit 339; the branch runs 349 (verified in wt-121): a misreport, batched for the fix round.
+- Spec review (clone review-8, no server, driver of `checkFeasibility` with order #30's three lines) and Standards review (read-only) dispatched with briefs `125-spec-review.md` and `125-standards-review.md`.
+- Standards review PR 125: no HARD. JUDGEMENT: PR body unit count (339 vs 349); pre-existing test name "answers two lines independently" in `route.integration.test.ts:166` is still accurate (invalid line). Confirmed: one `Set<string>` copied from `loadExcludedItemIds`, never mutated by the sample helpers; ids added across every slot, kind-agnostic; imports from `@/sample` only. Waiting on Spec.
+- Check-in 12:58: #96 on brief (check green 348, running build). PR 125 Spec reviewer stalled three times on the permission system denying its `.env.local` copy into review-8 (PowerShell and bash cp alike); orchestrator copied the file and sent one corrective message to continue with check 1. Playbook note: the orchestrator should copy the env into review clones before dispatch.

@@ -71,7 +71,7 @@ npm run test:integration
 - `npm run db:reset` applies every migration and `supabase/seed.sql`.
 - `npm run test:integration` runs `vitest` against `vitest.integration.config.mts`, which only picks up `src/**/*.integration.test.ts` (the default `vitest.config.mts` excludes that pattern, so `npm test` stays database-free).
 
-The tests read `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the environment; if unset, they fall back to running `supabase status -o env` themselves (`src/repository/test-support/local-stack-config.ts`). `repository.integration.test.ts`'s `beforeEach` deletes all rows from `compositions` (cascading to `composition_items`); `orders.integration.test.ts`'s `beforeEach` deletes all rows from `quizzes` then `orders` (in that order, since orders has no cascade). Seed Items are never touched. Stop the stack afterwards with `supabase stop`.
+The tests read `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the environment; if unset, they fall back to running `supabase status -o env` themselves (`src/repository/test-support/local-stack-config.ts`). That CLI fallback's parsed result is cached in module scope for the life of the process (ticket #123), so a running `next dev` or worker needs a restart after `supabase stop`/`start` changes ports or keys. `repository.integration.test.ts`'s `beforeEach` deletes all rows from `compositions` (cascading to `composition_items`); `orders.integration.test.ts`'s `beforeEach` deletes all rows from `quizzes` then `orders` (in that order, since orders has no cascade). Seed Items are never touched. Stop the stack afterwards with `supabase stop`.
 
 ## Admin: items
 
