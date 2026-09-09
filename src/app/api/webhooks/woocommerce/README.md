@@ -37,6 +37,10 @@ A second, smaller gap: neither `ContentRepository` nor `OrderRepository` had any
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` -- the repository's connection to the local Supabase stack (`resolveLocalStackConfig`, `src/repository/local-stack-config.ts`); falls back to `supabase status -o env` when unset.
 - `DATABASE_URL` -- the Postgres connection string pg-boss uses as its own store (`resolveDatabaseUrl`, `src/worker/boss.ts`); falls back to the local Supabase stack's default Postgres port.
 
+## WooCommerce's webhook ping
+
+Besides the signed `order.updated` delivery, WooCommerce sends a separate, unsigned request to the same URL whenever the webhook's `pending_delivery` flag is set: `WC_Webhook::deliver_ping()`, `application/x-www-form-urlencoded`, body exactly `webhook_id=<id>`, no `X-WC-Webhook-*` headers at all (ticket #132). The flag only clears when the ping itself gets a 200 -- this route used to fall through to the signature check (no signature header → 401), which left the flag permanently set, so every real delivery was doubled by a re-sent, always-failing ping alongside it. `handleWebhook` now recognises this exact shape (`isPingRequest`: no signature header **and** the raw body matching `^webhook_id=\d+$`) before the signature check and answers 200 without parsing, persisting or enqueueing anything, and without logging the body. This check only ever applies on the unsigned path -- any other unsigned or malformed body still 401s.
+
 ## Must stay public
 
 No auth middleware exists in this app yet (no `src/middleware.ts` or `src/proxy.ts`). WooCommerce has no way to carry a session or API key on this call -- the HMAC signature above is the only authentication this route has, and it verifies the request itself, not a user. If an auth proxy/middleware is added later, this route (`/api/webhooks/woocommerce`) must stay excluded from it.

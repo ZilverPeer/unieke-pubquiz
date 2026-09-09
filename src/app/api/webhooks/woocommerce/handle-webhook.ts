@@ -3,9 +3,12 @@
  * route.ts so it can be unit tested with faked repository/pg-boss deps
  * (mirrors src/app/download/resolve-download.ts's split from its route.ts).
  *
- * Order of checks matters: signature first (a bad signature must persist
- * and enqueue nothing), then the `processing` status gate (same guarantee),
- * only then does anything touch the repository.
+ * Order of checks matters: the ping check first (ticket #132 -- WooCommerce's
+ * own unsigned `WC_Webhook::deliver_ping()` request must 200 before the
+ * signature check ever runs, see isPingRequest below), then the signature
+ * (a bad signature must persist and enqueue nothing), then the `processing`
+ * status gate (same guarantee), only then does anything touch the
+ * repository.
  *
  * Enqueueing: a Quiz row the repository just returned as still `pending`
  * (i.e. it wasn't inserted just now as `failed` by this call, and hadn't
@@ -55,11 +58,32 @@ function parseJson(rawBody: string): { ok: true; value: unknown } | { ok: false 
   }
 }
 
+/**
+ * WooCommerce's own webhook ping (`WC_Webhook::deliver_ping()`, ticket
+ * #132): a separate, unsigned, `application/x-www-form-urlencoded` request
+ * -- exact body `webhook_id=<id>`, no `X-WC-Webhook-*` headers at all --
+ * that WooCommerce sends whenever the webhook's `pending_delivery` flag is
+ * set. The flag only clears on a 200; this route used to 401 the ping
+ * (no signature header), which left the flag set forever, so WooCommerce
+ * kept re-sending the ping alongside every real delivery from then on (see
+ * README.md "WooCommerce's webhook ping"). Only unsigned requests are
+ * checked against this shape -- a signed request can never coincidentally
+ * match it in practice, and the signature check below still 401s anything
+ * else unsigned.
+ */
+function isPingRequest(rawBody: string, signatureHeader: string | null): boolean {
+  return signatureHeader === null && /^webhook_id=\d+$/.test(rawBody);
+}
+
 export async function handleWebhook(
   rawBody: string,
   signatureHeader: string | null,
   deps: WebhookDeps,
 ): Promise<WebhookResult> {
+  if (isPingRequest(rawBody, signatureHeader)) {
+    return { status: 200 };
+  }
+
   if (!verifySignature(rawBody, signatureHeader, deps.secret)) {
     return { status: 401 };
   }
