@@ -15,8 +15,10 @@
  * 2. The CSV is parsed (parsePictureItemsCsv, src/admin/items/import-
  *    picture-csv.ts) -- header, row limit, and every field except `file`
  *    (that module never sees the zip; see its own docblock).
- * 3. The zip is read (unzipSync, fflate) into entries keyed by base name,
- *    skipping directory entries, `__MACOSX/` and `.DS_Store`.
+ * 3. The zip is read (listZipEntries, src/admin/items/import-zip.ts,
+ *    extracted in ticket #96 so the Music import can reuse the same
+ *    entry-listing rules) into entries keyed by base name, skipping
+ *    directory entries, `__MACOSX/` and `.DS_Store`.
  * 4. Every row's `file` column is matched to an entry (unmatched -> a
  *    `file`/fileMissing row error) and, once matched, re-validated through
  *    validatePictureItem with the entry's real `{ type, size }` (type from
@@ -34,11 +36,11 @@
  * row passes does createPictureItems (src/repository/admin/picture-
  * items.ts) run its own all-or-nothing batch write.
  */
-import { unzipSync } from "fflate";
 import { revalidatePath } from "next/cache";
 import { PICTURE_IMPORT_MAX_ZIP_BYTES } from "@/domain";
 import { assertOperator } from "@/admin/auth/session";
 import { type ActionResult, fail, succeed } from "@/admin/forms";
+import { listZipEntries } from "@/admin/items/import-zip";
 import { parsePictureItemsCsv, type RowError } from "@/admin/items/import-picture-csv";
 import { validatePictureItem, type PictureItemFormInput } from "@/admin/items/validate-picture";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
@@ -95,19 +97,6 @@ function extensionMimeType(fileName: string): string {
   return "";
 }
 
-function entryBaseName(path: string): string {
-  const segments = path.split("/");
-  return segments[segments.length - 1];
-}
-
-/** Directory entries, `__MACOSX/` metadata and `.DS_Store` files never name a real image (ticket #95 decision "Zip"). */
-function isSkippedEntry(path: string): boolean {
-  if (path.endsWith("/")) return true;
-  if (path === "__MACOSX" || path.startsWith("__MACOSX/") || path.includes("/__MACOSX/")) return true;
-  if (entryBaseName(path) === ".DS_Store") return true;
-  return false;
-}
-
 export async function importPictureItems(
   formData: FormData,
   deps: ImportActionDeps = defaultDeps,
@@ -147,17 +136,9 @@ export async function importPictureItems(
     return fail(parserErrorsToFieldErrors(parsed.errors));
   }
 
-  let rawEntries: Record<string, Uint8Array>;
-  try {
-    rawEntries = unzipSync(zipBytes);
-  } catch {
+  const entryByName = listZipEntries(zipBytes);
+  if (!entryByName) {
     return fail({ zip: "pictureImport.errors.zipParseError" });
-  }
-
-  const entryByName = new Map<string, Uint8Array>();
-  for (const [path, data] of Object.entries(rawEntries)) {
-    if (isSkippedEntry(path)) continue;
-    entryByName.set(entryBaseName(path), data);
   }
 
   const errors: RowError[] = [];

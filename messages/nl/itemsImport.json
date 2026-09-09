@@ -11,7 +11,8 @@
   },
   "kindLinks": {
     "text": "Tekst-Items importeren",
-    "picture": "Afbeelding-Items importeren"
+    "picture": "Afbeelding-Items importeren",
+    "music": "Muziek-Items importeren"
   },
   "success": "{count} Items geïmporteerd.",
   "report": {

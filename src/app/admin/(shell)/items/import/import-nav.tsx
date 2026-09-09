@@ -1,10 +1,11 @@
 /**
- * Small nav between the two bulk-import kinds (spec 4, ticket #95 decision
- * "Navigation"): the Text import page and the Picture import page each show
- * this, so an operator on either can reach the other without going back to
- * the Items list. A server component (both pages that render it are server
- * components); keys live in itemsImport.json ("kindLinks.text"/
- * "kindLinks.picture") since the Text import namespace already existed and
+ * Small nav between the three bulk-import kinds (spec 4, ticket #95
+ * decision "Navigation", extended for Music in ticket #96): the Text,
+ * Picture and Music import pages each show this, so an operator on any one
+ * can reach the others without going back to the Items list. A server
+ * component (every page that renders it is a server component); keys live
+ * in itemsImport.json ("kindLinks.text"/"kindLinks.picture"/
+ * "kindLinks.music") since the Text import namespace already existed and
  * this nav is shared, not duplicated per namespace.
  */
 import Link from "next/link";
@@ -20,6 +21,9 @@ export async function ImportNav() {
       </Link>
       <Link href="/admin/items/import/pictures" className="underline">
         {t("kindLinks.picture")}
+      </Link>
+      <Link href="/admin/items/import/music" className="underline">
+        {t("kindLinks.music")}
       </Link>
     </nav>
   );
