@@ -40,7 +40,6 @@
   "form": {
     "newTitle": "New Text Item",
     "editTitle": "Edit Item",
-    "kindNote": "Only Text Items can be created for now; Picture and Music kinds follow later.",
     "subsubcategory": "Subsubcategory",
     "subsubcategoryPlaceholder": "Choose a Subsubcategory",
     "difficulty": "Difficulty",

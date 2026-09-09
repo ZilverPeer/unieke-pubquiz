@@ -4,8 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { getItem, loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { createMusicSignedUrl } from "@/repository/admin/music-items";
-import { ItemForm, type ItemFormInitialValues } from "../item-form";
-import { MusicFields } from "../music-fields";
+import { ItemForm, type ItemFormInitialValues, type ItemFormKindProps } from "../item-form";
 
 export default async function EditItemPage({ params }: PageProps<"/admin/items/[id]">) {
   const { id } = await params;
@@ -38,22 +37,17 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
     },
   };
 
-  let kindFields: React.ReactNode;
+  // Kind-specific fields are rendered by ItemForm itself, from `kindProps`
+  // (serializable initial values only) -- see item-form.tsx's docblock for
+  // why (fix round on PR 116).
+  let kindProps: ItemFormKindProps | undefined;
   if (item.kind === "music" && item.music) {
-    const existingClipUrl = await createMusicSignedUrl(client, item.music.storagePath);
-    kindFields = (
-      <MusicFields
-        mode="edit"
-        errors={{}}
-        existingClipUrl={existingClipUrl}
-        initialValues={{
-          artist: item.music.artist,
-          title: item.music.title,
-          startSeconds: "",
-          endSeconds: "",
-        }}
-      />
-    );
+    const clipUrl = await createMusicSignedUrl(client, item.music.storagePath);
+    kindProps = {
+      artist: item.music.artist,
+      title: item.music.title,
+      clipUrl,
+    };
   }
 
   return (
@@ -68,7 +62,7 @@ export default async function EditItemPage({ params }: PageProps<"/admin/items/[
         kind={item.kind}
         subsubcategoryOptions={subsubcategoryOptions}
         initialValues={initialValues}
-        kindFields={kindFields}
+        kindProps={kindProps}
       />
     </div>
   );

@@ -11,20 +11,34 @@
  * assert on that return value).
  *
  * `kind` selects the action pair through ACTIONS and hides/shows the
- * question/answer inputs per Locale; `kindFields` is the kind-specific
- * slot (music-fields.tsx, and later picture-fields.tsx) rendered in its
- * own fieldset just before the submit button. Text stays the default so
- * the existing text pages keep working unchanged.
+ * question/answer inputs per Locale. The kind-specific fields
+ * (MusicFields, and later PictureFields) are imported and rendered by
+ * THIS component, not passed in as JSX: `kindProps` carries only the
+ * kind's serializable initial values (fix round on PR 116 -- a
+ * `kindFields?: ReactNode` slot built once on the server with
+ * `errors={{}}` could never show a validation error after a failed
+ * submit, since `errors` only exists inside this client component's own
+ * `useActionState`, not in the server page that would have had to
+ * rebuild the JSX). Text stays the default so the existing text pages
+ * keep working unchanged.
+ *
+ * Every error value in `errors` is a full message key from the messages
+ * root (e.g. "items.errors.subsubcategoryRequired",
+ * "musicItems.errors.artist.required"), so every error here is resolved
+ * with a root-scoped `useTranslations()` (`tRoot`) rather than one
+ * scoped to a single namespace -- closes the #88 defect where
+ * `useTranslations("items")` was called with a key that already repeated
+ * the "items." prefix and so never resolved.
  */
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
-import type { ActionResult } from "@/admin/forms";
+import type { ActionResult, FieldErrors } from "@/admin/forms";
 import type { ItemKind } from "@/domain";
 import type { SubsubcategoryOption } from "@/repository/admin/items";
 import { createTextItem, updateTextItem } from "./actions";
 import { createMusicItem, updateMusicItem } from "./music-actions";
+import { MusicFields } from "./music-fields";
 
 export interface ItemFormLocaleValues {
   question: string;
@@ -41,13 +55,28 @@ export interface ItemFormInitialValues {
   en: ItemFormLocaleValues;
 }
 
+/** Music kind's serializable initial values, passed straight through to MusicFields as props (plus the live `errors`). */
+export interface MusicKindProps {
+  artist: string;
+  title: string;
+  /** Signed URL of the currently stored clip; only present in edit mode. */
+  clipUrl?: string;
+}
+
+// Ticket #90 (Picture) adds its own kind==="picture" branch below,
+// rendering `<PictureFields {...kindProps} errors={errors} />` with
+// `PictureKindProps = { imageUrl?: string }` -- same shape, same reason
+// (serializable initial values only, the component itself renders the
+// live `errors`).
+export type ItemFormKindProps = MusicKindProps;
+
 export interface ItemFormProps {
   mode: "create" | "edit";
   itemId?: string;
   kind: ItemKind;
   subsubcategoryOptions: SubsubcategoryOption[];
   initialValues?: ItemFormInitialValues;
-  kindFields?: ReactNode;
+  kindProps?: ItemFormKindProps;
 }
 
 const EMPTY_LOCALE: ItemFormLocaleValues = { question: "", answer: "", fact: "", included: false };
@@ -70,9 +99,9 @@ const ACTIONS: Partial<Record<ItemKind, ActionPair>> = {
   music: [createMusicItem, updateMusicItem],
 };
 
-export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialValues, kindFields }: ItemFormProps) {
+export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialValues, kindProps }: ItemFormProps) {
   const t = useTranslations("items");
-  const tMusic = useTranslations("musicItems");
+  const tRoot = useTranslations();
   const router = useRouter();
 
   async function submit(_previous: FormState, formData: FormData): Promise<FormState> {
@@ -93,14 +122,13 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
     }
   }, [state, router]);
 
-  const errors = state && !state.ok ? state.errors : {};
+  const errors: FieldErrors = state && !state.ok ? state.errors : {};
   const values = initialValues ?? { subsubcategoryId: "", difficulty: "", nl: EMPTY_LOCALE, en: EMPTY_LOCALE };
+  const musicProps = kind === "music" ? (kindProps as MusicKindProps | undefined) : undefined;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      {kind === "text" ? <p className="text-gray-500">{t("form.kindNote")}</p> : null}
-
-      {errors.translations ? <p className="text-red-600">{t(errors.translations)}</p> : null}
+      {errors.translations ? <p className="text-red-600">{tRoot(errors.translations)}</p> : null}
 
       <label className="flex flex-col gap-1">
         <span>{t("form.subsubcategory")}</span>
@@ -112,7 +140,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
             </option>
           ))}
         </select>
-        {errors.subsubcategoryId ? <span className="text-red-600">{t(errors.subsubcategoryId)}</span> : null}
+        {errors.subsubcategoryId ? <span className="text-red-600">{tRoot(errors.subsubcategoryId)}</span> : null}
       </label>
 
       <label className="flex flex-col gap-1">
@@ -123,7 +151,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
           <option value="medium">{t("form.difficultyMedium")}</option>
           <option value="hard">{t("form.difficultyHard")}</option>
         </select>
-        {errors.difficulty ? <span className="text-red-600">{t(errors.difficulty)}</span> : null}
+        {errors.difficulty ? <span className="text-red-600">{tRoot(errors.difficulty)}</span> : null}
       </label>
 
       {(["nl", "en"] as const).map((locale) => (
@@ -133,7 +161,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
           {kind === "music" ? (
             <label className="flex items-center gap-2">
               <input type="checkbox" name={`${locale}.included`} defaultChecked={values[locale].included} />
-              <span>{tMusic("fields.locales")}</span>
+              <span>{tRoot("musicItems.fields.locales")}</span>
             </label>
           ) : null}
 
@@ -147,7 +175,7 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
                 className="border px-2 py-1"
               />
               {errors[`${locale}.question`] ? (
-                <span className="text-red-600">{t(errors[`${locale}.question`])}</span>
+                <span className="text-red-600">{tRoot(errors[`${locale}.question`])}</span>
               ) : null}
             </label>
           ) : null}
@@ -161,7 +189,9 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
                 defaultValue={values[locale].answer}
                 className="border px-2 py-1"
               />
-              {errors[`${locale}.answer`] ? <span className="text-red-600">{t(errors[`${locale}.answer`])}</span> : null}
+              {errors[`${locale}.answer`] ? (
+                <span className="text-red-600">{tRoot(errors[`${locale}.answer`])}</span>
+              ) : null}
             </label>
           ) : null}
 
@@ -172,7 +202,19 @@ export function ItemForm({ mode, itemId, kind, subsubcategoryOptions, initialVal
         </fieldset>
       ))}
 
-      {kindFields ? <fieldset className="flex flex-col gap-2 border p-3">{kindFields}</fieldset> : null}
+      {kind === "music" ? (
+        <fieldset className="flex flex-col gap-2 border p-3">
+          <MusicFields
+            mode={mode}
+            artist={musicProps?.artist ?? ""}
+            title={musicProps?.title ?? ""}
+            clipUrl={musicProps?.clipUrl}
+            errors={errors}
+          />
+        </fieldset>
+      ) : null}
+      {/* Ticket #90 (Picture) adds its own kind === "picture" branch here,
+          rendering <PictureFields {...(kindProps as PictureKindProps)} errors={errors} /> in its own fieldset. */}
 
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className="border px-3 py-1">

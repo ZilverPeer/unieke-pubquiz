@@ -291,5 +291,10 @@ describe("music round renderer", () => {
     } finally {
       await rm(outDir, { recursive: true, force: true });
     }
+
+    // renderMusicRoundMp3 runs ffmpeg through the same cutClip path as
+    // createMusicItem -- confirm it leaves no `pubquiz-music-*` temp
+    // directory behind either (fix round on PR 116).
+    await assertNoLeftoverTempDirs();
   }, 60_000);
 });

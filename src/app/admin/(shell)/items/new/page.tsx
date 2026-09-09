@@ -5,7 +5,7 @@ import type { ItemKind } from "@/domain";
 import { createSupabaseClient, resolveLocalStackConfig } from "@/repository";
 import { loadSubsubcategoryOptions } from "@/repository/admin/items";
 import { ItemForm } from "../item-form";
-import { MusicFields } from "../music-fields";
+import type { ItemFormKindProps } from "../item-form";
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -25,7 +25,10 @@ export default async function NewItemPage({ searchParams }: PageProps<"/admin/it
   const client = createSupabaseClient(resolveLocalStackConfig());
   const subsubcategoryOptions = await loadSubsubcategoryOptions(client, "nl");
 
-  const kindFields = kind === "music" ? <MusicFields mode="create" errors={{}} /> : undefined;
+  // Kind-specific fields are rendered by ItemForm itself, from `kindProps`
+  // (serializable initial values only) -- see item-form.tsx's docblock for
+  // why (fix round on PR 116).
+  const kindProps: ItemFormKindProps | undefined = kind === "music" ? { artist: "", title: "" } : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -38,7 +41,7 @@ export default async function NewItemPage({ searchParams }: PageProps<"/admin/it
         <Link href="/admin/items/new?kind=picture">{t("form.kindLinks.picture")}</Link>
         <Link href="/admin/items/new?kind=music">{t("form.kindLinks.music")}</Link>
       </nav>
-      <ItemForm mode="create" kind={kind} subsubcategoryOptions={subsubcategoryOptions} kindFields={kindFields} />
+      <ItemForm mode="create" kind={kind} subsubcategoryOptions={subsubcategoryOptions} kindProps={kindProps} />
     </div>
   );
 }

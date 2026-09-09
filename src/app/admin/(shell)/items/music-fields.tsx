@@ -1,49 +1,54 @@
 "use client";
 /**
  * Kind-specific inputs for the Music Item form (spec 4, ticket #91),
- * rendered inside item-form.tsx's shared `kindFields` slot. A client
- * component: the file-choice preview plays through `URL.createObjectURL`
- * before upload, and the "use current time" buttons read `audio.currentTime`
- * off that same element -- both need the browser's Audio element, so this
- * can't be a server component (items-kind-common brief).
+ * rendered by item-form.tsx itself (not passed in as JSX -- fix round on
+ * PR 116: a `kindFields?: ReactNode` slot built once on the server with
+ * `errors={{}}` can never show a validation error after a failed submit,
+ * since the page only renders once per navigation while `errors` changes
+ * on every `useActionState` update inside the client-only ItemForm). A
+ * client component: the file-choice preview plays through
+ * `URL.createObjectURL` before upload, and the "use current time" buttons
+ * read `audio.currentTime` off that same element -- both need the
+ * browser's Audio element, so this can't be a server component
+ * (items-kind-common brief).
  *
  * Error message keys in `errors` are full paths from the messages root
  * (e.g. "musicItems.errors.artist.required", written that way by
  * validate-music.ts), so this component resolves them with an unscoped
  * `useTranslations()` rather than one scoped to the "musicItems"
- * namespace -- see the PR body for the same observation about
- * item-form.tsx's shared-field errors.
+ * namespace -- see the PR body for the same fix applied to
+ * item-form.tsx's shared-field errors (closes the #88 defect there).
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { FieldErrors } from "@/admin/forms";
 
-export interface MusicFieldsInitialValues {
-  artist: string;
-  title: string;
-  startSeconds: string;
-  endSeconds: string;
-}
-
 export interface MusicFieldsProps {
   mode: "create" | "edit";
-  initialValues?: MusicFieldsInitialValues;
-  errors: FieldErrors;
+  artist: string;
+  title: string;
   /** Signed URL of the currently stored clip; only present in edit mode. */
-  existingClipUrl?: string;
+  clipUrl?: string;
+  errors: FieldErrors;
 }
 
-const EMPTY_VALUES: MusicFieldsInitialValues = { artist: "", title: "", startSeconds: "", endSeconds: "" };
-
-export function MusicFields({ mode, initialValues, errors, existingClipUrl }: MusicFieldsProps) {
+export function MusicFields({ mode, artist, title, clipUrl, errors }: MusicFieldsProps) {
   const t = useTranslations("musicItems");
   const tError = useTranslations();
-  const values = initialValues ?? EMPTY_VALUES;
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const startInputRef = useRef<HTMLInputElement>(null);
   const endInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Revoke the last object URL on unmount too, not only on the next file
+  // choice -- otherwise navigating away with a preview still selected
+  // leaks it for the life of the tab.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     setPreviewUrl((current) => {
@@ -63,13 +68,13 @@ export function MusicFields({ mode, initialValues, errors, existingClipUrl }: Mu
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
         <span>{t("fields.artist")}</span>
-        <input type="text" name="artist" defaultValue={values.artist} className="border px-2 py-1" />
+        <input type="text" name="artist" defaultValue={artist} className="border px-2 py-1" />
         {errors.artist ? <span className="text-red-600">{tError(errors.artist)}</span> : null}
       </label>
 
       <label className="flex flex-col gap-1">
         <span>{t("fields.title")}</span>
-        <input type="text" name="title" defaultValue={values.title} className="border px-2 py-1" />
+        <input type="text" name="title" defaultValue={title} className="border px-2 py-1" />
         {errors.title ? <span className="text-red-600">{tError(errors.title)}</span> : null}
       </label>
 
@@ -96,14 +101,7 @@ export function MusicFields({ mode, initialValues, errors, existingClipUrl }: Mu
       <div className="flex gap-3">
         <label className="flex flex-1 flex-col gap-1">
           <span>{t("fields.start")}</span>
-          <input
-            ref={startInputRef}
-            type="number"
-            name="startSeconds"
-            step="0.1"
-            defaultValue={values.startSeconds}
-            className="border px-2 py-1"
-          />
+          <input ref={startInputRef} type="number" name="startSeconds" step="0.1" className="border px-2 py-1" />
           <button type="button" onClick={() => applyCurrentTime(startInputRef)} className="w-fit border px-2 py-0.5 text-sm">
             {t("fields.useCurrentTimeStart")}
           </button>
@@ -111,14 +109,7 @@ export function MusicFields({ mode, initialValues, errors, existingClipUrl }: Mu
 
         <label className="flex flex-1 flex-col gap-1">
           <span>{t("fields.end")}</span>
-          <input
-            ref={endInputRef}
-            type="number"
-            name="endSeconds"
-            step="0.1"
-            defaultValue={values.endSeconds}
-            className="border px-2 py-1"
-          />
+          <input ref={endInputRef} type="number" name="endSeconds" step="0.1" className="border px-2 py-1" />
           <button type="button" onClick={() => applyCurrentTime(endInputRef)} className="w-fit border px-2 py-0.5 text-sm">
             {t("fields.useCurrentTimeEnd")}
           </button>
@@ -126,10 +117,10 @@ export function MusicFields({ mode, initialValues, errors, existingClipUrl }: Mu
       </div>
       {errors.endSeconds ? <span className="text-red-600">{tError(errors.endSeconds)}</span> : null}
 
-      {existingClipUrl ? (
+      {clipUrl ? (
         <div className="flex flex-col gap-1">
           <span>{t("fields.currentClip")}</span>
-          <audio controls src={existingClipUrl} />
+          <audio controls src={clipUrl} />
         </div>
       ) : null}
     </div>

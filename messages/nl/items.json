@@ -40,7 +40,6 @@
   "form": {
     "newTitle": "Nieuw tekst-Item",
     "editTitle": "Item bewerken",
-    "kindNote": "Alleen tekst-Items kunnen nu aangemaakt worden; afbeeldingen en muziek volgen later.",
     "subsubcategory": "Subsubcategorie",
     "subsubcategoryPlaceholder": "Kies een subsubcategorie",
     "difficulty": "Moeilijkheidsgraad",
