@@ -17,9 +17,9 @@ Starts the local Supabase stack (unless already running -- never resets it), the
 
 When you're done: `npm run loop:down` (see the end of this document).
 
-## The product page
+## The front page
 
-Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz – digitale download", &euro;14,95, with three always-visible fields above the price (ticket #72), no Beoordelingen (reviews) tab, and no quantity box next to "Toevoegen aan winkelwagen" (spec 3c, #83: the product is sold individually):
+Open http://localhost:45330/ in a browser (spec 6, ticket #145: the front page *is* the product page now -- WooCommerce's `page_on_front`/`show_on_front` setup points the Winkel archive at the front page, and the child theme's `woocommerce/archive-product.php` renders the landing page there instead of the default archive markup). It's Dutch, one long scroll: a hero ("Jouw avond. Jouw quiz. Niemand anders zijn quiz."), "Hoe werkt het" in three steps, "Wat krijg je" (the four deliverable files, the "8 rondes..." structure line, a "Bekijk een voorbeeld" link), the configurator ("Stel je quiz samen", &euro;19,95 incl. btw), an FAQ, and the footer. The configurator section is the same WooCommerce add-to-cart form the product page used to show on its own URL, with three always-visible fields above the price (ticket #72), no Beoordelingen (reviews) tab, and no quantity box next to "Toevoegen aan winkelwagen" (spec 3c, #83: the product is sold individually):
 
 - **Taal** -- Nederlands (preselected) / Engels
 - **Moeilijkheid** -- Makkelijk / Gemiddeld / Moeilijk / Gemengd (preselected)
@@ -27,7 +27,9 @@ Open http://localhost:45330/product/pubquiz/ in a browser. It's Dutch: "Pubquiz 
 
 Pick zero to eight Categories, then click **Toevoegen aan winkelwagen**. Trying to add the exact same Taal/Moeilijkheid/Categorieën combination a second time is refused with WooCommerce's own message ("Je hebt ... al in je winkelwagen ..."); a *different* combination becomes a second cart line -- see "A second Quiz in the same order" below.
 
-**Curl equivalent** (posts straight to the underlying checkbox field, bypassing the dropdown entirely -- the same request the checkbox fallback sends without JavaScript. A fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` repeats, once per pick, in pick order -- three picks below, so the sampler's cycle rule gives 3/3/2 rounds per pick, per CONTEXT.md "Quiz"):
+**Note:** the product's own URL (`/product/pubquiz/`) and the Winkel archive URL now 301-redirect to `/` (`shop/mu-plugins/pubquiz-front-page-redirects.php`, ticket #145) -- there is exactly one selling page.
+
+**Curl equivalent** (posts straight to the underlying checkbox field, bypassing the dropdown entirely -- the same request the checkbox fallback sends without JavaScript, now to the front page URL itself. A fresh cookie jar per attempt keeps the cart session; the Pubquiz product id varies per instance, so it's read from `.local/shop-setup.json`, the same file `loop:up`'s "Product: #N" line reads; `wapf[field_categories][]` repeats, once per pick, in pick order -- three picks below, so the sampler's cycle rule gives 3/3/2 rounds per pick, per CONTEXT.md "Quiz"):
 
 ```powershell
 $productId = (Get-Content .local/shop-setup.json | ConvertFrom-Json).productId
@@ -35,7 +37,7 @@ curl.exe -s -c cookies.txt -b cookies.txt `
   -d "quantity=1" -d "add-to-cart=$productId" -d "wapf_field_groups=$productId" `
   -d "wapf[field_locale]=nl" -d "wapf[field_difficulty]=easy" `
   -d "wapf[field_categories][]=1" -d "wapf[field_categories][]=2" -d "wapf[field_categories][]=3" `
-  "http://localhost:45330/product/pubquiz/"
+  "http://localhost:45330/"
 ```
 
 ## Checkout with the test gateway
@@ -130,7 +132,7 @@ No order is created. Change the billing e-mail to a fresh address and place the 
 
 ## A second Quiz in the same order
 
-Because the Pubquiz product is sold individually (spec 3c, #83), the only way to buy more than one Quiz in one order is to configure a *different* combination of Taal/Moeilijkheid/Categorieën and add it as a second cart line -- the identical configuration a second time is refused (see "The product page" above). Add the first configuration, then go back to http://localhost:45330/product/pubquiz/, pick a different Taal, Moeilijkheid or set of Categorieën, and click **Toevoegen aan winkelwagen** again: **Winkelwagen** now shows two lines, each &euro;14,95, no quantity column. Checkout, the mails and the downloads all follow exactly as in the single-order flow above, except the order summary lists both configurations and the completed mail carries two zip rows instead of one:
+Because the Pubquiz product is sold individually (spec 3c, #83), the only way to buy more than one Quiz in one order is to configure a *different* combination of Taal/Moeilijkheid/Categorieën and add it as a second cart line -- the identical configuration a second time is refused (see "The front page" above). Add the first configuration, then go back to http://localhost:45330/, pick a different Taal, Moeilijkheid or set of Categorieën, and click **Toevoegen aan winkelwagen** again: **Winkelwagen** now shows two lines, no quantity column. Checkout, the mails and the downloads all follow exactly as in the single-order flow above, except the order summary lists both configurations and the completed mail carries two zip rows instead of one:
 
 - `pubquiz-<order number>-1-nl.zip` -- Categorieën: ... (the first configuration)
 - `pubquiz-<order number>-2-<locale>.zip` -- Categorieën: ... (the second)

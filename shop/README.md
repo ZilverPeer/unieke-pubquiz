@@ -328,6 +328,71 @@ top of what the chrome plugin leaves.
   `shop:up`/`shop:down` (which would also re-rotate the WooCommerce REST key
   -- see "REST credentials" below).
 
+## Landing page (spec 6, #145)
+
+The front page (`http://localhost:45330/`) is the shop's only selling page --
+`page_on_front` already points at the Winkel page and `show_on_front = page`
+(setup-shop.php, ticket #70 fix round), so WordPress routes `/` through
+WooCommerce's own product-archive query, not `front-page.php`. The child
+theme's own `woocommerce/archive-product.php` (theme override, resolved by
+WooCommerce's template loader before the plugin's own copy) replaces the
+default archive markup with the landing page when `is_front_page() ||
+is_shop()`, and falls back to including the *plugin's* `templates/archive-
+product.php` directly otherwise (not `wc_get_template()`, which would
+re-locate this same theme file and recurse).
+
+- **Sections, in order:** `#hero`, `#hoe-werkt-het` (three steps),
+  `#wat-krijg-je` (the four deliverable files, inline SVG thumbnails, the "8
+  rondes..." structure line, a "Bekijk een voorbeeld" link to `/voorbeeld/`),
+  `#samenstellen` (the real WooCommerce add-to-cart form, `global $product`
+  set from the `pubquiz` product slug and rendered with
+  `woocommerce_template_single_add_to_cart()`, so the product-fields
+  plugin's fields, the searchable Categorieën dropdown and the 8-cap message
+  above all render exactly as they used to on the product's own page), `#faq`
+  (six entries), then the footer (#143). Copy: prototype B "Story first"
+  (branch `prototype-storefront`, commit ba49012), Dutch, informal "je".
+- **Layout.** `assets/css/landing.css`, its own stylesheet handle
+  (`pubquiz-landing`), enqueued from inside the template *before*
+  `get_header()` runs (so it still lands in `wp_head`'s queue) -- not
+  imported into `style.css`/`base.css` (#143's/#144's files, out of this
+  ticket's ownership). "Wat krijg je" is a four-card row and "Hoe werkt het"
+  is three columns at 1280px, both stacked at 375px. Plain WooCommerce
+  form-control look for the configurator; restyling those controls is #146.
+- **The searchable dropdown off the product page.**
+  `pubquiz-category-dropdown.php`'s asset enqueue and inline-script print are
+  each gated on `is_product()`, which is only ever true on the product's own
+  single-product URL -- false on the front page even with `global $product`
+  set, because the front page's *main query* is the product archive
+  (`is_shop()`), not a singular product query. Rather than duplicate that
+  plugin's ~100-line dropdown-wiring script (out of this ticket's file
+  ownership -- see "File ownership" in the ticket #145 brief), the landing
+  template calls the plugin's own unmodified functions
+  (`pubquiz_category_dropdown_enqueue_assets()`,
+  `pubquiz_category_dropdown_print_script()`) directly, with `$wp_query`'s
+  `is_singular`/`queried_object`/`queried_object_id` pointed at the Pubquiz
+  product only for the duration of each direct call -- saved and restored
+  immediately around it, so nothing else on the same request (the
+  `rel_canonical()` tag included, which prints later from `wp_head` priority
+  10) sees the front page's own query state changed.
+- **SEO.** `inc/seo.php`, `require_once`d from the template before
+  `get_header()`, hooks `pre_get_document_title` and `wp_head` guarded on
+  `is_front_page()`: title "Unieke Pubquiz: een unieke pubquiz, in minuten
+  gegenereerd", a meta description, and `og:title`/`og:description`/
+  `og:type` (`website`)/`og:image` (the theme's `assets/wordmark.png`)/
+  `og:url`. Lives in the theme, not a must-use plugin, because it only ever
+  applies to the front-page template this ticket owns and the ticket's file
+  ownership excludes `functions.php`.
+- **Redirects.** `shop/mu-plugins/pubquiz-front-page-redirects.php` 301s any
+  single product URL (`is_singular( 'product' )`) and the Winkel archive URL
+  when it isn't already the front page (`is_shop() && ! is_front_page()` --
+  a guard that never fires under the current `page_on_front` setup) to `/`.
+  No other URL is touched.
+- **Copy-across.** Same routine as "Theme" above -- this ticket's new files
+  (`woocommerce/archive-product.php`, `inc/seo.php`,
+  `assets/css/landing.css`, `pubquiz-front-page-redirects.php`) are copied
+  into the main checkout for every empirical run and left there for the
+  reviewer.
+
 ### Key verification (ticket #56): guest checkout, Dutch chrome, the notice
 
 Reproduced against a running `shop:up` (theme active, `nl_NL`, EUR/NL, guest
