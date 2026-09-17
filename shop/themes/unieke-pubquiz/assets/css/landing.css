@@ -15,6 +15,14 @@
  * and stacked at 375px (ticket brief "Decisions"). Tap targets at least
  * 44px; enforced by base.css's own button/link rules for the controls this
  * file doesn't redefine.
+ *
+ * Configurator controls (#146): the toggle (Taal), segmented control
+ * (Moeilijkheid) and the restyled Categorieën dropdown are added below,
+ * under "configurator controls". The Categorieën dropdown's own CSS today
+ * is the vendored Tom Select library stylesheet
+ * (`shop/assets/tom-select/tom-select.min.css`) -- a generic third-party
+ * look, not landing-specific, and not a file this ticket edits -- so the
+ * restyling lives here instead, scoped under `#samenstellen`.
  */
 
 .pubquiz-landing {
@@ -168,6 +176,207 @@
   font-size: 1.4rem;
   font-weight: 700;
   margin: 0 0 20px;
+}
+
+/*
+ * Price beside Bestellen (#146): `.pubquiz-configurator-actions` wraps
+ * WooCommerce's own quantity input (hidden -- the product is sold
+ * individually) and the add-to-cart button, printed via the
+ * `woocommerce_before_add_to_cart_button` / `woocommerce_after_add_to_cart_button`
+ * hooks from `woocommerce/archive-product.php`; here it's just the flex
+ * row, price left, button right, stacked at 375px.
+ */
+.pubquiz-configurator-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: var(--pubquiz-content-width);
+  margin: 20px auto 0;
+}
+
+.pubquiz-configurator-actions .pubquiz-configurator-price {
+  margin: 0;
+}
+
+.pubquiz-configurator-actions .single_add_to_cart_button {
+  margin-left: auto;
+}
+
+@media (max-width: 400px) {
+  .pubquiz-configurator-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pubquiz-configurator-actions .single_add_to_cart_button {
+    margin-left: 0;
+  }
+}
+
+/* ---- configurator controls (#146): toggle, segmented control, dropdown ---- */
+
+/*
+ * The enhanced select stays in the DOM (still the field `configurator.js`
+ * sets and still what the form posts) but is visually hidden once its
+ * radiogroup replacement is built -- a clip-rect pattern, not
+ * `display:none`, so it stays in the accessibility tree and the browser's
+ * own `required` validation still sees it.
+ */
+#samenstellen select.pubquiz-enhanced {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Taal: two-option toggle (prototype B, branch prototype-storefront, commit ba49012, `.control-toggle`) */
+#samenstellen .pubquiz-toggle {
+  display: inline-flex;
+  border: 2px solid var(--pubquiz-accent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#samenstellen .pubquiz-toggle-option {
+  min-height: 44px;
+  padding: 0 20px;
+  background: #ffffff;
+  color: var(--pubquiz-ink);
+  border: none;
+  border-radius: 0;
+  font-weight: 500;
+}
+
+#samenstellen .pubquiz-toggle-option:hover {
+  background: var(--pubquiz-surface);
+}
+
+#samenstellen .pubquiz-toggle-option[aria-checked="true"] {
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+}
+
+#samenstellen .pubquiz-toggle-option[aria-checked="true"]:hover {
+  background: var(--pubquiz-accent-hover);
+}
+
+/* Moeilijkheid: four-segment control (prototype B `.control-segmented`) */
+#samenstellen .pubquiz-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--pubquiz-surface);
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+#samenstellen .pubquiz-segmented-option {
+  min-height: 40px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--pubquiz-ink);
+  border: none;
+  border-radius: 7px;
+  font-weight: 500;
+}
+
+#samenstellen .pubquiz-segmented-option:hover {
+  background: #ffffff;
+}
+
+#samenstellen .pubquiz-segmented-option[aria-checked="true"] {
+  background: #ffffff;
+  color: var(--pubquiz-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+#samenstellen .pubquiz-control {
+  margin-bottom: 4px;
+}
+
+/*
+ * Categorieën dropdown (spec 3c, #83): Tom Select builds its `<select
+ * multiple>` right after the (now hidden) checkbox group, still inside
+ * `#samenstellen` -- these rules restyle its own class names (`.ts-wrapper`,
+ * `.ts-control`, `.ts-dropdown`, `.option`, `.item`) in the design tokens,
+ * the vendored stylesheet itself is untouched.
+ */
+#samenstellen .ts-wrapper {
+  width: 100%;
+  max-width: 480px;
+}
+
+#samenstellen .ts-control {
+  min-height: 44px;
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px 8px;
+}
+
+#samenstellen .ts-wrapper.focus .ts-control {
+  outline: 3px solid var(--pubquiz-focus);
+  outline-offset: 2px;
+  border-color: var(--pubquiz-accent);
+}
+
+#samenstellen .ts-dropdown {
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#samenstellen .ts-dropdown .option {
+  padding: 10px 12px;
+  color: var(--pubquiz-ink);
+}
+
+#samenstellen .ts-dropdown .option.active,
+#samenstellen .ts-dropdown .option:hover {
+  background: var(--pubquiz-surface);
+  color: var(--pubquiz-accent);
+}
+
+/* Chips (removable, "item" in Tom Select's own vocabulary) */
+#samenstellen .item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 2px 8px 2px 12px;
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+#samenstellen .item .remove {
+  border-left: none;
+  color: var(--pubquiz-accent-contrast);
+  padding: 0 6px;
+}
+
+#samenstellen .item .remove:hover {
+  background: var(--pubquiz-accent-hover);
+}
+
+#samenstellen .item .remove:focus-visible {
+  outline: 3px solid var(--pubquiz-focus);
+  outline-offset: 1px;
+}
+
+/* Cap message ("Kies maximaal 8 categorieën."), printed into `wp_footer` -- outside `#samenstellen`, so not scoped to it. */
+.pubquiz-category-dropdown-notice {
+  color: #b3261e;
+  font-weight: 600;
+  margin: 10px 0 0;
 }
 
 /* ---- faq ---- */
