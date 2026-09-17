@@ -28,3 +28,7 @@ Prototype dispatched to a Sonnet agent on branch `prototype-storefront` (`shop/p
 ## Spec published
 
 - #142 "Spec 6: storefront design" (ready-for-agent). Seams: rendered HTML over HTTP from wp-env, curl checkout POST, Mailpit, the bootstrap's unit test, screenshots at 375/1280 for Erik's visual acceptance. Follow-up issues filed from the discussion: #140 refund revokes downloads, #141 self-service re-render of an expired download (needs grilling). Next: `to-tickets` on #142.
+
+## Tickets published
+
+#143 foundation (theme, tokens, fonts, wordmark, header, footer), #144 bootstrap (legal placeholders, price/tax, mail branding, blocked by 143), #145 landing page (blocked by 143), #146 configurator controls (blocked by 145; the searchable dropdown stays, Erik's decision), #147 straight-to-checkout and checkout/cart look (blocked by 143), #148 withdrawal waiver (unblocked), #149 order-received/My Account/login and mails (blocked by 143, 144), #150 acceptance and close (blocked by 144, 146, 147, 148, 149). All sub-issues of #142 with native blocking edges. Frontier: #143 and #148.
