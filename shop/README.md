@@ -450,12 +450,11 @@ Account -> Downloads/Orders/Addresses and the login page screenshotted at
 at 1280px; the processing and completed mails of an order kept the
 wordmark, accent, footer text, notice, waiver line and download rows with
 Category names (Mailpit, unchanged by this ticket). My Account ->
-Downloads itself does not print Category names under its rows -- the
-downloads plugin only adds them via the order-item-meta hook the
-order-received/order-view/completed-mail templates share, not via the
-`woocommerce_customer_get_downloadable_products` filter My Account
-Downloads reads from -- a plugin gap, not a styling one, left for a later
-ticket.
+Downloads now also prints Category names under its rows (batched fix,
+#158): `pubquiz-downloads.php` hooks `woocommerce_customer_get_downloadable_products`
+as well as the order-item-meta hook the order-received/order-view/
+completed-mail templates share, so all four surfaces agree (verified
+against order 68 during the #150 acceptance run).
 
 ## Landing page (spec 6, #145)
 
@@ -478,8 +477,9 @@ re-locate this same theme file and recurse).
   `woocommerce_template_single_add_to_cart()`, so the product-fields
   plugin's fields, the searchable Categorieën dropdown and the 8-cap message
   above all render exactly as they used to on the product's own page), `#faq`
-  (six entries), then the footer (#143). Copy: prototype B "Story first"
-  (branch `prototype-storefront`, commit ba49012), Dutch, informal "je".
+  (six entries), then the footer (#143). Copy: the "Story first" structure
+  decided during grilling (`docs/logbook/2026-09-17-storefront-design-grilling.md`,
+  spec #142), Dutch, informal "je".
 - **Layout.** `assets/css/landing.css`, its own stylesheet handle
   (`pubquiz-landing`), enqueued from inside the template *before*
   `get_header()` runs (so it still lands in `wp_head`'s queue) -- not
@@ -530,7 +530,7 @@ this ticket's brief) -- `assets/js/configurator.js`, enqueued next to
 `landing.css` from `woocommerce/archive-product.php`, finds each select
 inside `#samenstellen` and builds a `role="radiogroup"` of `role="radio"`
 buttons mirroring its options: a two-option toggle for Taal, a four-segment
-control for Moeilijkheid (prototype B look, `landing.css`). The select
+control for Moeilijkheid (the "Story first" look, `landing.css`). The select
 itself stays in the DOM, visually hidden with a clip-rect pattern (class
 `pubquiz-enhanced`), not `display:none`, so it still carries the value the
 form posts and still passes the browser's own `required` validation. A
