@@ -72,6 +72,22 @@ wp_enqueue_style(
 );
 
 /**
+ * Configurator controls (#146): plain-JS progressive enhancement that turns
+ * the `locale`/`difficulty` `<select>` fields (Taal, Moeilijkheid -- kept as
+ * `<select>`, per `setup-field-group.php`, spec 6 orchestrator's interface
+ * gap resolution in this ticket's brief) into a toggle and a segmented
+ * control. No dependency; the selects render and post exactly as before
+ * without it. See `assets/js/configurator.js` for the behaviour.
+ */
+wp_enqueue_script(
+    'pubquiz-configurator',
+    get_stylesheet_directory_uri() . '/assets/js/configurator.js',
+    array(),
+    (string) filemtime( get_stylesheet_directory() . '/assets/js/configurator.js' ),
+    true
+);
+
+/**
  * Bridge for `pubquiz-category-dropdown.php`'s searchable Categorieën
  * dropdown (spec 3c, #83): both its asset enqueue and its inline-script
  * print are gated on `is_product()` (see that file's own docblock --
@@ -191,13 +207,49 @@ get_header();
 	<section id="samenstellen" class="pubquiz-configurator">
 		<h2><?php esc_html_e( 'Stel je quiz samen', 'unieke-pubquiz' ); ?></h2>
 		<?php if ( $pubquiz_landing_product instanceof WC_Product ) : ?>
-			<p class="pubquiz-configurator-price"><?php echo wp_kses_post( $pubquiz_landing_product->get_price_html() ); ?></p>
 			<?php
 			global $product;
 			$pubquiz_saved_global_product = $product;
 			$product                      = $pubquiz_landing_product;
 
+			/**
+			 * Price beside Bestellen (#146, ticket brief "Decisions"): wrap
+			 * WooCommerce's own quantity/button markup in one flex row with
+			 * the price, using the template's own
+			 * `woocommerce_before_add_to_cart_button` /
+			 * `woocommerce_after_add_to_cart_button` hooks (fired from
+			 * inside `woocommerce_template_single_add_to_cart()` ->
+			 * `single-product/add-to-cart/simple.php`) rather than a
+			 * template override -- added right before the call below and
+			 * removed right after, the same save/restore pattern the
+			 * `$wp_query` bridges above use, so nothing else that fires
+			 * these hooks elsewhere on the request (there is nothing else
+			 * on this page) is affected.
+			 *
+			 * Priority 100 on the opening hook, not the default 10: the
+			 * product-fields plugin (Taal/Moeilijkheid/Categorieën) prints
+			 * its own field group on the same `woocommerce_before_add_to_cart_button`
+			 * hook -- checked empirically (this ticket's PR body), a
+			 * lower/default priority here wrapped the whole field group in
+			 * the actions row instead of just the quantity input and
+			 * button. Priority 100 runs after it.
+			 */
+			$pubquiz_configurator_price_html = $pubquiz_landing_product->get_price_html();
+
+			$pubquiz_open_configurator_actions = function () use ( $pubquiz_configurator_price_html ) {
+				echo '<div class="pubquiz-configurator-actions"><span class="pubquiz-configurator-price">' . wp_kses_post( $pubquiz_configurator_price_html ) . '</span>';
+			};
+			$pubquiz_close_configurator_actions = function () {
+				echo '</div>';
+			};
+
+			add_action( 'woocommerce_before_add_to_cart_button', $pubquiz_open_configurator_actions, 100 );
+			add_action( 'woocommerce_after_add_to_cart_button', $pubquiz_close_configurator_actions, 100 );
+
 			woocommerce_template_single_add_to_cart();
+
+			remove_action( 'woocommerce_before_add_to_cart_button', $pubquiz_open_configurator_actions, 100 );
+			remove_action( 'woocommerce_after_add_to_cart_button', $pubquiz_close_configurator_actions, 100 );
 
 			$product = $pubquiz_saved_global_product;
 			?>

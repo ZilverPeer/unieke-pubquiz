@@ -466,6 +466,48 @@ re-locate this same theme file and recurse).
   into the main checkout for every empirical run and left there for the
   reviewer.
 
+### Configurator controls (#146)
+
+Taal and Moeilijkheid stay `<select>` fields (`setup-field-group.php`; the
+spec's "radios" wording is resolved against that fixed field-group shape by
+this ticket's brief) -- `assets/js/configurator.js`, enqueued next to
+`landing.css` from `woocommerce/archive-product.php`, finds each select
+inside `#samenstellen` and builds a `role="radiogroup"` of `role="radio"`
+buttons mirroring its options: a two-option toggle for Taal, a four-segment
+control for Moeilijkheid (prototype B look, `landing.css`). The select
+itself stays in the DOM, visually hidden with a clip-rect pattern (class
+`pubquiz-enhanced`), not `display:none`, so it still carries the value the
+form posts and still passes the browser's own `required` validation. A
+click, Space or Enter on a button sets the select's value and dispatches a
+bubbling `change` event; the arrow keys move the checked option with a
+roving `tabindex`, like native radios. **Without JavaScript** the plain
+`<select>` elements render and post exactly as before this ticket.
+
+The Categorieën dropdown (#83, above) keeps its own tom-select behaviour and
+checkbox fallback untouched -- only restyled, scoped under `#samenstellen`
+in `landing.css` (the input, the option list, hover/active options, the
+removable chips and their remove control, all in the accent/surface tokens
+from `base.css`) because the dropdown's own stylesheet today is the
+vendored Tom Select library CSS (`shop/assets/tom-select/`), a generic
+third-party look this ticket doesn't edit.
+
+The price moved next to the "Bestellen" button (the button's label, was
+"Toevoegen aan winkelwagen": `woocommerce_product_single_add_to_cart_text`,
+`functions.php`, guarded on `is_front_page() || is_shop()`) -- one flex row,
+`.pubquiz-configurator-actions`, built with the `woocommerce_before_add_to_cart_button`
+/ `woocommerce_after_add_to_cart_button` hooks from the template (added
+right before `woocommerce_template_single_add_to_cart()`, removed right
+after). Priority 100 on the opening hook, not the default: the
+product-fields plugin prints its own field group on that same hook, and a
+default/lower priority here wrapped the whole field group in the row
+instead of just the quantity input and button (checked empirically, this
+ticket's PR body). Stacked (price above button) at 375px.
+
+**Copy-across.** `woocommerce/archive-product.php`, `functions.php`,
+`assets/css/landing.css` and the new `assets/js/configurator.js` are copied
+into the main checkout for every empirical run and left there for the
+reviewer.
+
 ### Key verification (ticket #56): guest checkout, Dutch chrome, the notice
 
 Reproduced against a running `shop:up` (theme active, `nl_NL`, EUR/NL, guest
@@ -585,6 +627,10 @@ rule (CONTEXT.md "Quiz") both use -- is Category id order among the
 customer's checked boxes, not click order.
 
 ### Searchable Categorieën dropdown (spec 3c, #83)
+
+Restyled by #146 (design tokens, scoped under `#samenstellen` in
+`landing.css`) -- see "Configurator controls (#146)" above. The plugin's own
+behaviour and checkbox fallback described below are unchanged.
 
 `shop/mu-plugins/pubquiz-category-dropdown.php` enqueues a vendored copy of
 [Tom Select](https://tom-select.js.org/) (`shop/assets/tom-select/`, one JS
