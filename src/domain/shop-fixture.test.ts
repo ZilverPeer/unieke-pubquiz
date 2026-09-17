@@ -270,7 +270,7 @@ describe("shop/mu-plugins/wp-cli-scripts/setup-shop.php", () => {
     expect(php).toContain(
       "PUBQUIZ_PRODUCT_SHORT_DESCRIPTION', 'Een kant-en-klare pubquiz om zelf te presenteren: quizmasterscript, beeldronde, antwoordenblad en muziekronde, direct na aankoop per download.'",
     );
-    expect(php).toContain("PUBQUIZ_PRODUCT_PRICE', '14.95'");
+    expect(php).toContain("PUBQUIZ_PRODUCT_PRICE', '19.95'");
   });
 
   test("prints exactly the closing JSON keys parseSetupResult expects", () => {

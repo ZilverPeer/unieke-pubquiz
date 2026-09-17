@@ -18,7 +18,7 @@ that only asks for a name and an email. See "Dutch storefront" below.
 
 | Command | What it does |
 | --- | --- |
-| `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, starts the cron ticker container (see "The webhook" below), then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the Storefront theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates/reuses the Pubquiz product, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
+| `npm run shop:up` | Reads the running Supabase stack's `nl` Category names (see "Category names" below; fails fast if the stack isn't up), starts wp-env, starts the Mailpit mail catcher, starts the cron ticker container (see "The webhook" below), then runs the entire WordPress-side bootstrap as a single `wp eval-file` call (`setup-shop.php`, see "Single bootstrap"): idempotently activates the theme, installs the Dutch language, sets WooCommerce's Dutch store settings, renames the Dutch pages, creates the six legal/Voorbeeld placeholder pages, creates/reuses the Pubquiz product at &euro;19,95, (re)attaches its Advanced Product Fields field group (Dutch labels, Category choices from the Supabase stack), sets the tax options and the one NL 21% standard rate, switches the Cart/Checkout pages to classic shortcodes (see "Interface gaps"), creates/updates the `order.updated` webhook, sets the WooCommerce email branding options (header image, colours, footer identity text), and creates a fresh WooCommerce REST API key for the deliver module (see "REST credentials"). Prints its own wall-clock time. Safe to re-run any time. |
 | `npm run shop:down` | Stops wp-env, the Mailpit container, and the cron ticker container. Data is preserved (see "Reset"). |
 | `npm run shop:order -- --email a@b.com [--locale nl] [--difficulty easy] [--pick <categoryId>] [--quiz ...]` | Creates a **paid, `processing`** order for the Pubquiz product directly via WP-CLI, with `meta_data` set exactly per `CHECKOUT_META_KEYS`. `--quiz` starts a new line item (multi-quiz order); `--pick <id>` may repeat, order preserved, up to 8 times, distinct ids; `--quantity <n>` sets the current line item's quantity. |
 | `npm run shop:capture [-- --out <path>] [-- --port <n>]` | A one-shot HTTP listener (default port 3000) that prints and optionally saves the next webhook delivery it receives, then exits. |
@@ -204,6 +204,79 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
   Pubquiz-configured line item (same `pubquiz_locale` line-item-meta match
   as `pubquiz-hold-processing.php`). An order without a Pubquiz product
   gets neither.
+- **Legal placeholder pages and the Voorbeeld page (ticket #144, spec #142
+  "Footer and legal block" / "Sample slot").** `setup-shop.php` creates six
+  pages by slug -- Voorwaarden (`voorwaarden`), Privacy (`privacy`),
+  Herroeping (`herroeping`), Cookies (`cookies`), Contact (`contact`) and
+  Voorbeeld (`voorbeeld`) -- idempotently via `get_page_by_path()`, with
+  body exactly `Tekst volgt.` if missing; an existing page's content is
+  never touched again on a re-run (Erik writes the real text later, the
+  deployment spec). The footer links (ticket #143) already point at these
+  slugs. `wp_page_for_privacy_policy` is set to the Privacy page's id.
+  `woocommerce_terms_page_id` is deliberately left unset -- setting it would
+  add WooCommerce's own terms checkbox to checkout, and the withdrawal
+  waiver (#148) is the only checkbox there.
+- **Price (ticket #144).** `PUBQUIZ_PRODUCT_PRICE` is `19.95`
+  (`shop/mu-plugins/wp-cli-scripts/setup-shop.php`); the existing
+  `pubquiz_ensure_product()` step already converges a changed regular price
+  on a re-run, so no new step was needed for this. Pinned, like the other
+  product literals, by `src/domain/shop-fixture.test.ts`. The price does not
+  live in `scripts/shop/lib/config.ts` -- that file only keeps the product
+  *slug*, needed by `shop:order`'s product lookup; PHP is the single source
+  for the price, same as the product name and description.
+- **Tax (ticket #144, spec #142 "Price and tax").** `setup-shop.php` sets
+  `woocommerce_calc_taxes=yes`, `woocommerce_prices_include_tax=yes`,
+  `woocommerce_tax_display_shop=incl`, `woocommerce_tax_display_cart=incl`,
+  `woocommerce_tax_total_display=single`, and one standard NL rate at 21%
+  (`BTW`, no shipping tax), created via `WC_Tax::_insert_tax_rate()` only if
+  `WC_Tax::find_rates()` finds no existing NL standard rate yet. Verified
+  empirically against this wp-env (ticket #144 PR body): with
+  `_display_shop`/`_display_cart` at `incl`, WooCommerce already prints
+  "(inclusief &euro;X,XX btw)" next to the cart/checkout totals by itself,
+  but the product page's own `<p class="price">` shows the bare amount with
+  no wording at all -- so `woocommerce_price_display_suffix` is set to
+  `incl. btw`, not left empty, to cover that one spot too.
+- **Mail branding (ticket #144, spec #142 "Mails").** `setup-shop.php` sets
+  WooCommerce's transactional-email options: `woocommerce_email_header_image`
+  to the theme's wordmark PNG, read via `content_url( 'themes/unieke-pubquiz/assets/wordmark.png' )`
+  rather than `get_stylesheet_directory_uri()` (only valid once the theme is
+  the *active* one -- true here since step 1 already activated it earlier in
+  the same run, but `content_url()` needs no such ordering dependency),
+  `woocommerce_email_base_color` = `#1f5c45` (the accent), 
+  `woocommerce_email_background_color`/`_body_background_color` = the
+  theme's `--pubquiz-bg`/`--pubquiz-surface` tokens, `woocommerce_email_text_color`
+  = the ink token, `woocommerce_email_from_name` = `Unieke Pubquiz`, and
+  `woocommerce_email_footer_text` built from the identity array (see
+  "Identity" below) as one middle-dot-separated line.
+
+### Identity (ticket #144)
+
+The legal identity values the footer (ticket #143) and the mail branding
+above both print live in one file, `shop/themes/unieke-pubquiz/inc/identity.php`,
+which `return`s the placeholder array (`company_name`, `kvk`, `btw`,
+`address`, `email`). `functions.php` does
+`define( 'PUBQUIZ_FOOTER_IDENTITY', require __DIR__ . '/inc/identity.php' )`,
+keeping the constant name the footer code already used; `setup-shop.php`'s
+mail-branding step `require`s the exact same file by its `WP_CONTENT_DIR`
+path (`WP_CONTENT_DIR . '/themes/unieke-pubquiz/inc/identity.php'`), so the
+theme and the bootstrap can never print two different identity blocks.
+Placeholder values stay exactly as they were under `PUBQUIZ_FOOTER_IDENTITY`
+before this ticket; only their location moved.
+
+### Testing bootstrap steps without rotating the REST key (ticket #144)
+
+`setup-shop.php`'s last step rotates the WooCommerce REST API key that the
+running app on :3000 uses for delivery, so running the whole file via `wp
+eval-file` while the loop is up would break it. To prove a *new* bootstrap
+step in isolation, copy it (plus the small helpers it needs -- `pubquiz_log()`,
+`pubquiz_ensure_option()`, copied verbatim) into a throwaway
+`shop/mu-plugins/wp-cli-scripts/tmp-<ticket>.php` in the main checkout, run
+it twice with `npx wp-env run cli -- wp eval-file wp-content/mu-plugins/wp-cli-scripts/tmp-<ticket>.php --user=admin`
+(first run creates/sets, second run logs "already" for everything -- the
+idempotency proof), then delete the throwaway file before pushing -- it must
+never appear in a diff or stay in the main checkout. Used by ticket #144 to
+prove the placeholder pages, price, tax and mail-branding steps without
+touching the webhook or REST-key steps.
 
 ## Chrome (ticket #70)
 
