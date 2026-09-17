@@ -729,6 +729,58 @@ on the order's first line item, adding a private `[pubquiz]` order note --
 succeeds clears the flag itself, so a later successful attempt in the same
 session never inherits a stale note.
 
+## Withdrawal waiver (spec 6, #148)
+
+`shop/mu-plugins/pubquiz-withdrawal-waiver.php` adds one required checkbox
+to checkout -- consent to immediate delivery and acknowledgement that the
+right of withdrawal is lost once delivery starts, Dutch placeholder wording
+(final legal text is content for the deployment spec) -- for any cart
+containing a Pubquiz-configured item.
+
+**Cart matching rule.** A cart item counts as a Pubquiz item when its own
+`wapf` array (the field data Advanced Product Fields attaches to a cart
+item at add-to-cart time) carries a `locale` field with a non-empty string
+`raw` value -- the same presence check `pubquiz-checkout-feasibility.php`
+already uses to pick Pubquiz cart lines at the same point in checkout
+(`woocommerce_after_checkout_validation`, cart still exists, order does
+not). A cart with no Pubquiz item renders no checkbox and enforces no
+validation. Order-side display (thank-you page, the processing mail, the
+admin order screen) instead reuses `pubquiz_order_has_pubquiz_item()` from
+`pubquiz-customer-notice.php`.
+
+**Hooks.** `woocommerce_review_order_before_submit` renders the checkbox
+directly above "Plaats bestelling"; `woocommerce_checkout_process` requires
+it (`wc_add_notice()` with the Dutch error otherwise); `woocommerce_checkout_create_order`
+stores the acceptance on the order.
+
+**Order meta.** `pubquiz_withdrawal_waiver_accepted_at` (UTC ISO 8601,
+`gmdate( 'c' )`) and `pubquiz_withdrawal_waiver_label` (the exact label text
+shown when accepted, a record independent of later wording changes).
+
+**Display.** The order-received page (`woocommerce_thankyou`, after the
+customer notice), the processing mail only (`woocommerce_email_order_details`,
+filtered to `customer_processing_order`, html and plain text -- the
+completed mail is untouched), and the admin order screen
+(`woocommerce_admin_order_data_after_billing_address`), all showing the same
+confirmation line formatted with `wc_format_datetime()` in the site's
+timezone: "Je hebt op \<datum\> \<tijd\> ingestemd met directe levering en
+afgezien van je herroepingsrecht."
+
+**Verified empirically (ticket #148), red first.** On the unfixed shop,
+the walkthrough's curl add-to-cart then checkout *without* the field
+succeeded (`"result":"success"`, order #39). After copying the plugin
+across: the same checkout without the field failed
+(`"result":"failure"`, `messages` containing "Vink aan dat je afziet van je
+herroepingsrecht om te bestellen."); with `pubquiz_withdrawal_waiver=1`,
+checkout succeeded (order #40) and
+`wp post meta get 40 pubquiz_withdrawal_waiver_accepted_at` read back a UTC
+ISO 8601 timestamp. The order-received page and the processing mail
+(Mailpit, both html and plain text) contained "Je hebt op 17-09-2026 09:56
+ingestemd met directe levering en afgezien van je herroepingsrecht."; the
+completed mail for the same order did not. The checkout page's HTML showed
+the checkbox (`pubquiz_withdrawal_waiver_field`) immediately above the
+`place_order` submit button.
+
 ## REST credentials
 
 `npm run shop:up` also creates (or, on rerun, rotates) a WooCommerce REST API
