@@ -12,3 +12,7 @@ Erik, back after a week, asked for the retro points to be fixed before the grill
 ## 08:4x #136 and #137 dispatched
 
 wt-136 (`ticket-136-loop-reprobe`) unit-only, no stack. wt-137 (`ticket-137-failopen-note`): loop brought up from master, then the app stopped by pid so the feasibility check fails open; the shop bind-mounts the main checkout's `shop/`, so the implementer copies its one PHP file across per run and restores the main checkout before pushing. Check-in cron every 15 minutes, drift lines in this file.
+
+## 08:2x PR 138 (#136) merged on a read review
+
+Pure `confirmAppStillUp` helper with four unit cases (red: module missing), `APP_GRACE_PERIOD_MS = 10_000`, the re-probe only on the freshly-spawned branch of `ensureAppUp`, runbook sentence. Master check green (361 unit). The empirical `loop:up` run with the merged code follows once #137 no longer needs the app stopped. wt-136 removed.
