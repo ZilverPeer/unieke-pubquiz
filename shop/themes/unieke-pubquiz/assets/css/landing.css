@@ -1,0 +1,198 @@
+/*
+ * Unieke Pubquiz -- front page / landing page layout (ticket #145).
+ *
+ * Structure and copy: prototype B "Story first" (branch prototype-storefront,
+ * commit ba49012, shop/prototype/prototype.css `.variant-b`). Tokens (accent,
+ * fonts, focus ring, content width) come from base.css (#143), loaded first
+ * -- this file only lays the landing sections out, it does not redefine a
+ * token. Plain WooCommerce form-control look here (buttons, inputs already
+ * styled by base.css); restyling the configurator's controls themselves
+ * (toggle/segmented/dropdown look) is #146's ticket, out of scope here.
+ *
+ * Breakpoints designed mobile-first (375px), checked at 1280px (spec #142
+ * "Design tokens"): "Wat krijg je" is a horizontal spread of four cards at
+ * 1280px and stacked at 375px; "Hoe werkt het" is three columns at 1280px
+ * and stacked at 375px (ticket brief "Decisions"). Tap targets at least
+ * 44px; enforced by base.css's own button/link rules for the controls this
+ * file doesn't redefine.
+ */
+
+.pubquiz-landing {
+  max-width: none;
+}
+
+.pubquiz-landing section {
+  padding: 48px 24px;
+  max-width: var(--pubquiz-content-width);
+  margin: 0 auto;
+}
+
+.pubquiz-landing h2 {
+  font-size: 1.5rem;
+  margin: 0 0 24px;
+}
+
+/* ---- hero ---- */
+#hero.pubquiz-hero {
+  text-align: center;
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+
+.pubquiz-hero h1 {
+  font-weight: 900;
+  font-size: 2rem;
+  line-height: 1.15;
+  max-width: 16ch;
+  margin: 0 auto 20px;
+}
+
+.pubquiz-hero-lede {
+  font-size: 1.05rem;
+  color: var(--pubquiz-ink);
+  max-width: 50ch;
+  margin: 0 auto 28px;
+}
+
+.pubquiz-btn-cta {
+  min-height: 44px;
+}
+
+/* ---- hoe werkt het ---- */
+.pubquiz-how-it-works {
+  text-align: center;
+}
+
+.pubquiz-steps {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+  max-width: 420px;
+  justify-items: center;
+}
+
+.pubquiz-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.05rem;
+}
+
+.pubquiz-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+  font-weight: 700;
+  font-family: var(--pubquiz-font-heading);
+}
+
+/* ---- wat krijg je ---- */
+.pubquiz-structure-note {
+  color: var(--pubquiz-ink);
+  margin-bottom: 24px;
+}
+
+.pubquiz-deliverable-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.pubquiz-deliverable-card {
+  text-align: left;
+}
+
+.pubquiz-deliverable-card .pubquiz-thumb {
+  width: 90px;
+  height: auto;
+  margin-bottom: 8px;
+}
+
+.pubquiz-deliverable-card h3 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.pubquiz-deliverable-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--pubquiz-ink);
+}
+
+.pubquiz-sample-link {
+  margin-top: 24px;
+}
+
+.pubquiz-sample-link a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+/* ---- configurator ---- */
+.pubquiz-configurator {
+  background: var(--pubquiz-surface);
+  max-width: none;
+}
+
+.pubquiz-configurator h2,
+.pubquiz-configurator-price,
+.pubquiz-configurator .cart,
+.pubquiz-configurator-missing {
+  max-width: var(--pubquiz-content-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pubquiz-configurator-price {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 20px;
+}
+
+/* ---- faq ---- */
+.pubquiz-faq-list details {
+  border-bottom: 1px solid var(--pubquiz-border);
+  padding: 14px 0;
+}
+
+.pubquiz-faq-list summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.pubquiz-faq-list p {
+  color: var(--pubquiz-ink);
+  margin: 10px 0 0;
+}
+
+/* ---- 1280px: three-column "Hoe werkt het", four-card row "Wat krijg je" ---- */
+@media (min-width: 1280px) {
+  .pubquiz-steps {
+    grid-template-columns: repeat(3, 1fr);
+    max-width: none;
+    justify-items: stretch;
+  }
+
+  .pubquiz-deliverable-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .pubquiz-hero h1 {
+    font-size: 1.7rem;
+  }
+}
