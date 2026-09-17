@@ -311,6 +311,33 @@ function pubquiz_feasibility_log( string $message ) {
     }
 }
 
+/** The WooCommerce session key under which a fail-open reason is remembered for the current cart (ticket #137, retro follow-up to #98). */
+const PUBQUIZ_FEASIBILITY_SESSION_KEY = 'pubquiz_feasibility_fail_open';
+
+/**
+ * Remembers, in the WooCommerce session, that the feasibility check failed
+ * open for this cart -- alongside the `wc_get_logger()` warning above, never
+ * instead of it. The order-creation hook below reads and clears this flag so
+ * the resulting order gets a private `[pubquiz]` note (`pubquiz-operator-mail.php`
+ * mails every private note whose text starts with `[pubquiz]`). `$reason` is
+ * short and secret-free ("app unreachable", "HTTP <code>", "invalid
+ * response", "no active webhook") -- never a URL, header or body. No-op if
+ * WooCommerce has no session (defensive; `woocommerce_after_checkout_validation`
+ * always runs with one in practice).
+ */
+function pubquiz_feasibility_remember_fail_open( string $reason ) {
+    if ( function_exists( 'WC' ) && WC()->session ) {
+        WC()->session->set( PUBQUIZ_FEASIBILITY_SESSION_KEY, $reason );
+    }
+}
+
+/** Clears the fail-open flag: called both when the check succeeds (so a later successful checkout in the same session does not inherit a stale flag) and by the order-creation hook below once it has consumed the flag. */
+function pubquiz_feasibility_clear_fail_open() {
+    if ( function_exists( 'WC' ) && WC()->session ) {
+        WC()->session->set( PUBQUIZ_FEASIBILITY_SESSION_KEY, null );
+    }
+}
+
 add_action(
     'woocommerce_after_checkout_validation',
     function ( $data, $errors ) {
@@ -328,6 +355,7 @@ add_action(
         $webhook = pubquiz_feasibility_find_webhook();
         if ( null === $webhook || empty( $webhook['delivery_url'] ) || empty( $webhook['secret'] ) ) {
             pubquiz_feasibility_log( 'no active order.updated webhook found; skipping feasibility check' );
+            pubquiz_feasibility_remember_fail_open( 'no active webhook' );
             return;
         }
 
@@ -349,23 +377,27 @@ add_action(
 
         if ( is_wp_error( $response ) ) {
             pubquiz_feasibility_log( 'request failed: ' . $response->get_error_message() );
+            pubquiz_feasibility_remember_fail_open( 'app unreachable' );
             return;
         }
 
         $status = (int) wp_remote_retrieve_response_code( $response );
         if ( 200 !== $status ) {
             pubquiz_feasibility_log( "unexpected status {$status}" );
+            pubquiz_feasibility_remember_fail_open( "HTTP {$status}" );
             return;
         }
 
         $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( ! is_array( $decoded ) || ! isset( $decoded['lines'] ) || ! is_array( $decoded['lines'] ) ) {
             pubquiz_feasibility_log( 'response was not valid JSON with a lines array' );
+            pubquiz_feasibility_remember_fail_open( 'invalid response' );
             return;
         }
 
         if ( count( $decoded['lines'] ) !== count( $lines ) ) {
             pubquiz_feasibility_log( 'response lines count did not match request lines count' );
+            pubquiz_feasibility_remember_fail_open( 'invalid response' );
             return;
         }
 
@@ -382,6 +414,11 @@ add_action(
         $category_labels   = pubquiz_feasibility_choice_labels( $product, PUBQUIZ_FEASIBILITY_CATEGORIES_FIELD_ID );
         $difficulty_labels = pubquiz_feasibility_choice_labels( $product, PUBQUIZ_FEASIBILITY_DIFFICULTY_FIELD_ID );
 
+        // The check succeeded (fail-open not hit): clear any flag a previous
+        // attempt in this session left behind, so a later successful
+        // checkout does not inherit a stale note.
+        pubquiz_feasibility_clear_fail_open();
+
         foreach ( $decoded['lines'] as $index => $response_line ) {
             if ( ! is_array( $response_line ) ) {
                 continue;
@@ -395,4 +432,43 @@ add_action(
     },
     10,
     2
+);
+
+/**
+ * Leaves a private `[pubquiz]` order note when the feasibility check above
+ * failed open for this checkout (ticket #137, retro follow-up to #98): the
+ * customer already paid without a feasibility guarantee (spec 5: checkout
+ * never hangs, so the check fails open rather than blocking payment), so the
+ * operator needs a nudge -- `pubquiz-operator-mail.php` mails every private
+ * note whose text starts with `[pubquiz]`, no change needed there.
+ *
+ * The brief for this ticket named `pubquiz-checkout-meta.php`'s own hook,
+ * `woocommerce_checkout_create_order_line_item`, to reuse. Verified
+ * empirically (two throwaway orders with a debug log line) that hook fires
+ * once per order *line*, before `WC_Checkout::create_order()` has called
+ * `$order->save()`: `$order->get_id()` is still `0` there, and
+ * `WC_Order::add_order_note()` silently no-ops on an unsaved order (no note
+ * was written). `woocommerce_checkout_order_created` fires once per order,
+ * right after that `save()`, with a real id -- confirmed against the same
+ * two orders once switched. Same session read/clear either way.
+ */
+add_action(
+    'woocommerce_checkout_order_created',
+    function ( $order ) {
+        if ( ! function_exists( 'WC' ) || ! WC()->session || ! $order ) {
+            return;
+        }
+
+        $reason = WC()->session->get( PUBQUIZ_FEASIBILITY_SESSION_KEY );
+        if ( empty( $reason ) ) {
+            return;
+        }
+
+        pubquiz_feasibility_clear_fail_open();
+
+        $note = "[pubquiz] Feasibility check skipped at checkout: {$reason}. The quiz may fail to generate; watch this order.";
+        $order->add_order_note( $note, 0, false );
+    },
+    10,
+    1
 );

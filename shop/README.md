@@ -714,6 +714,21 @@ Advanced Product Fields field group (`Field_Groups::get_field_groups_of_product(
 the same choices `setup-field-group.php` attaches and
 `pubquiz-category-dropdown.php` reads client-side), not a second copy.
 
+**A trace the operator actually sees (ticket #137).** The `wc_get_logger()`
+warning above is easy to miss (2026-09-09: two orders went through fail-open
+while the app was down, and the operator only noticed when the customer
+asked where the quizzes were). Every fail-open path now also remembers its
+reason (`"app unreachable"`, `"HTTP <code>"`, `"invalid response"`, `"no
+active webhook"`) in the WooCommerce session
+(`pubquiz_feasibility_remember_fail_open()`), and a second hook on the same
+order-creation action `pubquiz-checkout-meta.php` uses
+(`woocommerce_checkout_create_order_line_item`) reads and clears that flag
+on the order's first line item, adding a private `[pubquiz]` order note --
+`pubquiz-operator-mail.php` already mails every private note starting with
+`[pubquiz]` to the operator, so no mail code changed. A checkout that
+succeeds clears the flag itself, so a later successful attempt in the same
+session never inherits a stale note.
+
 ## REST credentials
 
 `npm run shop:up` also creates (or, on rerun, rotates) a WooCommerce REST API
