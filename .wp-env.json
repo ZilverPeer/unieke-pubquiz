@@ -11,7 +11,8 @@
   ],
   "mappings": {
     "wp-content/mu-plugins": "./shop/mu-plugins",
-    "wp-content/mu-plugins/assets": "./shop/assets"
+    "wp-content/mu-plugins/assets": "./shop/assets",
+    "wp-content/themes/unieke-pubquiz": "./shop/themes/unieke-pubquiz"
   },
   "config": {
     "WP_DEBUG": true,

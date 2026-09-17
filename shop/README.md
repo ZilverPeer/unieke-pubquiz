@@ -252,6 +252,82 @@ e.g. after a theme switch). Verified against a running `shop:up`:
 `curl http://localhost:45330/` shows `storefront-full-width-content` on
 `<body>` and no `id="secondary"` anywhere in the page.
 
+## Theme (spec 6, #143)
+
+`npm run shop:up` now activates a child theme of Storefront, **Unieke
+Pubquiz**, instead of Storefront itself; Storefront stays installed as the
+parent theme (ADR-0001, spec #142: "Keep Storefront as the parent theme").
+Rule from spec #142 ("Implementation Decisions"): the theme owns the look
+(templates, stylesheet, fonts, wordmark, icons), must-use plugins own
+behaviour -- the chrome plugin above keeps stripping navigation, breadcrumb,
+sidebar and footer widgets; this theme adds the header and footer content on
+top of what the chrome plugin leaves.
+
+- **Directory and mapping.** `shop/themes/unieke-pubquiz/` (`style.css` with
+  `Template: storefront`, `functions.php`, `assets/fonts/`, `assets/css/`,
+  `assets/wordmark.svg`, `assets/wordmark.png`), bind-mounted the same way
+  the mu-plugins are: `.wp-env.json`'s `mappings` gained
+  `"wp-content/themes/unieke-pubquiz": "./shop/themes/unieke-pubquiz"`,
+  alongside Storefront's own declarative `themes` array entry (unchanged --
+  Storefront is still downloaded and stays the parent).
+- **Activation in the bootstrap.** `setup-shop.php`'s step 1 now activates
+  `PUBQUIZ_THEME_SLUG` (`unieke-pubquiz`) instead of
+  `PUBQUIZ_STOREFRONT_THEME_SLUG`, with the same idempotent
+  `get_stylesheet()` check and the same two log lines ("Activating theme
+  ..." / "Theme already active: ..."). `PUBQUIZ_STOREFRONT_THEME_SLUG`
+  (`storefront`) still exists and is still used by step 2 to install
+  Storefront's own Dutch translation (the parent theme's strings still need
+  a language pack even though it's no longer the active theme).
+- **Tokens, fonts, wordmark.** CSS custom properties on `:root` in
+  `assets/css/base.css` (imported by `style.css`, which Storefront's own
+  `child_scripts()` auto-enqueues as `storefront-child-style` after the
+  parent CSS): accent `#1f5c45`, a darker hover step, near-white background,
+  dark ink, one light surface grey, one border grey, and the focus-ring
+  colour (the accent). Archivo (700, 900) and Work Sans (400, 500, 600),
+  latin subset only, self-hosted as woff2 under `assets/fonts/` with their
+  OFL licence texts (`OFL-Archivo.txt`, `OFL-WorkSans.txt`), `font-display:
+  swap`, referenced by relative `url()` from `base.css` -- no `<link>` to
+  Google Fonts anywhere. `functions.php` dequeues Storefront's own
+  `storefront-fonts` style (`class-storefront.php`'s `google_fonts()`,
+  `https://fonts.googleapis.com/css?family=Source+Sans+Pro:...`), the one
+  third-party-host request Storefront makes by default. The wordmark
+  (`assets/wordmark.svg`, `assets/wordmark.png` at 1200x630) is Archivo 900
+  text rendered via an embedded copy of the woff2 (not path-converted --
+  see the ticket #143 PR body's "Interface gaps"); the header and footer
+  themselves render the wordmark as HTML text (Archivo 900), not an image,
+  per spec #142.
+- **Header.** `functions.php` unhooks `storefront_site_branding` (priority
+  20), `storefront_product_search` (40) and `storefront_header_cart` (60)
+  from `storefront_header`, and re-adds a wordmark link (20) and a cart
+  link with the live item count from `WC()->cart->get_cart_contents_count()`
+  (60) at the same priorities. The account link is *not* added again here:
+  `pubquiz-storefront-chrome.php` (ticket #70) already hooks one onto
+  `storefront_header` at priority 61, unchanged by this ticket -- adding a
+  second one in the theme would duplicate it.
+- **Footer.** `functions.php` unhooks `storefront_credit` (priority 20,
+  Storefront's "Built with Storefront" line) from `storefront_footer` and
+  replaces it with the wordmark, an identity block read from one
+  `PUBQUIZ_FOOTER_IDENTITY` constant array (company name, KvK, BTW-ID,
+  address, email -- placeholder values, clearly marked, until the
+  deployment spec fills them in) and links to Voorwaarden, Privacy,
+  Herroeping, Cookies and Contact (`/voorwaarden/`, `/privacy/`,
+  `/herroeping/`, `/cookies/`, `/contact/`). Those five pages are created by
+  ticket #144's bootstrap step, not this one -- until then the links 404,
+  which is out of scope here.
+- **Copy-across routine (spec #142 "Further Notes", #137's routine).** Every
+  WP-CLI call costs about 14 seconds on this machine and the shop's
+  containers bind-mount the *main checkout's* `shop/` directory, not a
+  worktree: edit the theme in your worktree, then for each empirical run
+  `cp -r` the changed files into the main checkout's
+  `shop/themes/unieke-pubquiz/` (plus `.wp-env.json` and `setup-shop.php` if
+  they changed), and leave the copies there when you're done so the shop
+  keeps serving the new theme for the reviewer. Changing `.wp-env.json`'s
+  `mappings` requires the bind mount itself to be recreated -- run `wp-env
+  start` again from the main checkout (it keeps the database; this is safe
+  to do once per mapping change, but not on every file edit) rather than
+  `shop:up`/`shop:down` (which would also re-rotate the WooCommerce REST key
+  -- see "REST credentials" below).
+
 ### Key verification (ticket #56): guest checkout, Dutch chrome, the notice
 
 Reproduced against a running `shop:up` (theme active, `nl_NL`, EUR/NL, guest

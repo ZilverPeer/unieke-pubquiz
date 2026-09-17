@@ -1,0 +1,358 @@
+/*
+ * Unieke Pubquiz -- tokens, fonts and base styles (ticket #143).
+ *
+ * Overrides Storefront's own CSS (which keeps loading, `storefront-style`);
+ * this file never forks a Storefront template or selector, it only adds
+ * rules on top -- spec #142 "Base styles": "Storefront's own CSS keeps
+ * loading (child theme); override, do not fork."
+ *
+ * Palette and type: prototype B "Story first"
+ * (branch prototype-storefront, commit ba49012, shop/prototype/prototype.css
+ * `.variant-b`), fixed by the orchestrator under the 95% rule (spec #142
+ * "Further Notes"). Contrast checked (ticket #143 PR body): ink-on-background
+ * 16.65:1, accent-on-background 7.51:1, white-on-accent 7.85:1 -- all above
+ * the 4.5:1 minimum.
+ */
+
+:root {
+  --pubquiz-accent: #1f5c45;
+  --pubquiz-accent-hover: #163f30;
+  --pubquiz-accent-contrast: #ffffff;
+  --pubquiz-bg: #fafaf8;
+  --pubquiz-ink: #1a1a1a;
+  --pubquiz-surface: #f4f8f6;
+  --pubquiz-border: #e2e5e3;
+  --pubquiz-focus: #1f5c45;
+
+  --pubquiz-font-heading: 'Archivo', sans-serif;
+  --pubquiz-font-body: 'Work Sans', sans-serif;
+
+  --pubquiz-content-width: 1120px;
+}
+
+/* ---- self-hosted fonts, latin subset only, no third-party host ---- */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/archivo-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('../fonts/archivo-900.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/work-sans-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/work-sans-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/work-sans-600.woff2') format('woff2');
+}
+
+/* ---- mobile safety: nothing wider than the viewport ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+img, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/*
+ * Storefront/WooCommerce's own product-page columns
+ * (.woocommerce div.product .images / .summary.entry-summary) are laid out
+ * with a fixed-percentage width against a desktop-first grid and only
+ * stack at Storefront's own breakpoint; at 375px they otherwise keep their
+ * wider natural content width and the page overflows instead of wrapping
+ * (checked empirically, ticket #143 PR body). `max-width: 100%` on the
+ * columns and their container is enough to keep every child (text,
+ * fields, the gallery image) within the viewport without overriding
+ * Storefront's own layout rules.
+ */
+.site-content,
+.woocommerce div.product .images,
+.woocommerce div.product div.summary {
+  max-width: 100%;
+}
+
+/* ---- base type ---- */
+body {
+  background: var(--pubquiz-bg);
+  color: var(--pubquiz-ink);
+  font-family: var(--pubquiz-font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6,
+.pubquiz-wordmark {
+  font-family: var(--pubquiz-font-heading);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--pubquiz-ink);
+}
+
+.pubquiz-wordmark {
+  font-weight: 900;
+}
+
+a {
+  color: var(--pubquiz-accent);
+}
+
+a:hover {
+  color: var(--pubquiz-accent-hover);
+}
+
+/* ---- visible focus, everywhere ---- */
+:focus-visible {
+  outline: 3px solid var(--pubquiz-focus);
+  outline-offset: 2px;
+}
+
+/* ---- buttons and inputs, WooCommerce's own classes ---- */
+.button,
+button,
+input[type="submit"],
+input[type="button"],
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce #respond input#submit,
+.woocommerce input.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+  border: none;
+  border-radius: 8px;
+  font-family: var(--pubquiz-font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover,
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.woocommerce a.button:hover,
+.woocommerce button.button:hover,
+.woocommerce #respond input#submit:hover,
+.woocommerce input.button:hover {
+  background: var(--pubquiz-accent-hover);
+  color: var(--pubquiz-accent-contrast);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="search"],
+input[type="number"],
+select,
+textarea,
+.woocommerce input.input-text,
+.woocommerce select {
+  min-height: 44px;
+  max-width: 100%;
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-family: var(--pubquiz-font-body);
+  color: var(--pubquiz-ink);
+  background: #ffffff;
+}
+
+/*
+ * Advanced Product Fields' own frontend.min.css puts a -5px margin-left on
+ * `.wapf-field-row` (to offset `.wapf-field-container`'s 5px side padding
+ * on a flex row) without a matching negative margin-right; on a `width:
+ * auto` block that widens the row 5px past its container's right edge --
+ * checked empirically at 375px/400px (ticket #143 PR body), where the
+ * fields and the dropdown visibly ran past the viewport. Neutralising the
+ * offset keeps the fields flush without overriding the plugin's own field
+ * layout (padding, flex-wrap) otherwise.
+ */
+.wapf-field-row {
+  margin-left: 0;
+}
+
+.woocommerce-product-details__short-description,
+.summary.entry-summary {
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+/* ---- layout ---- */
+.site-content,
+.col-full {
+  max-width: var(--pubquiz-content-width);
+}
+
+/* ---- header ---- */
+.site-header {
+  border-bottom: 1px solid var(--pubquiz-border);
+}
+
+/*
+ * One row at every width: wordmark (`.pubquiz-site-branding`), the cart
+ * link and the account link (`pubquiz-storefront-chrome.php`, ticket #70)
+ * are three siblings printed straight into `storefront_header`'s own
+ * `.col-full` wrapper (`storefront_header_container`), in that hook order.
+ * Without a flex row here they stack as separate block-level lines --
+ * fixed empirically (ticket #143 fix round 1, screenshots product-375.png
+ * and checkout-1280.png showed the wordmark on its own line with the icons
+ * wrapped underneath at both widths). `margin-left: auto` on the cart link
+ * groups it with the account link that follows it at the right edge,
+ * without needing a wrapper element around a plugin-printed link this
+ * theme doesn't own the markup of.
+ */
+.site-header .col-full {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.pubquiz-site-branding {
+  display: flex;
+  align-items: center;
+}
+
+a.pubquiz-wordmark {
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--pubquiz-ink);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+a.pubquiz-wordmark:hover {
+  color: var(--pubquiz-accent);
+}
+
+.pubquiz-cart-link,
+.pubquiz-account-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--pubquiz-ink);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.pubquiz-cart-link {
+  margin-left: auto;
+}
+
+.pubquiz-cart-link:hover,
+.pubquiz-account-link:hover {
+  background: var(--pubquiz-surface);
+  color: var(--pubquiz-accent);
+}
+
+.pubquiz-cart-count {
+  font-family: var(--pubquiz-font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* ---- footer ---- */
+.site-footer {
+  border-top: 1px solid var(--pubquiz-border);
+  padding: 0;
+}
+
+.pubquiz-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: var(--pubquiz-content-width);
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.pubquiz-footer-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--pubquiz-ink);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.pubquiz-footer-identity a {
+  color: var(--pubquiz-ink);
+}
+
+.pubquiz-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.pubquiz-footer-links a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--pubquiz-ink);
+}
+
+.pubquiz-footer-links a:hover {
+  color: var(--pubquiz-accent);
+  text-decoration: underline;
+}
+
+/* ---- breakpoints, designed 375 first, checked at 1280 ---- */
+@media (max-width: 400px) {
+  .pubquiz-footer {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 1280px) {
+  .site-content,
+  .col-full {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
