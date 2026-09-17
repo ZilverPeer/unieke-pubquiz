@@ -260,6 +260,25 @@ a.pubquiz-wordmark:hover {
   color: var(--pubquiz-accent);
 }
 
+/*
+ * Inner page titles (spec 6, #158): `Bestelling ontvangen`, `Downloads`,
+ * `Mijn account` render via Storefront's own `content-page.php`
+ * (`the_title('<h1 class="entry-title">', ...)` inside `.hentry`) sitting
+ * tight under the header bar with no top margin of its own. The front page
+ * never carries `.entry-title` (its own template renders the landing
+ * sections directly, no `storefront_page_header()` call), so this rule
+ * never touches it.
+ */
+.hentry .entry-title {
+  margin-top: 32px;
+}
+
+@media (min-width: 768px) {
+  .hentry .entry-title {
+    margin-top: 48px;
+  }
+}
+
 .pubquiz-cart-link,
 .pubquiz-account-link {
   display: inline-flex;
@@ -383,24 +402,39 @@ a.pubquiz-wordmark:hover {
   clear: both;
 }
 
-#customer_details .col-2 {
+.woocommerce-checkout #customer_details .col-2 {
   display: none;
 }
 
-#customer_details .col-1 {
+.woocommerce-checkout #customer_details .col-1 {
   width: 100%;
   float: none;
   margin-right: 0;
 }
 
 /* Order summary as a card on the surface token, each quiz line with its Dutch field labels (pubquiz-checkout-meta.php prints them; verified, not reimplemented). */
-#order_review {
+.woocommerce-checkout #order_review {
   max-width: 640px;
   margin: 0 auto;
   background: var(--pubquiz-surface);
   border: 1px solid var(--pubquiz-border);
   border-radius: 12px;
   padding: 24px;
+}
+
+/*
+ * At 1280px the summary card's own 640px max-width leaves it centred at
+ * roughly half the single checkout column's 1120px content width (spec 6,
+ * #158) -- full width here so it spans the column like every other checkout
+ * element above it.
+ */
+@media (min-width: 1280px) {
+  .woocommerce-checkout #order_review {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
 }
 
 .woocommerce-checkout-review-order-table {
