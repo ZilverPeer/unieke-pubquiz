@@ -53,8 +53,16 @@ const PUBQUIZ_LANDING_PRODUCT_SLUG = 'pubquiz';
 $pubquiz_landing_product_post = get_page_by_path( PUBQUIZ_LANDING_PRODUCT_SLUG, OBJECT, 'product' );
 $pubquiz_landing_product_id   = $pubquiz_landing_product_post ? $pubquiz_landing_product_post->ID : 0;
 
-global $product;
-$product = $pubquiz_landing_product_id ? wc_get_product( $pubquiz_landing_product_id ) : false;
+/**
+ * Not assigned to `global $product` yet -- this ticket only needs the
+ * global set for the duration of the add-to-cart form render inside
+ * `#samenstellen` below (`global $product` is WooCommerce's own convention
+ * for "the product this template part is about"; leaving it set for the
+ * rest of the request would be a global with no owner once this template
+ * finishes rendering). Saved and restored around that one render, the same
+ * way the `$wp_query` bridges above save and restore their own state.
+ */
+$pubquiz_landing_product = $pubquiz_landing_product_id ? wc_get_product( $pubquiz_landing_product_id ) : false;
 
 wp_enqueue_style(
     'pubquiz-landing',
@@ -139,7 +147,7 @@ get_header();
 
 	<section id="hero" class="pubquiz-hero">
 		<h1><?php esc_html_e( 'Jouw avond. Jouw quiz. Niemand anders zijn quiz.', 'unieke-pubquiz' ); ?></h1>
-		<p class="pubquiz-hero-lede"><?php esc_html_e( 'Een complete, unieke pubquiz -- als PDF en muziekronde-MP3, klaar om te printen en te hosten bij jou thuis. Elke quiz wordt speciaal voor jou gegenereerd: je kiest je categorieën, moeilijkheid en taal, en je krijgt nooit dezelfde vraag twee keer.', 'unieke-pubquiz' ); ?></p>
+		<p class="pubquiz-hero-lede"><?php esc_html_e( 'Een complete, unieke pubquiz — als PDF en muziekronde-MP3, klaar om te printen en te hosten bij jou thuis. Elke quiz wordt speciaal voor jou gegenereerd: je kiest je categorieën, moeilijkheid en taal, en je krijgt nooit dezelfde vraag twee keer.', 'unieke-pubquiz' ); ?></p>
 		<a class="button pubquiz-btn-cta" href="#samenstellen"><?php esc_html_e( 'Stel je quiz samen', 'unieke-pubquiz' ); ?></a>
 	</section>
 
@@ -182,9 +190,17 @@ get_header();
 
 	<section id="samenstellen" class="pubquiz-configurator">
 		<h2><?php esc_html_e( 'Stel je quiz samen', 'unieke-pubquiz' ); ?></h2>
-		<?php if ( $product instanceof WC_Product ) : ?>
-			<p class="pubquiz-configurator-price"><?php echo wp_kses_post( $product->get_price_html() ); ?></p>
-			<?php woocommerce_template_single_add_to_cart(); ?>
+		<?php if ( $pubquiz_landing_product instanceof WC_Product ) : ?>
+			<p class="pubquiz-configurator-price"><?php echo wp_kses_post( $pubquiz_landing_product->get_price_html() ); ?></p>
+			<?php
+			global $product;
+			$pubquiz_saved_global_product = $product;
+			$product                      = $pubquiz_landing_product;
+
+			woocommerce_template_single_add_to_cart();
+
+			$product = $pubquiz_saved_global_product;
+			?>
 		<?php else : ?>
 			<p class="pubquiz-configurator-missing"><?php esc_html_e( 'Het product is nog niet beschikbaar.', 'unieke-pubquiz' ); ?></p>
 		<?php endif; ?>
@@ -195,7 +211,7 @@ get_header();
 		<div class="pubquiz-faq-list">
 			<details>
 				<summary><?php esc_html_e( 'Voor hoeveel mensen?', 'unieke-pubquiz' ); ?></summary>
-				<p><?php esc_html_e( 'Voor elk gezelschap -- druk zoveel antwoordbladen af als je teams hebt.', 'unieke-pubquiz' ); ?></p>
+				<p><?php esc_html_e( 'Voor elk gezelschap — druk zoveel antwoordbladen af als je teams hebt.', 'unieke-pubquiz' ); ?></p>
 			</details>
 			<details>
 				<summary><?php esc_html_e( 'Hoe lang duurt een quiz?', 'unieke-pubquiz' ); ?></summary>
@@ -207,7 +223,7 @@ get_header();
 			</details>
 			<details>
 				<summary><?php esc_html_e( 'Kan ik dezelfde quiz twee keer krijgen?', 'unieke-pubquiz' ); ?></summary>
-				<p><?php esc_html_e( 'Nee. Elke bestelling levert nieuwe vragen -- je krijgt nooit dezelfde vraag twee keer.', 'unieke-pubquiz' ); ?></p>
+				<p><?php esc_html_e( 'Nee. Elke bestelling levert nieuwe vragen — je krijgt nooit dezelfde vraag twee keer.', 'unieke-pubquiz' ); ?></p>
 			</details>
 			<details>
 				<summary><?php esc_html_e( 'Hoe betaal ik?', 'unieke-pubquiz' ); ?></summary>

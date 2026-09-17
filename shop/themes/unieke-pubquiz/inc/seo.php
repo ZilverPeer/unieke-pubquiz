@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'PUBQUIZ_SEO_TITLE', 'Unieke Pubquiz: een unieke pubquiz, in minuten gegenereerd' );
 define(
     'PUBQUIZ_SEO_DESCRIPTION',
-    'Een complete, unieke pubquiz -- als PDF en muziekronde-MP3, speciaal voor jou samengesteld. Kies je categorieën, moeilijkheid en taal; je krijgt nooit dezelfde vraag twee keer.'
+    'Een complete, unieke pubquiz — als PDF en muziekronde-MP3, speciaal voor jou samengesteld. Kies je categorieën, moeilijkheid en taal; je krijgt nooit dezelfde vraag twee keer.'
 );
 
 /** Front-page-only document title -- everywhere else keeps WordPress's own generated title. */

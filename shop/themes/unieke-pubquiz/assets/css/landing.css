@@ -138,6 +138,17 @@
   font-weight: 600;
 }
 
+/*
+ * The only link this file introduces its own colour rule for (the "Bekijk
+ * een voorbeeld" link) -- base.css (#143, not owned by this ticket) already
+ * sets `a { color: var(--pubquiz-accent); }` unvisited but has no `:visited`
+ * rule of its own, so without this the browser default purple shows here
+ * after a click (fix round 1, #145).
+ */
+.pubquiz-sample-link a:visited {
+  color: var(--pubquiz-accent);
+}
+
 /* ---- configurator ---- */
 .pubquiz-configurator {
   background: var(--pubquiz-surface);
