@@ -26,6 +26,7 @@ How the main session runs a ticket from dispatch to merge. Written after the spe
 
 Every brief contains, in this order:
 
+- "Read `docs/agents/standing-rules.md` in full first": the secrets, stack, server and reporting rules every agent follows. They live in the repo since 2026-09-17; the copy in the briefs folder under `%LOCALAPPDATA%\Temp` was cleaned by Windows during a week of inactivity and two implementers ran without it.
 - Ticket number, worktree path, and "work only there". The orchestrator creates the worktree with a full `.env.local` copied from the main checkout (`shop:up` writes only the WooCommerce lines; nothing writes the Supabase and admin lines) and says so in the brief. Note that every `shop:up` or `scripts/shop/setup.ts` run rotates the WooCommerce REST key into the `.env.local` of the directory it runs in: an app started from any other directory then fails delivery with a 401 until it is restarted from a file carrying the new key.
 - Fixed file layout: which files to create, which to touch, which are off limits.
 - Named tdd seams (what gets a red test first) and which boundaries may be faked. Renderers and the sampler are never mocked.
