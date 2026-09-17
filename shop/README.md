@@ -995,6 +995,71 @@ completed mail for the same order did not. The checkout page's HTML showed
 the checkbox (`pubquiz_withdrawal_waiver_field`) immediately above the
 `place_order` submit button.
 
+## Straight to checkout (spec 6, #147)
+
+`shop/mu-plugins/pubquiz-checkout-redirect.php` sends a successful
+add-to-cart of a Pubquiz item straight to checkout, skipping the cart page
+-- the product is sold individually (spec 3c, #83), so a single-Quiz buyer
+never needs the cart to change a quantity. The cart stays reachable from the
+header icon (`pubquiz-storefront-chrome.php`) for adding a second,
+differently configured Quiz to the same order (see the walkthrough's "A
+second Quiz in the same order").
+
+**Cart matching rule.** Same as the withdrawal waiver above: reused via
+`function_exists( 'pubquiz_waiver_cart_has_pubquiz_item' )` rather than
+re-derived a third time.
+
+**Three hooks, no template override.**
+
+- `woocommerce_add_to_cart_redirect` returns `wc_get_checkout_url()` for a
+  Pubquiz item; WooCommerce's own `WC_Form_Handler::add_to_cart_action()`
+  redirects there directly instead of consulting
+  `woocommerce_cart_redirect_after_add` at all.
+- `pre_option_woocommerce_cart_redirect_after_add` filtered to `'yes'` --
+  belt and braces for any add-to-cart path that reads the option directly.
+- `pre_option_woocommerce_enable_ajax_add_to_cart` filtered to `'no'` -- the
+  product page's add-to-cart form posts and redirects instead of adding via
+  AJAX (which would never reach the filter above at all).
+
+`woocommerce_cart_redirect_after_error` (the AJAX add-to-cart error path)
+is untouched: with AJAX add-to-cart disabled, that code path never runs for
+this shop's one product.
+
+**"Nog een quiz toevoegen."** The same plugin prints one row into the
+checkout review-order table (`woocommerce_review_order_after_cart_contents`)
+linking to the landing page's configurator section
+(`home_url( '/#samenstellen' )`).
+
+**CSS, `assets/css/base.css` under the `/* ---- checkout and cart (#147) ---- */`
+banner.** Checkout single column at every width (`.col2-set`,
+`#customer_details`, `#order_review`, `#order_review_heading` forced to
+`width: 100%; float: none`; the empty shipping column, `#customer_details
+.col-2`, hidden), the order summary as a card on the surface token,
+`#place_order` full width. Cart table as a card, quantity column hidden
+(sold individually), coupon form and cross-sells hidden defensively (the
+coupon form does render on this shop -- no coupons exist, but WooCommerce
+still prints the form; cross-sells do not, this shop sells one product).
+Hiding the coupon form needed a selector at least as specific as
+Storefront's own `table.cart td.actions .coupon` (which also sets `display:
+inline-block` above `min-width: 768px`) -- `.woocommerce-cart .coupon`
+alone lost that specificity fight and the form still showed at 1280px
+(checked empirically, ticket #147 PR body);
+`.woocommerce-cart table.cart td.actions .coupon` wins outright.
+
+**Verified empirically (ticket #147), red first.** On the unfixed shop, the
+walkthrough's curl add-to-cart answered `200` (no redirect), and the
+checkout page carried no "Nog een quiz toevoegen" link. After copying the
+plugin and CSS across: add-to-cart answered `302` with `Location:
+http://localhost:45330/afrekenen/`; the checkout HTML carried exactly the
+three billing inputs, the quiz line with its Dutch labels (Taal,
+Moeilijkheid), the "Nog een quiz toevoegen" link to `/#samenstellen`, one
+`payment_method` input, the waiver checkbox and `id="place_order"`; the
+cart page still listed the line and its "Doorgaan naar afrekenen" link to
+`/afrekenen/`. Checkout with `pubquiz_withdrawal_waiver=1` and a fresh
+email succeeded (order #48). Screenshots at 375px and 1280px of both pages
+showed no horizontal overflow; `#place_order`'s `getBoundingClientRect().height`
+at 375px was 44.
+
 ## REST credentials
 
 `npm run shop:up` also creates (or, on rerun, rotates) a WooCommerce REST API

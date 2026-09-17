@@ -356,3 +356,108 @@ a.pubquiz-wordmark:hover {
     margin-right: auto;
   }
 }
+
+/* ---- checkout and cart (#147) ---- */
+
+/*
+ * Checkout, single column at every width (spec 6 "checkout, single
+ * column"), overriding Storefront's own `.col2-set`/`#order_review`
+ * side-by-side layout (assets/css/woocommerce/woocommerce.css) with CSS
+ * only -- no template override, per spec #142's "WooCommerce's own
+ * templates are used; no template override unless a hook cannot do it."
+ * `#customer_details .col-2` (the shipping column) is hidden outright:
+ * `pubquiz-checkout-fields.php` trims billing to first/last/email for the
+ * virtual-only Pubquiz cart and WooCommerce never renders shipping fields
+ * for a cart that doesn't need shipping, so `woocommerce_checkout_shipping()`
+ * prints nothing into it (checked empirically, ticket #147 PR body) --
+ * hiding the empty column removes the gutter it would otherwise leave.
+ */
+.woocommerce-checkout .col2-set,
+.woocommerce-checkout #customer_details,
+.woocommerce-checkout #order_review,
+.woocommerce-checkout #order_review_heading {
+  width: 100%;
+  float: none;
+  margin-left: 0;
+  margin-right: 0;
+  clear: both;
+}
+
+#customer_details .col-2 {
+  display: none;
+}
+
+#customer_details .col-1 {
+  width: 100%;
+  float: none;
+  margin-right: 0;
+}
+
+/* Order summary as a card on the surface token, each quiz line with its Dutch field labels (pubquiz-checkout-meta.php prints them; verified, not reimplemented). */
+#order_review {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--pubquiz-surface);
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.woocommerce-checkout-review-order-table {
+  width: 100%;
+}
+
+/*
+ * "Nog een quiz toevoegen": one review-order row
+ * (`pubquiz-checkout-redirect.php`, `woocommerce_review_order_after_cart_contents`)
+ * linking back to the landing page's configurator section.
+ */
+.pubquiz-add-another a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Plaats bestelling: full width, at least 44px tall (the global .button rule already sets min-height: 44px). */
+#place_order {
+  width: 100%;
+}
+
+/*
+ * Cart: table as a card, same tokens as the checkout order summary. The
+ * quantity column is hidden -- the Pubquiz product is sold individually
+ * (spec 3c, #83), so WooCommerce always prints a 1-only quantity input
+ * that offers nothing a buyer can use; adding a second Quiz means a second,
+ * differently configured line, not a bigger quantity on this one. The
+ * coupon form (no coupons exist in this shop) and cross-sells (the shop
+ * sells one product, so WooCommerce never has anything to cross-sell here
+ * -- checked empirically, ticket #147 PR body: absent from the served HTML
+ * already) are hidden defensively in case either ever renders.
+ */
+.woocommerce-cart table.cart {
+  background: var(--pubquiz-surface);
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 12px;
+}
+
+.woocommerce-cart .product-quantity {
+  display: none;
+}
+
+/*
+ * `.woocommerce-cart .coupon` alone loses to Storefront's own
+ * `table.cart td.actions .coupon` (higher specificity, and inside a
+ * `min-width: 768px` media query it also sets `display: inline-block`) --
+ * checked empirically, ticket #147 PR body: the coupon form still showed at
+ * 1280px with the lower-specificity rule. Matching Storefront's own
+ * selector shape plus the `.woocommerce-cart` body class beats it outright.
+ */
+.woocommerce-cart table.cart td.actions .coupon,
+.cart-collaterals .cross-sells {
+  display: none;
+}
+
+/* Doorgaan naar afrekenen: full width, at least 44px tall (the global .button rule already sets min-height: 44px). */
+.wc-proceed-to-checkout .checkout-button {
+  width: 100%;
+}
