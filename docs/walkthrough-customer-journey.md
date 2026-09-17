@@ -40,7 +40,7 @@ curl.exe -s -c cookies.txt -b cookies.txt `
 
 ## Checkout with the test gateway
 
-Click through to **Winkelwagen** then **Naar de kassa** (or go straight to http://localhost:45330/afrekenen/). The checkout form asks only for **Voornaam**, **Achternaam** and **E-mailadres** -- no address fields. Below that, a checkbox: **Een account aanmaken?** -- tick it once (see "My Account downloads" below) to see that path too.
+Click through to **Winkelwagen** then **Naar de kassa** (or go straight to http://localhost:45330/afrekenen/). The checkout form asks only for **Voornaam**, **Achternaam** and **E-mailadres** -- no address fields. Below that, a checkbox: **Een account aanmaken?** -- tick it once (see "My Account downloads" below) to see that path too. Just above **Plaats bestelling**, a required checkbox asks you to accept immediate delivery and give up your right of withdrawal (spec 6, #148); leaving it unticked refuses checkout with a Dutch message next to it.
 
 **Use a fresh e-mail address every time.** The no-repeat rule means Compositions never reuse the same Item pool for the same billing email across orders -- reusing an address doesn't break anything, it's just less interesting to look at.
 
@@ -57,6 +57,7 @@ curl.exe -s -c cookies.txt -b cookies.txt `
   -d "billing_first_name=Erik" -d "billing_last_name=Test" `
   -d "billing_email=$email" -d "billing_country=NL" `
   -d "payment_method=pubquiz_test_gateway" `
+  -d "pubquiz_withdrawal_waiver=1" `
   -d "woocommerce-process-checkout-nonce=$nonce" -d "_wp_http_referer=/afrekenen/" `
   "http://localhost:45330/?wc-ajax=checkout"
 ```
@@ -70,6 +71,8 @@ Redirects to `http://localhost:45330/afrekenen/order-received/<order id>/?key=..
 > Bedankt. Je bestelling is ontvangen.
 >
 > Je quiz wordt gemaakt. Je ontvangt binnen enkele minuten een e-mail met de downloadlink.
+>
+> Je hebt op &lt;date&gt; &lt;time&gt; ingestemd met directe levering en afgezien van je herroepingsrecht.
 
 followed by the order summary (product, your picks, the total).
 
@@ -87,7 +90,7 @@ to list messages and get an `ID`, then:
 curl.exe -s "http://127.0.0.1:45332/api/v1/message/<message id>"
 ```
 
-for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij `<site name>` is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated and your order summary (Taal/Moeilijkheid/Categorieën, in Dutch, matching what you picked). `<site name>` is WordPress's own site title, which `wp-env` sets to the checkout directory's name (this worktree's folder -- locally, whatever `../Pubquiz-wt-*` or similar you're running from), so it varies by checkout; every mail subject below carries the same value.
+for one message's full text. Within a couple of seconds you'll see **"Je bestelling bij `<site name>` is ontvangen!"**, addressed to your billing email, with the same "Je quiz wordt gemaakt..." notice repeated, the same waiver confirmation line as the order-received page, and your order summary (Taal/Moeilijkheid/Categorieën, in Dutch, matching what you picked). `<site name>` is WordPress's own site title, which `wp-env` sets to the checkout directory's name (this worktree's folder -- locally, whatever `../Pubquiz-wt-*` or similar you're running from), so it varies by checkout; every mail subject below carries the same value.
 
 If you ticked **Een account aanmaken?**, a second mail arrives: **"Je account bij `<site name>` is aangemaakt!"**, naming your username and a password-reset link (WooCommerce never mails a plaintext password) -- you don't need it for this walkthrough, since checkout already logs the new account in for the rest of your browser session.
 
@@ -99,7 +102,7 @@ Do nothing else. `npm run shop:up`'s cron ticker keeps WordPress's cron ticking 
 
 ## The completed mail
 
-A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling van `<site name>` is onderweg!"** (WooCommerce's own Dutch completed-order subject). It repeats the order summary and adds one row per Quiz (ticket #73): a plain link (no `target`) named after that Quiz's zip, with the picked Category names underneath as "Categorieën: ...":
+A fourth mail arrives once every Quiz in the order is delivered: **"Je bestelling van `<site name>` is onderweg!"** (WooCommerce's own Dutch completed-order subject). It repeats the order summary and adds one row per Quiz (ticket #73): a plain link (no `target`) named after that Quiz's zip, with the picked Category names underneath as "Categorieën: ..." -- it does **not** repeat the waiver confirmation line (only the processing mail and the order-received page do, per #148).
 
 - `pubquiz-<order number>-1-nl.zip` -- Categorieën: ...
 - `pubquiz-<order number>-2-nl.zip` -- Categorieën: ... (only on a multi-Quiz order)

@@ -19,6 +19,10 @@
  * be distinct (ticket #71's cycle rule -- see src/sample/README.md).
  * `--quantity <n>` defaults to 1 and creates one line item with that
  * quantity (n identical Quizzes, per the spec).
+ *
+ * Creates orders through WooCommerce's REST API, bypassing checkout entirely
+ * -- so the withdrawal-right waiver checkbox (`pubquiz-withdrawal-waiver.php`,
+ * spec 6, #148), which is enforced at checkout, never runs here.
  */
 import { CHECKOUT_META_KEYS } from "../../src/domain/checkout";
 import { SLOT_COUNT } from "../../src/domain/types";
