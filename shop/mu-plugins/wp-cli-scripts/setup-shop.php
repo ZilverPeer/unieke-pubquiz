@@ -265,6 +265,56 @@ if ( $pubquiz_sample_page ) {
 }
 
 // -----------------------------------------------------------------------
+// 4a. Legal placeholder pages and the Voorbeeld sample-link target (ticket
+//     #144, spec #142 "Footer and legal block" / "Sample slot"): created
+//     once, by slug, with body "Tekst volgt." An existing page's content is
+//     never touched again on a re-run -- Erik writes the real text later
+//     (deployment spec) -- only its presence is converged. The footer links
+//     (ticket #143) already point at these slugs; nothing to change there.
+// -----------------------------------------------------------------------
+define( 'PUBQUIZ_PLACEHOLDER_PAGE_BODY', 'Tekst volgt.' );
+
+$pubquiz_placeholder_pages = array(
+    'voorwaarden' => 'Voorwaarden',
+    'privacy'     => 'Privacy',
+    'herroeping'  => 'Herroeping',
+    'cookies'     => 'Cookies',
+    'contact'     => 'Contact',
+    'voorbeeld'   => 'Voorbeeld',
+);
+
+$pubquiz_privacy_page_id = 0;
+
+foreach ( $pubquiz_placeholder_pages as $pubquiz_page_slug => $pubquiz_page_title ) {
+    $pubquiz_page = get_page_by_path( $pubquiz_page_slug, OBJECT, 'page' );
+
+    if ( ! $pubquiz_page ) {
+        $pubquiz_page_id = wp_insert_post(
+            array(
+                'post_type'    => 'page',
+                'post_status'  => 'publish',
+                'post_title'   => $pubquiz_page_title,
+                'post_name'    => $pubquiz_page_slug,
+                'post_content' => PUBQUIZ_PLACEHOLDER_PAGE_BODY,
+            )
+        );
+        pubquiz_log( "Created page {$pubquiz_page_title} ({$pubquiz_page_slug})" );
+    } else {
+        $pubquiz_page_id = $pubquiz_page->ID;
+        pubquiz_log( "Page already {$pubquiz_page_title} ({$pubquiz_page_slug})" );
+    }
+
+    if ( 'privacy' === $pubquiz_page_slug ) {
+        $pubquiz_privacy_page_id = $pubquiz_page_id;
+    }
+}
+
+// Not `woocommerce_terms_page_id` -- that would add WooCommerce's own terms
+// checkbox to checkout; the withdrawal waiver (#148) is the only checkbox
+// (spec #142 decisions, ticket #144 brief).
+pubquiz_ensure_option( 'wp_page_for_privacy_policy', (string) $pubquiz_privacy_page_id );
+
+// -----------------------------------------------------------------------
 // 5. Front page: Winkel visible to a logged-out visitor instead of
 //    WooCommerce's coming-soon placeholder or the default "Hello world!"
 //    blog post (tickets #68/#70). Idempotent like every other option write
@@ -316,7 +366,7 @@ if ( ! $pubquiz_hello_world ) {
 define( 'PUBQUIZ_PRODUCT_SLUG', 'pubquiz' );
 define( 'PUBQUIZ_PRODUCT_NAME', 'Pubquiz – digitale download' );
 define( 'PUBQUIZ_PRODUCT_SHORT_DESCRIPTION', 'Een kant-en-klare pubquiz om zelf te presenteren: quizmasterscript, beeldronde, antwoordenblad en muziekronde, direct na aankoop per download.' );
-define( 'PUBQUIZ_PRODUCT_PRICE', '14.95' );
+define( 'PUBQUIZ_PRODUCT_PRICE', '19.95' );
 
 function pubquiz_ensure_product() {
     $existing = get_page_by_path( PUBQUIZ_PRODUCT_SLUG, OBJECT, 'product' );
@@ -471,6 +521,96 @@ function pubquiz_ensure_webhook( $name, $topic, $delivery_url, $secret ) {
 }
 
 $pubquiz_webhook_id = pubquiz_ensure_webhook( PUBQUIZ_WEBHOOK_NAME, PUBQUIZ_WEBHOOK_TOPIC, $webhook_delivery_url, $webhook_secret );
+
+// -----------------------------------------------------------------------
+// 9a. Tax (ticket #144, spec #142 "Price and tax"): prices entered and
+//     shown including BTW, one 21% NL standard rate, so every shown price
+//     is the consumer price. Verified empirically against this wp-env
+//     (ticket #144 PR body): with `woocommerce_tax_display_shop`/`_cart` at
+//     `incl`, WooCommerce prints "(incl. BTW)" wording next to cart and
+//     checkout totals by itself, but the product page's own `<p class="price">`
+//     shows the bare amount with no suffix at all -- so
+//     `woocommerce_price_display_suffix` is set to `incl. btw` here, not
+//     left empty, to cover that one spot too.
+// -----------------------------------------------------------------------
+pubquiz_ensure_option( 'woocommerce_calc_taxes', 'yes' );
+pubquiz_ensure_option( 'woocommerce_prices_include_tax', 'yes' );
+pubquiz_ensure_option( 'woocommerce_tax_display_shop', 'incl' );
+pubquiz_ensure_option( 'woocommerce_tax_display_cart', 'incl' );
+pubquiz_ensure_option( 'woocommerce_tax_total_display', 'single' );
+pubquiz_ensure_option( 'woocommerce_price_display_suffix', 'incl. btw' );
+
+define( 'PUBQUIZ_TAX_RATE_COUNTRY', 'NL' );
+define( 'PUBQUIZ_TAX_RATE_NAME', 'BTW' );
+define( 'PUBQUIZ_TAX_RATE_VALUE', '21.0000' );
+
+/**
+ * Idempotent by looking up an existing NL standard rate first
+ * (`WC_Tax::find_rates()`, the same lookup WooCommerce's own tax
+ * calculation uses) before inserting a new one with `WC_Tax::_insert_tax_rate()`
+ * -- the low-level insert `wp wc tax create` itself wraps, used directly
+ * here for the same "no shelling out from inside eval-file" reason as the
+ * webhook and REST key steps above.
+ */
+function pubquiz_ensure_nl_standard_tax_rate() {
+    $existing = WC_Tax::find_rates(
+        array(
+            'country'   => PUBQUIZ_TAX_RATE_COUNTRY,
+            'state'     => '',
+            'postcode'  => '',
+            'city'      => '',
+            'tax_class' => '',
+        )
+    );
+
+    if ( ! empty( $existing ) ) {
+        pubquiz_log( 'NL standard tax rate already present.' );
+        return;
+    }
+
+    pubquiz_log( 'Creating NL standard tax rate (21%).' );
+    WC_Tax::_insert_tax_rate(
+        array(
+            'tax_rate_country'  => PUBQUIZ_TAX_RATE_COUNTRY,
+            'tax_rate_state'    => '',
+            'tax_rate'          => PUBQUIZ_TAX_RATE_VALUE,
+            'tax_rate_name'     => PUBQUIZ_TAX_RATE_NAME,
+            'tax_rate_priority' => 1,
+            'tax_rate_compound' => 0,
+            'tax_rate_shipping' => 0,
+            'tax_rate_order'    => 1,
+            'tax_rate_class'    => '',
+        )
+    );
+}
+
+pubquiz_ensure_nl_standard_tax_rate();
+
+// -----------------------------------------------------------------------
+// 9b. Mail branding (ticket #144, spec #142 "Mails"): WooCommerce's
+//     transactional-email header image, colours and footer text.
+//     `get_stylesheet_directory_uri()` is only valid once the theme is
+//     active, which step 1 above already did in this same run, but
+//     `content_url()` needs no such dependency, so it's used instead.
+// -----------------------------------------------------------------------
+$pubquiz_identity = require WP_CONTENT_DIR . '/themes/unieke-pubquiz/inc/identity.php';
+
+pubquiz_ensure_option( 'woocommerce_email_header_image', content_url( 'themes/unieke-pubquiz/assets/wordmark.png' ) );
+pubquiz_ensure_option( 'woocommerce_email_from_name', 'Unieke Pubquiz' );
+pubquiz_ensure_option( 'woocommerce_email_base_color', '#1f5c45' );
+pubquiz_ensure_option( 'woocommerce_email_background_color', '#fafaf8' );
+pubquiz_ensure_option( 'woocommerce_email_body_background_color', '#f4f8f6' );
+pubquiz_ensure_option( 'woocommerce_email_text_color', '#1a1a1a' );
+
+$pubquiz_email_footer_text = sprintf(
+    '%s · %s · %s · %s · %s',
+    $pubquiz_identity['company_name'],
+    $pubquiz_identity['kvk'],
+    $pubquiz_identity['btw'],
+    $pubquiz_identity['address'],
+    $pubquiz_identity['email']
+);
+pubquiz_ensure_option( 'woocommerce_email_footer_text', $pubquiz_email_footer_text );
 
 // -----------------------------------------------------------------------
 // 10. A fresh WooCommerce REST API key for the deliver module (#41).

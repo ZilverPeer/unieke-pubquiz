@@ -22,13 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Footer legal identity, spec #142 "Footer and legal block": one place for
- * the values the footer prints, placeholders until the deployment spec
- * (#144's sibling ticket in spec 6) fills them in. Keys mirror the fields
- * competitor research (docs/research/2026-09-competitor-analysis.md) named
- * as required: company name, KvK number, BTW-ID, address, contact email.
- */
-/**
  * The wordmark's literal text (spec #142: "the wordmark is typographic
  * (Archivo 900)"; #143's header/footer decisions: "HTML text `Unieke
  * Pubquiz`"). Not `get_bloginfo( 'name' )`: the WordPress site title is
@@ -38,16 +31,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 define( 'PUBQUIZ_WORDMARK_TEXT', 'Unieke Pubquiz' );
 
-define(
-    'PUBQUIZ_FOOTER_IDENTITY',
-    array(
-        'company_name' => 'Unieke Pubquiz B.V. (placeholder)',
-        'kvk'           => 'KvK 00000000 (placeholder)',
-        'btw'           => 'BTW NL000000000B00 (placeholder)',
-        'address'       => 'Straatnaam 1, 1000 AA Plaatsnaam (placeholder)',
-        'email'         => 'info@uniekepubquiz.nl (placeholder)',
-    )
-);
+/**
+ * Footer legal identity, spec #142 "Footer and legal block": one place for
+ * the values the footer prints, placeholders until the deployment spec
+ * fills them in. Moved out to `inc/identity.php` (ticket #144) so the
+ * bootstrap's mail-branding step can `require` the exact same array by path
+ * for the processing mail's footer text -- see that file's own docblock.
+ */
+define( 'PUBQUIZ_FOOTER_IDENTITY', require __DIR__ . '/inc/identity.php' );
 
 /**
  * Fonts and base styles. `storefront-child-style` (Storefront's own
