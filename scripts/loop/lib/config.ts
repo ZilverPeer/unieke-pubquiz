@@ -26,3 +26,8 @@ export const MAILPIT_URL = `http://127.0.0.1:${MAILPIT_UI_PORT}`;
 
 export const APP_START_TIMEOUT_MS = 120_000;
 export const APP_POLL_INTERVAL_MS = 2_000;
+// Ticket #136: after a freshly spawned app first answers, how long to wait
+// before re-probing it once more -- long enough to catch the 2026-09-09
+// incident (died about 5s after answering), short enough that the whole
+// loop:up run costs at most this much longer.
+export const APP_GRACE_PERIOD_MS = 10_000;
