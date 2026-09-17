@@ -16,3 +16,11 @@ wt-136 (`ticket-136-loop-reprobe`) unit-only, no stack. wt-137 (`ticket-137-fail
 ## 08:2x PR 138 (#136) merged on a read review
 
 Pure `confirmAppStillUp` helper with four unit cases (red: module missing), `APP_GRACE_PERIOD_MS = 10_000`, the re-probe only on the freshly-spawned branch of `ensureAppUp`, runbook sentence. Master check green (361 unit). The empirical `loop:up` run with the merged code follows once #137 no longer needs the app stopped. wt-136 removed.
+
+## 2026-09-17 retro follow-ups closed
+
+- PR 139 (#137) merged: every fail-open path in `pubquiz-checkout-feasibility.php` remembers its reason in the WooCommerce session; on `woocommerce_checkout_order_created` the plugin adds a private `[pubquiz] Feasibility check skipped at checkout: <reason>` note, which the operator mail picks up. Red order #35 (no note, no mail), green order #38 (note plus "[Pubquiz] Order #38 needs attention" in Mailpit). The brief named the wrong hook (`woocommerce_checkout_create_order_line_item` fires before save, the note no-ops); the implementer switched with evidence. `npm run shop:order` bypasses real checkout, so the proof used curl-driven checkout.
+- Standing rules moved into the repo as `docs/agents/standing-rules.md` and the brief template opens with "read it in full". Why: Windows cleaned the Temp copy during a week of inactivity and both implementers ran without it (PRs were fine; the risk was real).
+- PR 138 (#136) verified empirically: `npm run loop:up` on master printed `App: still up after 10 s (pid 9328).` and the app answered 200 on 3000 afterwards.
+- Wave-end: `loop:down` done, port 3000 closed, no worktrees besides main, `~/.wp-env` holds only the loop's own environment. Check-in cron deleted. No drift lines this session.
+- Next: grilling for the storefront design spec, then the PDF deliverable design spec; VPS, payments and real mail last.
