@@ -11,3 +11,5 @@
 ## Verdict
 
 _(Erik fills this in after flipping through the three.)_
+
+Erik, 2026-09-17: **B (Story first)** wins on structure. Accent deep green `#1f5c45`, Archivo headings, Work Sans body, carried into the storefront design spec as fixed decisions. This branch stays as the reference for the child-theme implementers until the spec's tickets are merged, then it is deleted.
