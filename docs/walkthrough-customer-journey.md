@@ -70,6 +70,8 @@ The JSON response carries `"result":"success"` and a `redirect` URL -- the order
 
 ## The order-received page
 
+In the new look (spec 6, #149): the order overview and the order-details table sit as cards on the surface token, same as the checkout order summary; the notice and waiver lines are two calm paragraphs between them; the download link (once the order completes) is an accent button at least 44px tall.
+
 Redirects to `http://localhost:45330/afrekenen/order-received/<order id>/?key=...`. It reads, in Dutch:
 
 > Bedankt. Je bestelling is ontvangen.
@@ -140,6 +142,8 @@ Because the Pubquiz product is sold individually (spec 3c, #83), the only way to
 - `pubquiz-<order number>-2-<locale>.zip` -- Categorieën: ... (the second)
 
 ## My Account downloads (an account created at checkout)
+
+In the new look (spec 6, #149): the account navigation is a horizontal pill list at 1280px wide (stacked at 375px), with the current section in the accent colour; the Downloads, Orders and Addresses tables sit as cards on the surface token, and each download link is an accent button at least 44px tall.
 
 If you ticked **Een account aanmaken?**, the same download links also show up under **Mijn account -> Downloads** (http://localhost:45330/mijn-account/downloads/) for as long as your browser session (or cookie jar) stays logged in from checkout -- no separate login step needed right after placing the order. The page lists, per product: **Product / Resterende downloads / Vervalt / Download** -- one row per Quiz zip, each with **&infin;** (unlimited) and **Nooit** (never expires).
 

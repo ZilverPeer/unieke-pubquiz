@@ -401,6 +401,51 @@ top of what the chrome plugin leaves.
   `shop:up`/`shop:down` (which would also re-rotate the WooCommerce REST key
   -- see "REST credentials" below).
 
+### Pages after paying (#149)
+
+Order-received, login/registration and My Account are styled through
+`assets/css/base.css` under its `/* ---- order-received, account, login
+(#149) ---- */` banner -- CSS only, on WooCommerce's own templates, no
+template override. Selectors covered: `.woocommerce-order-overview` and
+`.woocommerce-order-details table.woocommerce-table--order-details` (cards
+on the surface token, same look as the checkout order summary above,
+left-aligned like the rest of the page rather than centred -- a centred
+card zigzagged against the page's left-aligned headings and billing
+address, fix round 1); `.pubquiz-customer-notice`/`.pubquiz-withdrawal-waiver`
+(one calm paragraph each, same left alignment); `.pubquiz-downloads a` (the
+downloads plugin's own links, styled as accent buttons at least 44px tall
+-- `:link`/`:visited` needed to outrank Storefront's own `.hentry
+.entry-content a` underline rule, checked empirically against an
+order-received page); `.woocommerce-form-login`/`.woocommerce-form-register`
+(single column, `#customer_login`'s own `.col-1`/`.col-2` forced full
+width); `.woocommerce-MyAccount-navigation` (a horizontal pill list from
+768px, stacked below it, `.is-active` in the accent -- `768px`, not
+`1280px`: Storefront's own structural CSS floats
+`.woocommerce-MyAccount-navigation` at `width: 17.65%` and
+`.woocommerce-MyAccount-content` at `width: 76.47%; float: right`, a
+same-specificity single-class selector each, checked via
+`CSS.getMatchedStylesForNode`; flexing the nav's own `<ul>` into a row
+inside that ~18%-wide float still wrapped one item per line, so both
+elements are taken out of the float at the breakpoint instead, fix round
+1); `.woocommerce-MyAccount-content table.shop_table` and
+`.woocommerce-Addresses` (cards on the surface token, padding on `th`/`td`
+rather than the `<table>` element -- `border-collapse: collapse` makes
+table-level padding inert, fix round 1; WooCommerce's own
+`shop_table_responsive` `data-title` rendering handles narrow widths,
+unchanged). Verified empirically (PR bodies of #157 and its fix round):
+curl checkouts with `createaccount=1`, their order-received pages, My
+Account -> Downloads/Orders/Addresses and the login page screenshotted at
+375px and 1280px, no horizontal overflow, six navigation items on one row
+at 1280px; the processing and completed mails of an order kept the
+wordmark, accent, footer text, notice, waiver line and download rows with
+Category names (Mailpit, unchanged by this ticket). My Account ->
+Downloads itself does not print Category names under its rows -- the
+downloads plugin only adds them via the order-item-meta hook the
+order-received/order-view/completed-mail templates share, not via the
+`woocommerce_customer_get_downloadable_products` filter My Account
+Downloads reads from -- a plugin gap, not a styling one, left for a later
+ticket.
+
 ## Landing page (spec 6, #145)
 
 The front page (`http://localhost:45330/`) is the shop's only selling page --
