@@ -221,6 +221,26 @@ textarea,
   border-bottom: 1px solid var(--pubquiz-border);
 }
 
+/*
+ * One row at every width: wordmark (`.pubquiz-site-branding`), the cart
+ * link and the account link (`pubquiz-storefront-chrome.php`, ticket #70)
+ * are three siblings printed straight into `storefront_header`'s own
+ * `.col-full` wrapper (`storefront_header_container`), in that hook order.
+ * Without a flex row here they stack as separate block-level lines --
+ * fixed empirically (ticket #143 fix round 1, screenshots product-375.png
+ * and checkout-1280.png showed the wordmark on its own line with the icons
+ * wrapped underneath at both widths). `margin-left: auto` on the cart link
+ * groups it with the account link that follows it at the right edge,
+ * without needing a wrapper element around a plugin-printed link this
+ * theme doesn't own the markup of.
+ */
+.site-header .col-full {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
 .pubquiz-site-branding {
   display: flex;
   align-items: center;
@@ -252,6 +272,11 @@ a.pubquiz-wordmark:hover {
   border-radius: 8px;
   color: var(--pubquiz-ink);
   text-decoration: none;
+  flex-shrink: 0;
+}
+
+.pubquiz-cart-link {
+  margin-left: auto;
 }
 
 .pubquiz-cart-link:hover,

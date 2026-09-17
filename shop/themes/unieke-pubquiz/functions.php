@@ -82,17 +82,63 @@ add_action(
  * `inc/woocommerce/storefront-woocommerce-template-hooks.php`:
  *
  *   storefront_header:
- *     storefront_site_branding   @ 20  (WordPress: logo/site title)
- *     storefront_product_search  @ 40  (WooCommerce: header search form)
- *     storefront_header_cart     @ 60  (WooCommerce: cart icon + fly-out)
+ *     storefront_header_container        @  0  (opens <div class="col-full">)
+ *     storefront_site_branding           @ 20  (WordPress: logo/site title)
+ *     storefront_header_container_close  @ 41  (closes it, *before* the
+ *                                                cart at 60 -- Storefront
+ *                                                normally reopens a second
+ *                                                `col-full-nav` wrapper via
+ *                                                `storefront_primary_navigation_wrapper`
+ *                                                at 42 for the nav + cart;
+ *                                                the chrome plugin removes
+ *                                                that reopen along with the
+ *                                                nav, ticket #70, so without
+ *                                                this theme's own container
+ *                                                the cart and account links
+ *                                                render outside any
+ *                                                `col-full` at all -- fixed
+ *                                                empirically, ticket #143
+ *                                                fix round 1: the wordmark
+ *                                                sat on its own row with the
+ *                                                icons wrapped underneath at
+ *                                                every width, screenshots
+ *                                                product-375.png and
+ *                                                checkout-1280.png)
+ *     storefront_product_search          @ 40  (WooCommerce: header search form)
+ *     storefront_header_cart             @ 60  (WooCommerce: cart icon + fly-out)
+ *
+ * `storefront_header_container`/`_close` are removed and replaced with this
+ * theme's own open (priority 0) and close (65, after the chrome plugin's
+ * account link at 61) so the wordmark, the cart link and the account link
+ * are all printed inside one `.col-full`, which `assets/css/base.css`
+ * turns into a single flex row (wordmark left, cart and account grouped
+ * right via `margin-left: auto` on the cart link) at every width.
  */
 add_action(
     'init',
     function () {
+        remove_action( 'storefront_header', 'storefront_header_container', 0 );
         remove_action( 'storefront_header', 'storefront_site_branding', 20 );
+        remove_action( 'storefront_header', 'storefront_header_container_close', 41 );
         remove_action( 'storefront_header', 'storefront_product_search', 40 );
         remove_action( 'storefront_header', 'storefront_header_cart', 60 );
     }
+);
+
+add_action(
+    'storefront_header',
+    function () {
+        echo '<div class="col-full">';
+    },
+    0
+);
+
+add_action(
+    'storefront_header',
+    function () {
+        echo '</div>';
+    },
+    65
 );
 
 /**
@@ -182,8 +228,9 @@ add_action(
         printf( '<span>%s</span>', esc_html( $pubquiz_identity['btw'] ) );
         printf( '<span>%s</span>', esc_html( $pubquiz_identity['address'] ) );
         printf(
-            '<a href="mailto:%1$s">%1$s</a>',
-            esc_attr( $pubquiz_identity['email'] )
+            '<a href="%1$s">%2$s</a>',
+            esc_url( 'mailto:' . $pubquiz_identity['email'] ),
+            esc_html( $pubquiz_identity['email'] )
         );
         echo '</div>';
 
