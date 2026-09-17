@@ -458,6 +458,36 @@ a.pubquiz-wordmark:hover {
 }
 
 /*
+ * Ticket #160: the "Een account aanmaken?" checkbox and the withdrawal
+ * waiver checkbox are plain native `<input type="checkbox">` elements (not
+ * hidden, `appearance: auto` -- checked empirically, ticket #160 PR body),
+ * so `accent-color` recolours them directly.
+ */
+.woocommerce-checkout input[type="checkbox"] {
+  accent-color: var(--pubquiz-accent);
+}
+
+/*
+ * Ticket #160: the payment method radio itself is a different case --
+ * Storefront hides the native `<input type="radio">` (`display: none`,
+ * `assets/css/base/icons.css`'s clip-rect visually-hidden pattern) and
+ * draws its own control as a Font Awesome glyph on `label::before`, coloured
+ * by the *checked* rule's `color` property, not by any background, border or
+ * `accent-color` on the (invisible) input -- `accent-color` on the input has
+ * no visual effect at all here (checked empirically: computed `accentColor`
+ * on the input read the accent already, but the rendered glyph stayed
+ * Storefront's purple, ticket #160 PR body, orchestrator correction).
+ * Matches the inline style's selector shape (`#payment .payment_methods li
+ * input[type="radio"]:first-child:checked + label::before`) so this wins on
+ * equal specificity by cascade order (this stylesheet loads after
+ * Storefront's). The unchecked glyph already inherits the ink text colour
+ * (no separate purple rule targets it), so no override needed there.
+ */
+#payment .payment_methods li input[type="radio"]:first-child:checked + label::before {
+  color: var(--pubquiz-accent);
+}
+
+/*
  * Cart: table as a card, same tokens as the checkout order summary. The
  * quantity column is hidden -- the Pubquiz product is sold individually
  * (spec 3c, #83), so WooCommerce always prints a 1-only quantity input
@@ -488,6 +518,20 @@ a.pubquiz-wordmark:hover {
  */
 .woocommerce-cart table.cart td.actions .coupon,
 .cart-collaterals .cross-sells {
+  display: none;
+}
+
+/*
+ * Ticket #160: the placeholder product thumbnail and the "Update
+ * winkelwagen" button have no purpose for a single sold-individually
+ * product (spec 3c, #83) -- the header cell for the now-empty thumbnail
+ * column is hidden too, so the row doesn't carry a blank leading column.
+ * The remove control (`.product-remove`) stays: WooCommerce still posts the
+ * cart form for it through JS, so hiding the update button changes nothing
+ * functional (confirmed empirically, ticket #160 PR body).
+ */
+.woocommerce-cart-form .product-thumbnail,
+.woocommerce-cart-form button[name="update_cart"] {
   display: none;
 }
 

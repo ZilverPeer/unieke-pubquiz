@@ -220,6 +220,18 @@ pubquiz_ensure_option( 'woocommerce_enable_guest_checkout', 'yes' );
 pubquiz_ensure_option( 'woocommerce_enable_signup_and_login_from_checkout', 'yes' );
 // Spec 3c (#83): no Beoordelingen tab or star rating anywhere in the shop.
 pubquiz_ensure_option( 'woocommerce_enable_reviews', 'no' );
+// Ticket #160: coupons are not part of this shop's flow (one product,
+// one price); off removes the "Heb je een waardebon?" prompt and the cart
+// coupon form from the served HTML by itself, no CSS needed.
+pubquiz_ensure_option( 'woocommerce_enable_coupons', 'no' );
+// Ticket #160: WooCommerce's own English default replaced with the Dutch
+// sentences the checkout and account-registration blocks render;
+// `[privacy_policy]` is WooCommerce's own placeholder, replaced with a link
+// to whichever page `wp_page_for_privacy_policy` names (set to the Privacy
+// placeholder page in step 4a below, read at render time, not at write time
+// here, so the order of these two steps doesn't matter).
+pubquiz_ensure_option( 'woocommerce_checkout_privacy_policy_text', 'Je gegevens worden gebruikt om je bestelling te verwerken en je quiz te leveren, zoals beschreven in ons [privacy_policy].' );
+pubquiz_ensure_option( 'woocommerce_registration_privacy_policy_text', 'Je gegevens worden gebruikt om je account aan te maken en je bestellingen te tonen, zoals beschreven in ons [privacy_policy].' );
 
 // -----------------------------------------------------------------------
 // 4. Dutch pages: rename WooCommerce's Shop/Cart/Checkout/My account pages
