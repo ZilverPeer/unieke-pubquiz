@@ -18,3 +18,9 @@ Fixed by me (95% rule), to go into the spec as decisions:
 - No analytics, no cookie banner in this spec.
 
 Prototype dispatched to a Sonnet agent on branch `prototype-storefront` (`shop/prototype/index.html`, variants A "Configurator first", B "Story first", C "Compact card"); Erik picks, then `to-spec`.
+
+## Prototype verdict and competitor research
+
+- Prototype (branch `prototype-storefront`, ba49012): **B "Story first"** wins on structure; accent deep green `#1f5c45`, Archivo headings, Work Sans body (fixed by me, Erik can swap the accent).
+- Erik brought a competitor analysis (`docs/research/2026-09-competitor-analysis.md`, from a claude.ai deep-research chat). Outcomes for the storefront spec: withdrawal-right waiver checkbox at checkout confirmed in the order mail; footer legal block (company, KvK, BTW-ID, address, email; links Voorwaarden, Privacy, Herroeping, Cookies, texts in the deployment spec); "Bekijk een voorbeeld" slot in "Wat krijg je"; copy leads with unique-per-order, category/difficulty/language choice, no repeats; Dutch/Nederland only, Belgium later; prices incl. BTW; working price **€19,95** (mid tier, Erik's call).
+- Roadmap outcomes: next spec is **deliverables design** = PDF styling + a questions-only PowerPoint in every zip (picture images, music cue slides, no answers) + host score sheet as the last page of the quizmaster PDF. Then a **free sample** spec: one fixed Composition re-rendered with the layout via the recompose script, delivered as a €0 WooCommerce product so the email gate and the no-repeat rule come for free. Mollie later (no recurring fee). Theme quizzes are Categories with content, no code.
