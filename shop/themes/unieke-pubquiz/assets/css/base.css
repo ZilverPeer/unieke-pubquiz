@@ -461,3 +461,228 @@ a.pubquiz-wordmark:hover {
 .wc-proceed-to-checkout .checkout-button {
   width: 100%;
 }
+
+/* ---- order-received, account, login (#149) ---- */
+
+/*
+ * Order-received (`.woocommerce-order`, WooCommerce's own `order-received.php`
+ * template): the order overview list and the order-details table as cards
+ * on the surface token, the same look as the checkout order summary
+ * (`#order_review`, above). Markup confirmed empirically against order #54
+ * (curl, PR body): `.woocommerce-order-overview` (a `<ul>`; its `order_details`
+ * class is WooCommerce's own template naming and unrelated to the order
+ * *details table* below despite the shared word), then
+ * `.pubquiz-customer-notice` and `.pubquiz-withdrawal-waiver`
+ * (`pubquiz-customer-notice.php`/`pubquiz-withdrawal-waiver.php`'s own
+ * paragraphs, printed on `woocommerce_thankyou` right after the overview),
+ * then `.woocommerce-order-details` (heading + `.woocommerce-table--order-details`).
+ */
+.woocommerce-order-overview,
+.woocommerce-order-details table.woocommerce-table--order-details {
+  max-width: 640px;
+  margin: 0 auto 24px;
+  background: var(--pubquiz-surface);
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.woocommerce-order-overview {
+  list-style: none;
+}
+
+.woocommerce-order-details table.woocommerce-table--order-details {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* One calm paragraph each, centred with the cards above and below them. */
+.pubquiz-customer-notice,
+.pubquiz-withdrawal-waiver {
+  max-width: 640px;
+  margin: 0 auto 16px;
+  color: var(--pubquiz-ink);
+}
+
+/*
+ * Download links (`pubquiz-downloads.php`'s `.pubquiz-downloads` list,
+ * `woocommerce_order_item_meta_end`): plain `<a>` tags, no `.button` class,
+ * so the global `.button` rule above does not reach them -- accent buttons
+ * here, at least 44px tall like every other primary action on the page.
+ * Storefront's own `style.css` carries `.hentry .entry-content a { text-
+ * decoration: underline }` -- two classes plus an element, same specificity
+ * weight as a one-class-one-pseudo-class selector -- which otherwise beats a
+ * plain `.pubquiz-downloads a` (one class, one element) and leaves the
+ * button-styled link underlined (checked empirically on order #54, PR body).
+ * `:link`/`:visited` count as a class each for specificity, matching that
+ * weight without touching markup this theme doesn't own.
+ */
+.pubquiz-downloads {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.pubquiz-downloads li + li {
+  margin-top: 12px;
+}
+
+.pubquiz-downloads a:link,
+.pubquiz-downloads a:visited {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.pubquiz-downloads a:hover {
+  background: var(--pubquiz-accent-hover);
+  color: var(--pubquiz-accent-contrast);
+}
+
+.pubquiz-downloads-categories {
+  display: block;
+  margin-top: 4px;
+  color: var(--pubquiz-ink);
+}
+
+/*
+ * Login and registration (`.woocommerce-form-login`, `.woocommerce-form-register`
+ * -- My Account registration is off in this shop, per its own settings, so
+ * only the login form ever renders here empirically; the register rule is
+ * kept for when it's switched on, since the decision names both). Single
+ * column at every width: WooCommerce only lays them out in a `.col2-set`
+ * side by side when both render at once, so forcing full width here is
+ * enough without touching `#customer_login`'s own two-column wrapper.
+ */
+#customer_login .col-1,
+#customer_login .col-2 {
+  width: 100%;
+  float: none;
+  margin-right: 0;
+}
+
+.woocommerce-form-login,
+.woocommerce-form-register {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.woocommerce-form-login .form-row,
+.woocommerce-form-register .form-row {
+  margin-bottom: 16px;
+}
+
+.woocommerce-form-login__submit,
+.woocommerce-form-register__submit {
+  width: 100%;
+}
+
+.woocommerce-LostPassword a {
+  color: var(--pubquiz-accent);
+}
+
+/*
+ * My Account navigation (`.woocommerce-MyAccount-navigation`): a horizontal
+ * pill list from 1280px, stacked at 375px (mobile-first: the stacked list
+ * is the unadorned default, the row is the 1280px addition), active item
+ * in the accent. Markup confirmed empirically:
+ * `.woocommerce-MyAccount-navigation-link[--dashboard|--orders|--downloads|
+ * --edit-address|--edit-account|--customer-logout]`, `.is-active` on the
+ * current page's `<li>`.
+ */
+.woocommerce-MyAccount-navigation ul {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.woocommerce-MyAccount-navigation-link a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+  color: var(--pubquiz-ink);
+  text-decoration: none;
+}
+
+.woocommerce-MyAccount-navigation-link a:hover {
+  background: var(--pubquiz-surface);
+  color: var(--pubquiz-accent);
+}
+
+.woocommerce-MyAccount-navigation-link.is-active a {
+  background: var(--pubquiz-accent);
+  color: var(--pubquiz-accent-contrast);
+}
+
+@media (min-width: 1280px) {
+  .woocommerce-MyAccount-navigation ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .woocommerce-MyAccount-navigation-link a {
+    padding: 0 20px;
+  }
+}
+
+/*
+ * My Account content (`.woocommerce-MyAccount-content`): Orders, Downloads
+ * and Addresses tables as cards, same surface token as the order-received
+ * page. `shop_table_responsive` (Orders and Downloads) already carries
+ * WooCommerce's own `data-title` attributes and CSS for stacking rows at
+ * narrow widths (`woocommerce/assets/css/woocommerce.css`, still loading,
+ * see this file's own header comment) -- not reimplemented here, only
+ * carded.
+ */
+.woocommerce-MyAccount-content table.shop_table,
+.woocommerce-MyAccount-content .woocommerce-Addresses {
+  background: var(--pubquiz-surface);
+  border: 1px solid var(--pubquiz-border);
+  border-radius: 12px;
+}
+
+.woocommerce-MyAccount-content table.shop_table {
+  width: 100%;
+  border-collapse: collapse;
+  padding: 8px;
+}
+
+.woocommerce-MyAccount-downloads-file {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Addresses (`.woocommerce-Addresses`, a `.u-columns.col2-set` of two `.woocommerce-Address` cards): single column at 375px, side by side from 1280px. */
+.woocommerce-Addresses.col2-set .col-1,
+.woocommerce-Addresses.col2-set .col-2 {
+  width: 100%;
+  float: none;
+  margin-right: 0;
+  padding: 24px;
+}
+
+@media (min-width: 1280px) {
+  .woocommerce-Addresses.col2-set {
+    display: flex;
+    gap: 24px;
+  }
+
+  .woocommerce-Addresses.col2-set .col-1,
+  .woocommerce-Addresses.col2-set .col-2 {
+    width: 50%;
+  }
+}

@@ -401,6 +401,32 @@ top of what the chrome plugin leaves.
   `shop:up`/`shop:down` (which would also re-rotate the WooCommerce REST key
   -- see "REST credentials" below).
 
+### Pages after paying (#149)
+
+Order-received, login/registration and My Account are styled through
+`assets/css/base.css` under its `/* ---- order-received, account, login
+(#149) ---- */` banner -- CSS only, on WooCommerce's own templates, no
+template override. Selectors covered: `.woocommerce-order-overview` and
+`.woocommerce-order-details table.woocommerce-table--order-details` (cards
+on the surface token, same look as the checkout order summary above),
+`.pubquiz-customer-notice`/`.pubquiz-withdrawal-waiver` (one calm paragraph
+each), `.pubquiz-downloads a` (the downloads plugin's own links, styled as
+accent buttons at least 44px tall -- `:link`/`:visited` needed to outrank
+Storefront's own `.hentry .entry-content a` underline rule, checked
+empirically against order #54's order-received page); `.woocommerce-form-login`/
+`.woocommerce-form-register` (single column, `#customer_login`'s own
+`.col-1`/`.col-2` forced full width); `.woocommerce-MyAccount-navigation`
+(a horizontal pill list from 1280px, stacked below it, `.is-active` in the
+accent); `.woocommerce-MyAccount-content table.shop_table` and
+`.woocommerce-Addresses` (cards on the surface token; WooCommerce's own
+`shop_table_responsive` `data-title` rendering handles narrow widths,
+unchanged). Verified empirically (PR body): order #54 (curl checkout,
+`createaccount=1`), its order-received, My Account -> Downloads/Orders/
+Addresses and the login page screenshotted at 375px and 1280px, no
+horizontal overflow; the processing and completed mails of that order kept
+the wordmark, accent, footer text, notice, waiver line and download rows
+with Category names (Mailpit, unchanged by this ticket).
+
 ## Landing page (spec 6, #145)
 
 The front page (`http://localhost:45330/`) is the shop's only selling page --
