@@ -37,12 +37,14 @@ import { existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { createSupabaseClient, resolveLocalStackConfig } from "../../src/repository";
 import { isPidAlive, type PidAliveDeps } from "./lib/pid-alive";
+import { confirmAppStillUp } from "./lib/confirm-app-still-up";
 import { formatSupabaseStartedLine, formatSupabaseStartFailure, parseSupabaseStatusResult } from "./lib/supabase-status";
 import { formatShopSetupLines } from "./lib/shop-setup-summary";
 import { readSetupResultFile } from "../shop/lib/setup-result-file";
 import { waitUntilUrlAnswers } from "./lib/wait-for-url";
 import { deletePidFile, readPidFile, writePidFile } from "./lib/pidfile";
 import {
+  APP_GRACE_PERIOD_MS,
   APP_POLL_INTERVAL_MS,
   APP_START_TIMEOUT_MS,
   APP_URL,
@@ -211,6 +213,25 @@ async function ensureAppUp(): Promise<void> {
     );
   }
   console.log(`App: ${APP_URL} is up (pid ${child.pid}).`);
+
+  // Ticket #136 (retro follow-up to the 2026-09-09 dead-app incident): the
+  // app answered once here, but on that incident it died about 5s later
+  // without anything telling Erik -- the pid file and the printed summary
+  // both still claimed it was up. Only this branch (a freshly spawned
+  // process) re-probes after a grace period; the "already answers, reusing
+  // it" and "pid file names a live process" branches above are unaffected.
+  await new Promise((resolve) => setTimeout(resolve, APP_GRACE_PERIOD_MS));
+  const stillUp = confirmAppStillUp({
+    pidAlive: isPidAlive(child.pid, pidAliveDeps()),
+    urlAnswers: await waitUntilUrlAnswers(APP_URL, { timeoutMs: 1, intervalMs: 1 }),
+  });
+  if (!stillUp.ok) {
+    deletePidFile(NEXT_DEV_PID_PATH);
+    throw new Error(
+      `App: died within ${APP_GRACE_PERIOD_MS / 1000}s of coming up (${stillUp.reason}). Check ${NEXT_DEV_LOG_PATH} for the reason.`,
+    );
+  }
+  console.log(`App: still up after ${APP_GRACE_PERIOD_MS / 1000} s (pid ${child.pid}).`);
 }
 
 async function main() {

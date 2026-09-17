@@ -29,6 +29,8 @@ starts the whole loop (the Supabase stack, the shop with Mailpit and the cron ti
 
 ### Troubleshooting
 
+If `npm run loop:up` prints `App: died within 10s of coming up (...)` instead of `App: still up after 10 s (pid N).` (ticket #136, retro follow-up to a 2026-09-09 incident where the app died silently after answering once), open the app log it names and re-run `npm run loop:up`.
+
 If an order sits in `processing` for more than a minute, check `docker ps` for `pubquiz-cron-ticker` -- if it's missing or stuck, kick the scheduler by hand as a fallback:
 
 ```sh
