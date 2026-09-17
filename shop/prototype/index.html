@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<!--
+PROTOTYPE, throwaway: three variants of the landing page, switchable via ?variant=. Delete after the storefront spec is written.
+Question: "What should the Unieke Pubquiz shop's landing page look like?"
+-->
+<title>Unieke Pubquiz — prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Source+Sans+3:wght@400;500;600&family=Archivo:wght@400;500;900&family=Work+Sans:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body data-active-variant="A">
+
+<!-- ============================================================ -->
+<!-- VARIANT A — Configurator first                                -->
+<!-- ============================================================ -->
+<section class="variant variant-a" data-variant="A" aria-label="Variant A — Configurator first">
+
+  <header class="site-header">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <div class="header-icons">
+      <button type="button" class="icon-btn" aria-label="Winkelwagen">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-2 4h13M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" aria-label="Account">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20c1.6-3.6 4.6-5.4 7.5-5.4s5.9 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="hero hero-split">
+    <div class="hero-copy">
+      <h1>Een complete, unieke pubquiz — klaar in enkele minuten</h1>
+      <p class="hero-lede">Als PDF en muziekronde-MP3, speciaal voor jou samengesteld: klaar om te printen en vanavond nog te hosten bij jou thuis.</p>
+      <a class="btn-primary btn-cta" href="#configurator-a">Stel je quiz samen</a>
+      <svg class="hero-doodle" viewBox="0 0 200 120" width="220" aria-hidden="true">
+        <rect x="10" y="20" width="70" height="90" rx="6" fill="none" stroke="var(--accent)" stroke-width="3"/>
+        <line x1="24" y1="40" x2="66" y2="40" stroke="var(--accent)" stroke-width="3"/>
+        <line x1="24" y1="55" x2="66" y2="55" stroke="var(--accent)" stroke-width="3"/>
+        <line x1="24" y1="70" x2="50" y2="70" stroke="var(--accent)" stroke-width="3"/>
+        <circle cx="140" cy="55" r="34" fill="none" stroke="var(--accent)" stroke-width="3"/>
+        <path d="M126 55a14 14 0 1128 0 14 14 0 01-28 0z" fill="var(--accent)"/>
+      </svg>
+    </div>
+
+    <div class="configurator card" id="configurator-a">
+      <h2>Stel je quiz samen</h2>
+
+      <fieldset class="field">
+        <legend>Taal</legend>
+        <div class="control-toggle">
+          <input type="radio" name="taal-a" id="taal-nl-a" checked>
+          <label for="taal-nl-a">Nederlands</label>
+          <input type="radio" name="taal-a" id="taal-en-a">
+          <label for="taal-en-a">Engels</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Moeilijkheid</legend>
+        <div class="control-segmented">
+          <input type="radio" name="moeilijkheid-a" id="moeilijk-makkelijk-a">
+          <label for="moeilijk-makkelijk-a">Makkelijk</label>
+          <input type="radio" name="moeilijkheid-a" id="moeilijk-gemiddeld-a">
+          <label for="moeilijk-gemiddeld-a">Gemiddeld</label>
+          <input type="radio" name="moeilijkheid-a" id="moeilijk-moeilijk-a">
+          <label for="moeilijk-moeilijk-a">Moeilijk</label>
+          <input type="radio" name="moeilijkheid-a" id="moeilijk-gemengd-a" checked>
+          <label for="moeilijk-gemengd-a">Gemengd</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Categorieën</legend>
+        <div class="chips" data-max="8">
+          <button type="button" class="chip">Sport</button>
+          <button type="button" class="chip">Geschiedenis</button>
+          <button type="button" class="chip">Muziek</button>
+          <button type="button" class="chip">Aardrijkskunde</button>
+          <button type="button" class="chip">Wetenschap</button>
+          <button type="button" class="chip">Film en TV</button>
+          <button type="button" class="chip">Literatuur</button>
+          <button type="button" class="chip">Algemene Kennis</button>
+        </div>
+        <p class="helper-text">Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.</p>
+        <p class="cap-message" hidden>Kies maximaal 8 categorieën.</p>
+      </fieldset>
+
+      <div class="price-row">
+        <span class="price">&euro;14,95</span>
+        <button type="button" class="btn-primary btn-bestellen">Bestellen</button>
+      </div>
+      <p class="prototype-feedback" role="status" hidden>Dit is een prototype — er wordt niets besteld.</p>
+    </div>
+  </section>
+
+  <section class="how-it-works">
+    <h2>Hoe werkt het</h2>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Kies je categorieën</li>
+      <li><span class="step-num">2</span>Betaal</li>
+      <li><span class="step-num">3</span>Binnen enkele minuten de downloadlink in je mail</li>
+    </ol>
+  </section>
+
+  <section class="what-you-get">
+    <h2>Wat krijg je</h2>
+    <p class="structure-note">8 rondes: 6 tekstrondes, 1 fotoronde, 1 muziekronde — 10 vragen per ronde.</p>
+    <div class="deliverable-grid">
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="20" x2="68" y2="20" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="32" x2="68" y2="32" stroke="#ccc" stroke-width="2"/><line x1="12" y1="42" x2="68" y2="42" stroke="#ccc" stroke-width="2"/><line x1="12" y1="60" x2="68" y2="60" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="72" x2="68" y2="72" stroke="#ccc" stroke-width="2"/></svg>
+        <h3>Quizmaster-PDF</h3>
+        <p>Alle vragen, antwoorden en weetjes.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><rect x="10" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="44" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="10" y="44" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="44" y="44" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>
+        <h3>Fotoronde-PDF</h3>
+        <p>Genummerde afbeeldingen voor de teams.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="1" y1="50" x2="79" y2="50" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/><line x1="40" y1="1" x2="40" y2="99" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/></svg>
+        <h3>Antwoordbladen-PDF</h3>
+        <p>Eén per team, om uit te knippen.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><circle cx="30" cy="70" r="9" fill="var(--accent)"/><rect x="38" y="30" width="2.5" height="42" fill="var(--accent)"/><path d="M40 30 L60 24 L60 34 L40 40 Z" fill="var(--accent)"/></svg>
+        <h3>Muziekronde-MP3</h3>
+        <p>10 fragmenten met aankondiging.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq">
+    <h2>Veelgestelde vragen</h2>
+    <div class="faq-list">
+      <details><summary>Voor hoeveel mensen?</summary><p>Voor elk gezelschap — druk zoveel antwoordbladen af als je teams hebt.</p></details>
+      <details><summary>Hoe lang duurt een quiz?</summary><p>Reken op een avondvullend programma, ongeveer 1,5 tot 2 uur met 8 rondes.</p></details>
+      <details><summary>Moet ik iets installeren?</summary><p>Nee. Je krijgt een PDF en een MP3 in je mail, klaar om te printen en af te spelen.</p></details>
+      <details><summary>Kan ik dezelfde quiz twee keer krijgen?</summary><p>Nee. Elke bestelling levert nieuwe vragen — je krijgt nooit dezelfde vraag twee keer.</p></details>
+      <details><summary>Krijg ik mijn geld terug?</summary><p>Het is een digitaal product: zodra je de bestanden hebt ontvangen, is terugbetalen niet meer mogelijk. Kloppen de bestanden niet? Mail ons, dan lossen we het op.</p></details>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <nav aria-label="Footer">
+      <a href="#">Privacy</a>
+      <a href="#">Voorwaarden</a>
+      <a href="#">Contact</a>
+    </nav>
+  </footer>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT B — Story first                                       -->
+<!-- ============================================================ -->
+<section class="variant variant-b" data-variant="B" aria-label="Variant B — Story first">
+
+  <header class="site-header">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <div class="header-icons">
+      <button type="button" class="icon-btn" aria-label="Winkelwagen">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-2 4h13M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" aria-label="Account">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20c1.6-3.6 4.6-5.4 7.5-5.4s5.9 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="hero hero-story">
+    <h1>Jouw avond. Jouw quiz. Niemand anders zijn quiz.</h1>
+    <p class="hero-lede">Een complete, unieke pubquiz — als PDF en muziekronde-MP3, klaar om te printen en te hosten bij jou thuis. Binnen enkele minuten gegenereerd, speciaal voor jou.</p>
+    <a class="btn-primary btn-cta" href="#configurator-b">Stel je quiz samen</a>
+  </section>
+
+  <section class="how-it-works how-it-works-story">
+    <h2>Hoe werkt het</h2>
+    <ol class="steps steps-story">
+      <li><span class="step-num">1</span><span>Kies je categorieën</span></li>
+      <li><span class="step-num">2</span><span>Betaal</span></li>
+      <li><span class="step-num">3</span><span>Binnen enkele minuten de downloadlink in je mail</span></li>
+    </ol>
+  </section>
+
+  <section class="what-you-get what-you-get-spread">
+    <h2>Wat krijg je</h2>
+    <p class="structure-note">8 rondes: 6 tekstrondes, 1 fotoronde, 1 muziekronde — 10 vragen per ronde.</p>
+    <div class="deliverable-spread">
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="20" x2="68" y2="20" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="32" x2="68" y2="32" stroke="#ccc" stroke-width="2"/><line x1="12" y1="42" x2="68" y2="42" stroke="#ccc" stroke-width="2"/><line x1="12" y1="60" x2="68" y2="60" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="72" x2="68" y2="72" stroke="#ccc" stroke-width="2"/></svg>
+        <h3>Quizmaster-PDF</h3>
+        <p>Alle vragen, antwoorden en weetjes.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><rect x="10" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="44" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="10" y="44" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="44" y="44" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>
+        <h3>Fotoronde-PDF</h3>
+        <p>Genummerde afbeeldingen voor de teams.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="1" y1="50" x2="79" y2="50" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/><line x1="40" y1="1" x2="40" y2="99" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/></svg>
+        <h3>Antwoordbladen-PDF</h3>
+        <p>Eén per team, om uit te knippen.</p>
+      </div>
+      <div class="deliverable-card">
+        <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><circle cx="30" cy="70" r="9" fill="var(--accent)"/><rect x="38" y="30" width="2.5" height="42" fill="var(--accent)"/><path d="M40 30 L60 24 L60 34 L40 40 Z" fill="var(--accent)"/></svg>
+        <h3>Muziekronde-MP3</h3>
+        <p>10 fragmenten met aankondiging.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="configurator configurator-full" id="configurator-b">
+    <h2>Stel je quiz samen</h2>
+    <div class="configurator-steps">
+      <fieldset class="field">
+        <legend>Taal</legend>
+        <div class="control-toggle">
+          <input type="radio" name="taal-b" id="taal-nl-b" checked>
+          <label for="taal-nl-b">Nederlands</label>
+          <input type="radio" name="taal-b" id="taal-en-b">
+          <label for="taal-en-b">Engels</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Moeilijkheid</legend>
+        <div class="control-segmented">
+          <input type="radio" name="moeilijkheid-b" id="moeilijk-makkelijk-b">
+          <label for="moeilijk-makkelijk-b">Makkelijk</label>
+          <input type="radio" name="moeilijkheid-b" id="moeilijk-gemiddeld-b">
+          <label for="moeilijk-gemiddeld-b">Gemiddeld</label>
+          <input type="radio" name="moeilijkheid-b" id="moeilijk-moeilijk-b">
+          <label for="moeilijk-moeilijk-b">Moeilijk</label>
+          <input type="radio" name="moeilijkheid-b" id="moeilijk-gemengd-b" checked>
+          <label for="moeilijk-gemengd-b">Gemengd</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Categorieën</legend>
+        <div class="chips" data-max="8">
+          <button type="button" class="chip">Sport</button>
+          <button type="button" class="chip">Geschiedenis</button>
+          <button type="button" class="chip">Muziek</button>
+          <button type="button" class="chip">Aardrijkskunde</button>
+          <button type="button" class="chip">Wetenschap</button>
+          <button type="button" class="chip">Film en TV</button>
+          <button type="button" class="chip">Literatuur</button>
+          <button type="button" class="chip">Algemene Kennis</button>
+        </div>
+        <p class="helper-text">Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.</p>
+        <p class="cap-message" hidden>Kies maximaal 8 categorieën.</p>
+      </fieldset>
+    </div>
+    <div class="price-row">
+      <span class="price">&euro;14,95</span>
+      <button type="button" class="btn-primary btn-bestellen">Bestellen</button>
+    </div>
+    <p class="prototype-feedback" role="status" hidden>Dit is een prototype — er wordt niets besteld.</p>
+  </section>
+
+  <section class="faq">
+    <h2>Veelgestelde vragen</h2>
+    <div class="faq-list">
+      <details><summary>Voor hoeveel mensen?</summary><p>Voor elk gezelschap — druk zoveel antwoordbladen af als je teams hebt.</p></details>
+      <details><summary>Hoe lang duurt een quiz?</summary><p>Reken op een avondvullend programma, ongeveer 1,5 tot 2 uur met 8 rondes.</p></details>
+      <details><summary>Moet ik iets installeren?</summary><p>Nee. Je krijgt een PDF en een MP3 in je mail, klaar om te printen en af te spelen.</p></details>
+      <details><summary>Kan ik dezelfde quiz twee keer krijgen?</summary><p>Nee. Elke bestelling levert nieuwe vragen — je krijgt nooit dezelfde vraag twee keer.</p></details>
+      <details><summary>Krijg ik mijn geld terug?</summary><p>Het is een digitaal product: zodra je de bestanden hebt ontvangen, is terugbetalen niet meer mogelijk. Kloppen de bestanden niet? Mail ons, dan lossen we het op.</p></details>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <nav aria-label="Footer">
+      <a href="#">Privacy</a>
+      <a href="#">Voorwaarden</a>
+      <a href="#">Contact</a>
+    </nav>
+  </footer>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT C — Compact card                                      -->
+<!-- ============================================================ -->
+<section class="variant variant-c" data-variant="C" aria-label="Variant C — Compact card">
+
+  <header class="site-header">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <div class="header-icons">
+      <button type="button" class="icon-btn" aria-label="Winkelwagen">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-2 4h13M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" aria-label="Account">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20c1.6-3.6 4.6-5.4 7.5-5.4s5.9 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="store-card-wrap">
+    <div class="configurator card store-card" id="configurator-c">
+      <span class="wordmark wordmark-card">Unieke Pubquiz</span>
+      <p class="hero-lede hero-lede-compact">Een complete, unieke pubquiz als PDF en muziekronde-MP3 — klaar in enkele minuten, om te printen en te hosten bij jou thuis.</p>
+
+      <fieldset class="field">
+        <legend>Taal</legend>
+        <div class="control-toggle">
+          <input type="radio" name="taal-c" id="taal-nl-c" checked>
+          <label for="taal-nl-c">Nederlands</label>
+          <input type="radio" name="taal-c" id="taal-en-c">
+          <label for="taal-en-c">Engels</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Moeilijkheid</legend>
+        <div class="control-segmented">
+          <input type="radio" name="moeilijkheid-c" id="moeilijk-makkelijk-c">
+          <label for="moeilijk-makkelijk-c">Makkelijk</label>
+          <input type="radio" name="moeilijkheid-c" id="moeilijk-gemiddeld-c">
+          <label for="moeilijk-gemiddeld-c">Gemiddeld</label>
+          <input type="radio" name="moeilijkheid-c" id="moeilijk-moeilijk-c">
+          <label for="moeilijk-moeilijk-c">Moeilijk</label>
+          <input type="radio" name="moeilijkheid-c" id="moeilijk-gemengd-c" checked>
+          <label for="moeilijk-gemengd-c">Gemengd</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Categorieën</legend>
+        <div class="chips" data-max="8">
+          <button type="button" class="chip">Sport</button>
+          <button type="button" class="chip">Geschiedenis</button>
+          <button type="button" class="chip">Muziek</button>
+          <button type="button" class="chip">Aardrijkskunde</button>
+          <button type="button" class="chip">Wetenschap</button>
+          <button type="button" class="chip">Film en TV</button>
+          <button type="button" class="chip">Literatuur</button>
+          <button type="button" class="chip">Algemene Kennis</button>
+        </div>
+        <p class="helper-text">Zonder keuze krijgt elke ronde een willekeurige categorie. Kies categorieën als je ze in je quiz wilt.</p>
+        <p class="cap-message" hidden>Kies maximaal 8 categorieën.</p>
+      </fieldset>
+
+      <div class="price-row">
+        <span class="price">&euro;14,95</span>
+        <button type="button" class="btn-primary btn-bestellen">Bestellen</button>
+      </div>
+      <p class="prototype-feedback" role="status" hidden>Dit is een prototype — er wordt niets besteld.</p>
+    </div>
+
+    <div class="accordions">
+      <details>
+        <summary>Hoe werkt het</summary>
+        <ol class="steps">
+          <li><span class="step-num">1</span>Kies je categorieën</li>
+          <li><span class="step-num">2</span>Betaal</li>
+          <li><span class="step-num">3</span>Binnen enkele minuten de downloadlink in je mail</li>
+        </ol>
+      </details>
+      <details>
+        <summary>Wat krijg je</summary>
+        <p class="structure-note">8 rondes: 6 tekstrondes, 1 fotoronde, 1 muziekronde — 10 vragen per ronde.</p>
+        <div class="deliverable-grid deliverable-grid-compact">
+          <div class="deliverable-card">
+            <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="20" x2="68" y2="20" stroke="var(--accent)" stroke-width="2"/><line x1="12" y1="32" x2="68" y2="32" stroke="#ccc" stroke-width="2"/><line x1="12" y1="42" x2="68" y2="42" stroke="#ccc" stroke-width="2"/></svg>
+            <h3>Quizmaster-PDF</h3>
+            <p>Alle vragen, antwoorden en weetjes.</p>
+          </div>
+          <div class="deliverable-card">
+            <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><rect x="10" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="44" y="10" width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>
+            <h3>Fotoronde-PDF</h3>
+            <p>Genummerde afbeeldingen voor de teams.</p>
+          </div>
+          <div class="deliverable-card">
+            <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><line x1="1" y1="50" x2="79" y2="50" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/></svg>
+            <h3>Antwoordbladen-PDF</h3>
+            <p>Eén per team, om uit te knippen.</p>
+          </div>
+          <div class="deliverable-card">
+            <svg class="thumb" viewBox="0 0 80 100" aria-hidden="true"><rect x="1" y="1" width="78" height="98" rx="4" fill="#fff" stroke="var(--accent)" stroke-width="2"/><circle cx="30" cy="70" r="9" fill="var(--accent)"/><rect x="38" y="30" width="2.5" height="42" fill="var(--accent)"/></svg>
+            <h3>Muziekronde-MP3</h3>
+            <p>10 fragmenten met aankondiging.</p>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>Veelgestelde vragen</summary>
+        <div class="faq-list">
+          <details><summary>Voor hoeveel mensen?</summary><p>Voor elk gezelschap — druk zoveel antwoordbladen af als je teams hebt.</p></details>
+          <details><summary>Hoe lang duurt een quiz?</summary><p>Reken op een avondvullend programma, ongeveer 1,5 tot 2 uur met 8 rondes.</p></details>
+          <details><summary>Moet ik iets installeren?</summary><p>Nee. Je krijgt een PDF en een MP3 in je mail, klaar om te printen en af te spelen.</p></details>
+          <details><summary>Kan ik dezelfde quiz twee keer krijgen?</summary><p>Nee. Elke bestelling levert nieuwe vragen — je krijgt nooit dezelfde vraag twee keer.</p></details>
+          <details><summary>Krijg ik mijn geld terug?</summary><p>Het is een digitaal product: zodra je de bestanden hebt ontvangen, is terugbetalen niet meer mogelijk. Kloppen de bestanden niet? Mail ons, dan lossen we het op.</p></details>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <span class="wordmark">Unieke Pubquiz</span>
+    <nav aria-label="Footer">
+      <a href="#">Privacy</a>
+      <a href="#">Voorwaarden</a>
+      <a href="#">Contact</a>
+    </nav>
+  </footer>
+</section>
+
+<!-- Floating prototype switcher — not part of any design -->
+<div class="prototype-switcher" id="prototype-switcher">
+  <button type="button" class="switcher-arrow" id="switcher-prev" aria-label="Vorige variant">&#8592;</button>
+  <span class="switcher-label" id="switcher-label">A — Configurator first</span>
+  <button type="button" class="switcher-arrow" id="switcher-next" aria-label="Volgende variant">&#8594;</button>
+</div>
+
+<script src="prototype.js"></script>
+</body>
+</html>

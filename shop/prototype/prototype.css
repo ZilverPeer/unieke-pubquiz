@@ -1,0 +1,426 @@
+/* PROTOTYPE, throwaway — see index.html top comment. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+body {
+  font-family: 'Source Sans 3', sans-serif;
+  line-height: 1.5;
+}
+
+img, svg { max-width: 100%; }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 3px solid #1a1a1a;
+  outline-offset: 2px;
+}
+
+/* ---- variant visibility ---- */
+.variant { display: none; }
+body[data-active-variant="A"] .variant[data-variant="A"],
+body[data-active-variant="B"] .variant[data-variant="B"],
+body[data-active-variant="C"] .variant[data-variant="C"] {
+  display: block;
+}
+
+/* ---- palettes & type per variant ---- */
+.variant-a {
+  --accent: #c8511c;
+  --accent-contrast: #fff;
+  --font-heading: 'Poppins', sans-serif;
+  --font-body: 'Source Sans 3', sans-serif;
+}
+.variant-b {
+  --accent: #1f5c45;
+  --accent-contrast: #fff;
+  --font-heading: 'Archivo', sans-serif;
+  --font-body: 'Work Sans', sans-serif;
+}
+.variant-c {
+  --accent: #b3116e;
+  --accent-contrast: #fff;
+  --font-heading: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+.variant { font-family: var(--font-body); }
+.variant :is(h1, h2, h3, .wordmark, .step-num) { font-family: var(--font-heading); }
+.variant :focus-visible { outline-color: var(--accent); }
+
+/* ---- header ---- */
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eee;
+}
+.wordmark {
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.header-icons { display: flex; gap: 8px; }
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.icon-btn:hover { background: #f2f2f2; }
+
+/* ---- buttons ---- */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(0.92); }
+
+.prototype-feedback {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* ---- generic sections ---- */
+section.hero, .how-it-works, .what-you-get, .faq, .configurator-full {
+  padding: 48px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 16px; }
+h2 { font-size: 1.5rem; margin: 0 0 24px; }
+.hero-lede { font-size: 1.1rem; color: #333; max-width: 46ch; }
+
+/* ---- fields / fieldset ---- */
+fieldset.field {
+  border: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+fieldset.field legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+/* toggle (Taal) */
+.control-toggle {
+  display: inline-flex;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.control-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.control-toggle label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+.control-toggle input:checked + label {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* segmented (Moeilijkheid) */
+.control-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: #f2f2f2;
+  border-radius: 10px;
+  padding: 4px;
+}
+.control-segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.control-segmented label {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+.control-segmented input:checked + label {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* chips (Categorieën) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 2px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.helper-text, .cap-message {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 10px 0 0;
+}
+.cap-message { color: #b3261e; font-weight: 600; }
+
+.price-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.price { font-size: 1.4rem; font-weight: 700; }
+
+/* ---- how it works ---- */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.05rem;
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ---- what you get ---- */
+.structure-note { color: #444; margin-bottom: 24px; }
+.deliverable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+.deliverable-card { text-align: left; }
+.deliverable-card .thumb { width: 90px; height: auto; margin-bottom: 8px; }
+.deliverable-card h3 { font-size: 1rem; margin: 0 0 4px; }
+.deliverable-card p { margin: 0; font-size: 0.9rem; color: #444; }
+
+/* ---- faq ---- */
+.faq-list details {
+  border-bottom: 1px solid #e5e5e5;
+  padding: 14px 0;
+}
+.faq-list summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.faq-list p { color: #333; margin: 10px 0 0; }
+
+/* ---- footer ---- */
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32px 24px;
+  border-top: 1px solid #eee;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.site-footer nav { display: flex; gap: 20px; }
+.site-footer a {
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.site-footer a:hover { text-decoration: underline; }
+
+/* ===================================================== */
+/* Variant A — configurator first, two-column hero        */
+/* ===================================================== */
+.variant-a .hero-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+}
+.variant-a .hero-copy { display: flex; flex-direction: column; gap: 16px; }
+.variant-a .hero-doodle { margin-top: 24px; }
+.variant-a .card {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 28px;
+}
+@media (min-width: 900px) {
+  .variant-a .hero-split { grid-template-columns: 1fr 1fr; }
+}
+
+/* ===================================================== */
+/* Variant B — story first, long scroll                   */
+/* ===================================================== */
+.variant-b .hero-story {
+  text-align: center;
+  padding-top: 72px;
+  padding-bottom: 72px;
+}
+.variant-b .hero-story h1 {
+  font-weight: 900;
+  font-size: 2.6rem;
+  max-width: 16ch;
+  margin: 0 auto 20px;
+}
+.variant-b .hero-story .hero-lede { margin: 0 auto 28px; }
+.variant-b .how-it-works-story { text-align: center; }
+.variant-b .steps-story { justify-items: center; max-width: 420px; margin: 0 auto; }
+.variant-b .deliverable-spread {
+  display: flex;
+  overflow-x: auto;
+  gap: 20px;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+}
+.variant-b .deliverable-spread .deliverable-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+}
+.variant-b .configurator-full {
+  background: #f4f8f6;
+  max-width: none;
+  padding: 56px 24px;
+}
+.variant-b .configurator-full h2,
+.variant-b .configurator-full .price-row { max-width: 1100px; margin-left: auto; margin-right: auto; }
+.variant-b .configurator-steps {
+  display: grid;
+  gap: 32px;
+  max-width: 1100px;
+  margin: 0 auto 24px;
+}
+@media (min-width: 900px) {
+  .variant-b .configurator-steps { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ===================================================== */
+/* Variant C — compact card                                */
+/* ===================================================== */
+.variant-c .store-card-wrap {
+  max-width: 480px;
+  margin: 32px auto;
+  padding: 0 16px 48px;
+}
+.variant-c .store-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  padding: 28px;
+  text-align: left;
+}
+.variant-c .wordmark-card { display: block; font-size: 1.4rem; margin-bottom: 8px; }
+.variant-c .hero-lede-compact { font-size: 1rem; margin: 0 0 20px; max-width: none; }
+.variant-c .accordions { margin-top: 20px; }
+.variant-c .accordions > details {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.variant-c .accordions > details summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.variant-c .deliverable-grid-compact { grid-template-columns: repeat(2, 1fr); }
+.variant-c .accordions .faq-list details {
+  border: none;
+  padding: 10px 0;
+}
+
+/* ---- floating prototype switcher (not part of any design) ---- */
+.prototype-switcher {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  z-index: 1000;
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+.switcher-arrow {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.switcher-arrow:hover { background: #444; }
+.switcher-label { white-space: nowrap; padding: 0 4px; }
+
+/* ---- mobile safety ---- */
+@media (max-width: 400px) {
+  h1 { font-size: 1.6rem; }
+  .variant-b .hero-story h1 { font-size: 2rem; }
+  .price-row { flex-wrap: wrap; }
+}
