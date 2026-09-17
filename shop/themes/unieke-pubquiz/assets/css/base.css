@@ -476,31 +476,47 @@ a.pubquiz-wordmark:hover {
  * (`pubquiz-customer-notice.php`/`pubquiz-withdrawal-waiver.php`'s own
  * paragraphs, printed on `woocommerce_thankyou` right after the overview),
  * then `.woocommerce-order-details` (heading + `.woocommerce-table--order-details`).
+ *
+ * Left-aligned (`margin-left: 0`, no `margin: 0 auto`), not centred: the
+ * page's own headings, the billing-address block below and the checkout
+ * summary above all sit at the left edge of the content column, so a
+ * centred card zigzagged against them (fix round 1, PR 157 review, checked
+ * on order #58's order-received page at 1280px).
  */
 .woocommerce-order-overview,
 .woocommerce-order-details table.woocommerce-table--order-details {
   max-width: 640px;
-  margin: 0 auto 24px;
+  margin: 0 0 24px;
   background: var(--pubquiz-surface);
   border: 1px solid var(--pubquiz-border);
   border-radius: 12px;
-  padding: 24px;
 }
 
 .woocommerce-order-overview {
   list-style: none;
+  padding: 24px;
 }
 
+/*
+ * `border-collapse: collapse` makes padding on the `<table>` element itself
+ * inert (checked empirically, fix round 1 PR body); the card's inner gutter
+ * has to live on the cells instead.
+ */
 .woocommerce-order-details table.woocommerce-table--order-details {
   width: 100%;
   border-collapse: collapse;
 }
 
-/* One calm paragraph each, centred with the cards above and below them. */
+.woocommerce-order-details table.woocommerce-table--order-details th,
+.woocommerce-order-details table.woocommerce-table--order-details td {
+  padding: 16px 24px;
+}
+
+/* One calm paragraph each, left-aligned with the cards above and below them (see their own comment above). */
 .pubquiz-customer-notice,
 .pubquiz-withdrawal-waiver {
   max-width: 640px;
-  margin: 0 auto 16px;
+  margin: 0 0 16px;
   color: var(--pubquiz-ink);
 }
 
@@ -591,13 +607,35 @@ a.pubquiz-wordmark:hover {
 
 /*
  * My Account navigation (`.woocommerce-MyAccount-navigation`): a horizontal
- * pill list from 1280px, stacked at 375px (mobile-first: the stacked list
- * is the unadorned default, the row is the 1280px addition), active item
+ * pill list from 768px, stacked at 375px (mobile-first: the stacked list
+ * is the unadorned default, the row is the 768px addition), active item
  * in the accent. Markup confirmed empirically:
  * `.woocommerce-MyAccount-navigation-link[--dashboard|--orders|--downloads|
  * --edit-address|--edit-account|--customer-logout]`, `.is-active` on the
  * current page's `<li>`.
+ *
+ * Storefront's own structural CSS (`woocommerce.css`) floats
+ * `.woocommerce-MyAccount-navigation` at `width: 17.65%` and
+ * `.woocommerce-MyAccount-content` at `width: 76.47%; float: right`
+ * (`woocommerce_account_navigation`/`woocommerce_account_content`'s own
+ * two-column layout) -- a bare, single-class selector each, checked via
+ * `CSS.getMatchedStylesForNode` against the live page (fix round 1 PR
+ * body). Flexing `ul` into a row inside that ~18%-wide float still wraps
+ * one item per line (checked empirically at 1280px, same PR body: the
+ * reviewer's and this ticket's own `downloads-1280.png` both showed a
+ * stacked list) -- the float itself has to go, at the same breakpoint
+ * (`768px`, comfortably under any width this shop styles), same
+ * specificity, loaded later so it wins on the tie.
  */
+@media (min-width: 768px) {
+  .woocommerce-MyAccount-navigation,
+  .woocommerce-MyAccount-content {
+    float: none;
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
 .woocommerce-MyAccount-navigation ul {
   list-style: none;
   margin: 0 0 24px;
@@ -627,7 +665,7 @@ a.pubquiz-wordmark:hover {
   color: var(--pubquiz-accent-contrast);
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 768px) {
   .woocommerce-MyAccount-navigation ul {
     flex-direction: row;
     flex-wrap: wrap;
@@ -645,7 +683,9 @@ a.pubquiz-wordmark:hover {
  * WooCommerce's own `data-title` attributes and CSS for stacking rows at
  * narrow widths (`woocommerce/assets/css/woocommerce.css`, still loading,
  * see this file's own header comment) -- not reimplemented here, only
- * carded.
+ * carded. `border-collapse: collapse` makes padding on the `<table>`
+ * element itself inert, same issue as the order-details table above (fix
+ * round 1 PR body) -- the gutter lives on the cells instead.
  */
 .woocommerce-MyAccount-content table.shop_table,
 .woocommerce-MyAccount-content .woocommerce-Addresses {
@@ -657,7 +697,11 @@ a.pubquiz-wordmark:hover {
 .woocommerce-MyAccount-content table.shop_table {
   width: 100%;
   border-collapse: collapse;
-  padding: 8px;
+}
+
+.woocommerce-MyAccount-content table.shop_table th,
+.woocommerce-MyAccount-content table.shop_table td {
+  padding: 12px 16px;
 }
 
 .woocommerce-MyAccount-downloads-file {
