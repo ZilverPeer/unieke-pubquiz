@@ -235,3 +235,23 @@ add_action(
     },
     20
 );
+
+/**
+ * Configurator button label (#146, ticket brief "Decisions": "Button
+ * label: `Bestellen` via the `woocommerce_product_single_add_to_cart_text`
+ * filter ... guarded on `is_front_page() || is_shop()`; that is the only
+ * `functions.php` change."). Guarded the same way `archive-product.php`
+ * guards which page gets the landing markup, so the plugin's own default
+ * text ("Toevoegen aan winkelwagen") keeps showing anywhere else this
+ * filter might otherwise run (there is no other selling page today, but
+ * the guard costs nothing and matches the template's own condition).
+ */
+add_filter(
+    'woocommerce_product_single_add_to_cart_text',
+    function ( $pubquiz_text ) {
+        if ( is_front_page() || is_shop() ) {
+            return __( 'Bestellen', 'unieke-pubquiz' );
+        }
+        return $pubquiz_text;
+    }
+);
