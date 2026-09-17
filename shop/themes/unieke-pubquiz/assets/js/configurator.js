@@ -31,6 +31,10 @@
 	 * @param {string} optionClass
 	 */
 	function enhanceSelect( select, groupClass, optionClass ) {
+		if ( select.classList.contains( 'pubquiz-enhanced' ) ) {
+			return;
+		}
+
 		var container = select.closest( '.wapf-field-container' );
 		var fieldId = select.getAttribute( 'data-field-id' ) || '';
 		var labelEl = container ? container.querySelector( '.wapf-field-label label' ) : null;

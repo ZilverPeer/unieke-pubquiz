@@ -205,7 +205,8 @@ add_filter(
                     continue;
                 }
 
-                $locale = (string) $item->get_meta( 'pubquiz_locale', true );
+                $locale     = (string) $item->get_meta( 'pubquiz_locale', true );
+                $categories = pubquiz_categories_summary_for_item( $item );
                 foreach ( $urls as $sequence => $url ) {
                     $filename    = pubquiz_zip_filename( $order->get_id(), $sequence, $locale );
                     $downloads[] = array(
@@ -223,11 +224,51 @@ add_filter(
                             'name' => $filename,
                             'file' => $url,
                         ),
+                        // Not a WooCommerce-recognised key; read back only by
+                        // the woocommerce_account_downloads_column_download-product
+                        // hook below, to print the category names under the
+                        // filename the same way the order-view/mail row does
+                        // (pubquiz_render_download_links() above).
+                        'pubquiz_categories'  => $categories,
                     );
                 }
             }
         }
 
         return $downloads;
+    }
+);
+
+/**
+ * My Account -> Downloads: prints the product-name column ourselves so the
+ * category names can sit beneath the filename, the same look as the
+ * order-view/completed-mail row (`pubquiz_render_download_links()` above).
+ * `woocommerce_account_downloads_column_<column_id>` (WooCommerce's own
+ * per-column override hook, `order/order-downloads.php`) fully replaces the
+ * template's default `download-product` cell once anything is hooked to it,
+ * so the product-url/product-name branching the template would otherwise do
+ * is reproduced here rather than left out. `$download` is one row built by
+ * the `woocommerce_customer_get_downloadable_products` filter above, so its
+ * `pubquiz_categories` key is only ever present there; every other
+ * WooCommerce-native download row (there are none in this shop, but the
+ * hook is not scoped to Pubquiz rows) falls through with an empty list and
+ * still renders the plain product name.
+ */
+add_action(
+    'woocommerce_account_downloads_column_download-product',
+    function ( $download ) {
+        if ( ! empty( $download['product_url'] ) ) {
+            printf( '<a href="%1$s">%2$s</a>', esc_url( $download['product_url'] ), esc_html( $download['product_name'] ) );
+        } else {
+            echo esc_html( $download['product_name'] );
+        }
+
+        $categories = ! empty( $download['pubquiz_categories'] ) ? $download['pubquiz_categories'] : array();
+        if ( ! empty( $categories ) ) {
+            printf(
+                '<br><small class="pubquiz-downloads-categories">%s</small>',
+                esc_html( 'Categorieën: ' . implode( ', ', $categories ) )
+            );
+        }
     }
 );

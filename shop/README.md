@@ -236,6 +236,10 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
   but the product page's own `<p class="price">` shows the bare amount with
   no wording at all -- so `woocommerce_price_display_suffix` is set to
   `incl. btw`, not left empty, to cover that one spot too.
+- **Price format (ticket #158).** `woocommerce_price_decimal_sep=,` and
+  `woocommerce_price_thousand_sep=.` so every shown price reads the Dutch
+  `€19,95`, not WooCommerce's own English-default `€19.95`;
+  `woocommerce_price_num_decimals` stays `2` (WooCommerce's own default).
 - **Mail branding (ticket #144, spec #142 "Mails").** `setup-shop.php` sets
   WooCommerce's transactional-email options: `woocommerce_email_header_image`
   to the theme's wordmark PNG, read via `content_url( 'themes/unieke-pubquiz/assets/wordmark.png' )`

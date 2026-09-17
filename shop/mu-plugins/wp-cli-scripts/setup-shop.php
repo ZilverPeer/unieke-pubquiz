@@ -298,6 +298,10 @@ foreach ( $pubquiz_placeholder_pages as $pubquiz_page_slug => $pubquiz_page_titl
                 'post_content' => PUBQUIZ_PLACEHOLDER_PAGE_BODY,
             )
         );
+        if ( is_wp_error( $pubquiz_page_id ) ) {
+            pubquiz_log( 'Could not create page ' . $pubquiz_page_slug . ': ' . $pubquiz_page_id->get_error_message() );
+            continue;
+        }
         pubquiz_log( "Created page {$pubquiz_page_title} ({$pubquiz_page_slug})" );
     } else {
         $pubquiz_page_id = $pubquiz_page->ID;
@@ -539,6 +543,13 @@ pubquiz_ensure_option( 'woocommerce_tax_display_shop', 'incl' );
 pubquiz_ensure_option( 'woocommerce_tax_display_cart', 'incl' );
 pubquiz_ensure_option( 'woocommerce_tax_total_display', 'single' );
 pubquiz_ensure_option( 'woocommerce_price_display_suffix', 'incl. btw' );
+
+// Dutch price format (ticket #158, spec 6 batched fixes): WooCommerce's
+// defaults are the English `.`/`,` separators, so every shown price read
+// "€19.95" instead of the Dutch "€19,95" -- `woocommerce_price_num_decimals`
+// is unaffected and stays 2.
+pubquiz_ensure_option( 'woocommerce_price_decimal_sep', ',' );
+pubquiz_ensure_option( 'woocommerce_price_thousand_sep', '.' );
 
 define( 'PUBQUIZ_TAX_RATE_COUNTRY', 'NL' );
 define( 'PUBQUIZ_TAX_RATE_NAME', 'BTW' );

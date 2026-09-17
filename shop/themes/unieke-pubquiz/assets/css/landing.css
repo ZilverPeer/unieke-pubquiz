@@ -235,6 +235,23 @@
   border: 0;
 }
 
+/*
+ * Focus ring for the toggle/segmented buttons (spec 6, #158): Storefront's
+ * own `style.css` carries `button:focus { outline: ...; }` at a bare
+ * element-plus-pseudo-class specificity, which otherwise wins over
+ * `.pubquiz-toggle-option:focus-visible`/`.pubquiz-segmented-option:focus-visible`
+ * (one class each, same weight, loses on source order) and shows Storefront's
+ * 2px purple ring instead of this theme's 3px accent one (base.css's global
+ * `:focus-visible` rule, same values, repeated here since a bare `:focus-visible`
+ * alone still loses the specificity fight the same way). `#samenstellen` is
+ * this section's own id, so `#samenstellen [role="radio"]:focus-visible`
+ * outranks Storefront's rule regardless of load order.
+ */
+#samenstellen [role="radio"]:focus-visible {
+  outline: 3px solid var(--pubquiz-focus);
+  outline-offset: 2px;
+}
+
 /* Taal: two-option toggle (prototype B, branch prototype-storefront, commit ba49012, `.control-toggle`) */
 #samenstellen .pubquiz-toggle {
   display: inline-flex;
@@ -278,7 +295,7 @@
 }
 
 #samenstellen .pubquiz-segmented-option {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   background: transparent;
   color: var(--pubquiz-ink);
