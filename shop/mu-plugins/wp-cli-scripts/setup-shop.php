@@ -87,15 +87,22 @@ if ( ! is_array( $pubquiz_categories ) || empty( $pubquiz_categories ) ) {
 
 // -----------------------------------------------------------------------
 // 1. Theme: Storefront is installed declaratively by .wp-env.json's
-//    `themes` array; only activate it if it isn't already active.
+//    `themes` array and stays installed as the parent theme (ADR-0001);
+//    the Unieke Pubquiz child theme (ticket #143) is bind-mounted the same
+//    way `.wp-env.json` mounts the mu-plugins, under its own
+//    `wp-content/themes/unieke-pubquiz` mapping, so it never needs
+//    downloading here -- only activating, once, same idempotent
+//    read-before-write check as before (spec #142: "the theme owns the
+//    look, must-use plugins own behaviour").
 // -----------------------------------------------------------------------
 define( 'PUBQUIZ_STOREFRONT_THEME_SLUG', 'storefront' );
+define( 'PUBQUIZ_THEME_SLUG', 'unieke-pubquiz' );
 
-if ( get_stylesheet() !== PUBQUIZ_STOREFRONT_THEME_SLUG ) {
-    pubquiz_log( 'Activating theme ' . PUBQUIZ_STOREFRONT_THEME_SLUG );
-    switch_theme( PUBQUIZ_STOREFRONT_THEME_SLUG );
+if ( get_stylesheet() !== PUBQUIZ_THEME_SLUG ) {
+    pubquiz_log( 'Activating theme ' . PUBQUIZ_THEME_SLUG );
+    switch_theme( PUBQUIZ_THEME_SLUG );
 } else {
-    pubquiz_log( 'Theme already active: ' . PUBQUIZ_STOREFRONT_THEME_SLUG );
+    pubquiz_log( 'Theme already active: ' . PUBQUIZ_THEME_SLUG );
 }
 
 // -----------------------------------------------------------------------

@@ -1,0 +1,19 @@
+/*
+Theme Name: Unieke Pubquiz
+Theme URI: https://github.com/ZilverPeer/unieke-pubquiz
+Author: Unieke Pubquiz
+Description: Child theme of Storefront carrying the Unieke Pubquiz brand -- tokens, self-hosted fonts, wordmark, header and footer (ticket #143). Storefront stays the parent theme (ADR-0001); this theme owns the look, the must-use plugins own behaviour (spec #142).
+Template: storefront
+Version: 1.0.0
+Text Domain: unieke-pubquiz
+*/
+
+/*
+ * WordPress requires this file (the theme header above) and auto-enqueues
+ * it as `storefront-child-style` (Storefront's own `child_scripts()`,
+ * after the parent style) -- see functions.php's "Fonts and base styles"
+ * comment. The actual rules live in assets/css/base.css so the theme
+ * header stays a pure declarations file; @import keeps them in the same
+ * stylesheet Storefront enqueues, at the same cascade position.
+ */
+@import url('assets/css/base.css');
