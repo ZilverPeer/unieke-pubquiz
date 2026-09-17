@@ -37,6 +37,14 @@ add_action(
                 $this->method_description = 'Always succeeds and sets the order to processing. Local development only.';
                 $this->has_fields         = false;
                 $this->title              = 'Test payment (local only)';
+                // WooCommerce's own get_description() passes this property straight
+                // to wp_kses_post(); left unset it stays null, and PHP 8.1's
+                // preg_replace() logs "Passing null to parameter #3 ($subject) of
+                // type string is deprecated" into the checkout's payment block on
+                // every request with a cart (#160, found by the PR 159 Spec
+                // reviewer). An explicit empty string is valid input and prints
+                // nothing, same as before this fix.
+                $this->description        = '';
 
                 $this->init_form_fields();
                 $this->init_settings();

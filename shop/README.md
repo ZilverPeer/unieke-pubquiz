@@ -144,10 +144,17 @@ idempotently, via `shop/mu-plugins/wp-cli-scripts/setup-shop.php` (see
   `woocommerce_enable_guest_checkout=yes`,
   `woocommerce_enable_signup_and_login_from_checkout=yes`,
   `woocommerce_enable_reviews=no` (spec 3c, #83: no Beoordelingen tab or
-  star rating anywhere in the shop) -- option names verified against the
-  installed WooCommerce itself (`wp option list --search=woocommerce_*`),
-  not assumed. `setup-shop.php` reads each option first and only calls
-  `update_option()` when the value differs.
+  star rating anywhere in the shop), `woocommerce_enable_coupons=no`
+  (ticket #160: no coupons in this shop's flow -- off removes the "Heb je
+  een waardebon?" prompt and the cart coupon form by itself, no CSS needed),
+  `woocommerce_checkout_privacy_policy_text` and
+  `woocommerce_registration_privacy_policy_text` set to Dutch sentences
+  ending in WooCommerce's own `[privacy_policy]` placeholder, which it
+  replaces with a link to whichever page `wp_page_for_privacy_policy` names
+  (the Privacy placeholder page, ticket #144) -- option names verified
+  against the installed WooCommerce itself (`wp option list
+  --search=woocommerce_*`), not assumed. `setup-shop.php` reads each option
+  first and only calls `update_option()` when the value differs.
 - **Product.** The Pubquiz product's name, short description and
   (placeholder, 14.95 EUR) price are Dutch, set by `setup-shop.php`'s
   `pubquiz_ensure_product()` both at creation and, so a re-run converges an
@@ -1139,7 +1146,30 @@ Storefront's own `table.cart td.actions .coupon` (which also sets `display:
 inline-block` above `min-width: 768px`) -- `.woocommerce-cart .coupon`
 alone lost that specificity fight and the form still showed at 1280px
 (checked empirically, ticket #147 PR body);
-`.woocommerce-cart table.cart td.actions .coupon` wins outright.
+`.woocommerce-cart table.cart td.actions .coupon` wins outright. Since
+ticket #160 turned `woocommerce_enable_coupons` off, WooCommerce no longer
+prints the coupon form or prompt at all -- this CSS rule stays as a
+defensive fallback, same reasoning as the cross-sells rule above it.
+
+**Gateway description, accent controls, hidden cart controls (ticket
+#160).** `pubquiz-test-gateway.php`'s constructor sets `$this->description
+= ''` -- left unset, WooCommerce's `get_description()` passes `null` to
+`wp_kses_post()` and PHP 8.1 logs a `Deprecated` line into the checkout's
+payment block on every request with a cart. In `base.css`: the "Een account
+aanmaken?" and withdrawal waiver checkboxes are plain native controls, so
+`accent-color: var(--pubquiz-accent)` on `.woocommerce-checkout
+input[type="checkbox"]` recolours them directly; the payment method radio
+is not -- Storefront hides the native `<input type="radio">` and draws its
+own glyph on `label::before`, coloured by that pseudo-element's `color`
+property when checked, so the fix targets `#payment .payment_methods li
+input[type="radio"]:first-child:checked + label::before { color:
+var(--pubquiz-accent); }` instead (matching Storefront's own selector shape
+so it wins on cascade order at equal specificity). In the cart:
+`.woocommerce-cart-form .product-thumbnail` (both the header and body
+cells) and `.woocommerce-cart-form button[name="update_cart"]` are hidden
+-- neither has a purpose for a single sold-individually product; the remove
+control stays and keeps working (WooCommerce still posts the cart form for
+it through JS).
 
 **Verified empirically (ticket #147), red first.** On the unfixed shop, the
 walkthrough's curl add-to-cart answered `200` (no redirect), and the
